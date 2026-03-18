@@ -1,0 +1,2 @@
+- Never ever change anything in `types.ts` without explicit permission.
+- Never ever change any existing tests without explicit permission.
