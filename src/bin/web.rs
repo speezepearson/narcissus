@@ -89,6 +89,9 @@ struct TapeView {
     state: String,
     head: i64,
     len: i64,
+    /// For display centering (may differ from head for raw tape views).
+    #[serde(skip)]
+    display_center: i64,
     tape: Vec<Option<String>>,
 }
 
@@ -130,16 +133,29 @@ fn build_tape_view(
     len: i64,
     sym_fn: impl Fn(usize) -> String,
 ) -> TapeView {
-    let tape: Vec<Option<String>> = (head - WINDOW..=head + WINDOW)
+    build_tape_view_centered(state, head, len, head, len, sym_fn)
+}
+
+/// Like build_tape_view but the tape window is centered on `display_center`
+/// (in a tape of `display_len` symbols), while head/len report different values.
+fn build_tape_view_centered(
+    state: String,
+    head: i64,
+    len: i64,
+    display_center: i64,
+    display_len: i64,
+    sym_fn: impl Fn(usize) -> String,
+) -> TapeView {
+    let tape: Vec<Option<String>> = (display_center - WINDOW..=display_center + WINDOW)
         .map(|pos| {
-            if pos < 0 || pos >= len {
+            if pos < 0 || pos >= display_len {
                 None
             } else {
                 Some(sym_fn(pos as usize))
             }
         })
         .collect();
-    TapeView { state, head, len, tape }
+    TapeView { state, head, len, display_center, tape }
 }
 
 fn w1sym_char(s: W1Sym) -> char {
@@ -175,13 +191,17 @@ async fn handle_state(State(app): State<SharedApp>) -> Json<StateResponse> {
     let middle_decoded = utm::decode_running_state(&middle_tape);
 
     let middle = middle_decoded.as_ref().map(|md| {
+        // Center the display on the raw UtmSym position of the head cell,
+        // but report head/len as cell indices.
         let hash_pos = middle_tape.iter().position(|s| matches!(s, UtmSym::Hash));
         let cell_width = 1 + md.state_bits + 1 + md.symbol_bits + 1;
         let data_start = hash_pos.map(|h| h + 1).unwrap_or(0);
         let raw_head = data_start + md.head_pos * cell_width;
 
-        build_tape_view(
+        build_tape_view_centered(
             format!("{}", md.state),
+            md.head_pos as i64,
+            md.tape_syms.len() as i64,
             raw_head as i64,
             middle_tape.len() as i64,
             |pos| utmsym_char(middle_tape[pos]).to_string(),
