@@ -1,7 +1,9 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-use axum::{extract::State, response::Html, routing::get, Json, Router};
-use serde::Serialize;
+use axum::{extract::{Query, State}, response::Html, routing::get, Json, Router};
+use serde::{Deserialize, Serialize};
 use utmmmmm::tm::{Dir, TuringMachine};
 use utmmmmm::utm::{self, UtmSym, UtmState};
 
@@ -35,6 +37,8 @@ struct App {
     inner_sym_table: Vec<W1Sym>,
     initial_tape: Vec<UtmSym>,
     sim: Mutex<UtmState>,
+    /// Steps per second (0 = unlimited).
+    sps: AtomicU64,
 }
 
 impl App {
@@ -48,7 +52,10 @@ impl App {
         let inner_sym_table = build_sym_table(&w1);
 
         let sim = Mutex::new(UtmState::new(&outer_tape));
-        App { outer_sym_table, inner_sym_table, initial_tape: outer_tape, sim }
+        App {
+            outer_sym_table, inner_sym_table, initial_tape: outer_tape, sim,
+            sps: AtomicU64::new(0), // unlimited
+        }
     }
 
     fn reset(&self) {
@@ -81,6 +88,7 @@ type SharedApp = Arc<App>;
 struct TapeView {
     state: String,
     head: i64,
+    len: i64,
     tape: Vec<Option<String>>,
 }
 
@@ -89,6 +97,7 @@ struct StateResponse {
     steps: u64,
     halted: bool,
     accepted: bool,
+    sps: u64,
     outer: TapeView,
     middle: Option<TapeView>,
     inner: Option<TapeView>,
@@ -130,7 +139,7 @@ fn build_tape_view(
             }
         })
         .collect();
-    TapeView { state, head, tape }
+    TapeView { state, head, len, tape }
 }
 
 fn w1sym_char(s: W1Sym) -> char {
@@ -145,9 +154,6 @@ fn w1sym_char(s: W1Sym) -> char {
 async fn handle_state(State(app): State<SharedApp>) -> Json<StateResponse> {
     let sim = app.sim.lock().unwrap();
 
-    // === Outer: the interpreter simulating the UTM TM ===
-    // Each outer data cell holds a (state_index, symbol_index).
-    // Symbol indices map to outer_sym_table (UtmSym values).
     let outer = build_tape_view(
         format!("{}", sim.current_state),
         sim.head_pos as i64,
@@ -160,29 +166,17 @@ async fn handle_state(State(app): State<SharedApp>) -> Json<StateResponse> {
         },
     );
 
-    // === Reconstruct the UTM TM's tape as Vec<UtmSym> ===
-    // This tape is encode(write1, []) as modified during simulation.
     let middle_tape: Vec<UtmSym> = sim.cells.iter()
         .map(|(_, sym_idx)| {
             app.outer_sym_table.get(*sym_idx as usize).copied().unwrap_or(UtmSym::Blank)
         })
         .collect();
 
-    // === Middle: the UTM TM's tape shown as UtmSym chars ===
-    // Decode the middle tape to find write1's head position in the data cells.
-    // Then show the raw UtmSym tape centered on write1's head cell.
     let middle_decoded = utm::decode_running_state(&middle_tape);
 
     let middle = middle_decoded.as_ref().map(|md| {
-        // Find where in the UtmSym tape the data region's head cell is.
-        // The hash is somewhere in the middle tape; data starts after it.
-        // Each data cell is [<state_bits><symbol_bits>|<symbol_bits>] =
-        //   1 + state_bits + symbol_bits + 1 + symbol_bits + 1 chars... no,
-        //   format is [ss|a] = 1 + 2 + 1 + 1 + 1 = 6 chars for state_bits=2,sym_bits=1.
-        // But actually cell format is [ss|a] where ss = state_bits zeros/ones.
-        // Let me just find the hash in middle_tape and compute.
         let hash_pos = middle_tape.iter().position(|s| matches!(s, UtmSym::Hash));
-        let cell_width = 1 + md.state_bits + 1 + md.symbol_bits + 1; // [ss|a]
+        let cell_width = 1 + md.state_bits + 1 + md.symbol_bits + 1;
         let data_start = hash_pos.map(|h| h + 1).unwrap_or(0);
         let raw_head = data_start + md.head_pos * cell_width;
 
@@ -194,7 +188,6 @@ async fn handle_state(State(app): State<SharedApp>) -> Json<StateResponse> {
         )
     });
 
-    // === Inner: write1's tape decoded from the middle ===
     let inner = middle_decoded.as_ref().map(|md| {
         build_tape_view(
             format!("{}", md.state),
@@ -213,10 +206,21 @@ async fn handle_state(State(app): State<SharedApp>) -> Json<StateResponse> {
         steps: sim.steps,
         halted: sim.halted,
         accepted: sim.accepted,
+        sps: app.sps.load(Ordering::Relaxed),
         outer,
         middle,
         inner,
     })
+}
+
+#[derive(Deserialize)]
+struct SpeedParams {
+    sps: u64,
+}
+
+async fn handle_speed(State(app): State<SharedApp>, Query(params): Query<SpeedParams>) -> &'static str {
+    app.sps.store(params.sps, Ordering::Relaxed);
+    "ok"
 }
 
 async fn handle_reset(State(app): State<SharedApp>) -> &'static str {
@@ -244,6 +248,9 @@ button { background: #333; color: #0f0; border: 1px solid #0f0; padding: 5px 15p
          cursor: pointer; font-family: monospace; margin-right: 10px; }
 button:hover { background: #050; }
 .info { color: #888; margin-bottom: 10px; }
+label { color: #888; margin-right: 5px; }
+input[type=range] { vertical-align: middle; }
+.speed-val { color: #0f0; margin-left: 5px; }
 </style>
 </head>
 <body>
@@ -251,6 +258,10 @@ button:hover { background: #050; }
 <div class="controls">
   <button onclick="doReset()">Reset</button>
   <span class="info" id="info">steps: 0</span>
+  <br><br>
+  <label>Speed:</label>
+  <input type="range" id="speed" min="0" max="7" value="0" oninput="setSpeed()">
+  <span class="speed-val" id="speed-val">unlimited</span>
 </div>
 
 <h2>Outer: UTM TM state (being simulated by interpreter)</h2>
@@ -266,6 +277,17 @@ button:hover { background: #050; }
 <span class="head-line" id="inner-head"></span></pre>
 
 <script>
+// Speed steps: 0=unlimited, 1=1, 2=10, 3=100, 4=1000, 5=10000, 6=100000, 7=1000000
+const SPEED_LEVELS = [0, 1, 10, 100, 1000, 10000, 100000, 1000000];
+const SPEED_LABELS = ['unlimited', '1/s', '10/s', '100/s', '1k/s', '10k/s', '100k/s', '1M/s'];
+
+function setSpeed() {
+    const idx = parseInt(document.getElementById('speed').value);
+    const sps = SPEED_LEVELS[idx];
+    document.getElementById('speed-val').textContent = SPEED_LABELS[idx];
+    fetch('/speed?sps=' + sps);
+}
+
 function renderTape(tapeArr) {
     return tapeArr.map(s => {
         if (s === null) return ' ';
@@ -273,8 +295,8 @@ function renderTape(tapeArr) {
     }).join('');
 }
 
-function renderHead(state, pos) {
-    return ' '.repeat(20) + '^ (state=' + state + ') (pos=' + pos + ')';
+function renderHead(state, pos, len) {
+    return ' '.repeat(20) + '^ (state=' + state + ') (pos=' + pos + '/' + len + ')';
 }
 
 function renderView(prefix, view) {
@@ -284,7 +306,7 @@ function renderView(prefix, view) {
         return;
     }
     document.getElementById(prefix + '-tape').textContent = renderTape(view.tape);
-    document.getElementById(prefix + '-head').textContent = renderHead(view.state, view.head);
+    document.getElementById(prefix + '-head').textContent = renderHead(view.state, view.head, view.len);
 }
 
 async function refresh() {
@@ -321,29 +343,69 @@ async fn main() {
     let app = Arc::new(App::new());
     let app_clone = Arc::clone(&app);
 
-    // Stepping thread: step the UTM interpreter continuously
+    // Stepping thread: step the UTM interpreter with rate limiting
     std::thread::spawn(move || {
+        let mut last_step = Instant::now();
+        let mut steps_this_second: u64 = 0;
+        let mut second_start = Instant::now();
+
         loop {
+            let sps = app_clone.sps.load(Ordering::Relaxed);
+
             {
                 let mut sim = app_clone.sim.lock().unwrap();
                 if sim.halted {
                     drop(sim);
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    std::thread::sleep(Duration::from_millis(100));
+                    steps_this_second = 0;
+                    second_start = Instant::now();
                     continue;
                 }
-                for _ in 0..1000 {
-                    if !sim.step() {
-                        break;
+
+                if sps == 0 {
+                    // Unlimited: step in batches
+                    for _ in 0..1000 {
+                        if !sim.step() { break; }
+                    }
+                } else {
+                    // Rate limited: step up to sps per second
+                    let now = Instant::now();
+                    if now.duration_since(second_start) >= Duration::from_secs(1) {
+                        steps_this_second = 0;
+                        second_start = now;
+                    }
+
+                    if steps_this_second < sps {
+                        // Step a batch proportional to sps, but not more than remaining budget
+                        let remaining = sps - steps_this_second;
+                        let batch = remaining.min(100).max(1);
+                        for _ in 0..batch {
+                            if !sim.step() { break; }
+                            steps_this_second += 1;
+                        }
                     }
                 }
             }
-            std::thread::yield_now();
+
+            let sps = app_clone.sps.load(Ordering::Relaxed);
+            if sps == 0 {
+                std::thread::yield_now();
+            } else {
+                // Sleep to pace steps. For low sps, sleep longer.
+                let sleep_us = if sps <= 100 {
+                    1_000_000 / sps.max(1)
+                } else {
+                    1_000 // 1ms for higher rates
+                };
+                std::thread::sleep(Duration::from_micros(sleep_us));
+            }
         }
     });
 
     let router = Router::new()
         .route("/", get(handle_index))
         .route("/state", get(handle_state))
+        .route("/speed", get(handle_speed))
         .route("/reset", get(handle_reset))
         .with_state(app);
 
