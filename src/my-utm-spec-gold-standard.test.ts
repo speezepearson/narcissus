@@ -10,7 +10,7 @@ import {
   step,
   type TuringMachineSnapshot,
 } from "./types";
-import { myUtmSpec } from "./my-utm-spec";
+import { makeInitUtmSnapshot, myUtmSpec } from "./my-utm-spec";
 import {
   acceptImmediatelySpec,
   checkPalindromeSpec,
@@ -55,6 +55,13 @@ describe("myUtmSpec gold standard tests", () => {
       const decoded = myUtmSpec.decode(tm.spec, makeInitSnapshot(myUtmSpec, encoded));
       expect(decoded).toEqual(tm);
     });
+
+    it('can encode/decode itself', () => {
+      const simulated = makeInitUtmSnapshot(makeInitSnapshot(flipBitsSpec, ["0"]));
+      const simulator = makeInitUtmSnapshot(simulated);
+      const decoded = myUtmSpec.decode(myUtmSpec, simulator);
+      expect(decoded).toEqual(simulated);
+    })
   });
 
   describe("rules", () => {
@@ -100,11 +107,8 @@ describe("myUtmSpec gold standard tests", () => {
 
   describe("recursion", () => {
     it("can simulate itself", () => {
-      const baseTm = makeInitSnapshot(checkPalindromeSpec, ["a", "b", "a"]);
-      const utm = makeInitSnapshot(
-        myUtmSpec,
-        myUtmSpec.encode(makeInitSnapshot(myUtmSpec, myUtmSpec.encode(baseTm))),
-      );
+      const baseTm = makeInitSnapshot(flipBitsSpec, ["0", "1"]);
+      const utm = makeInitUtmSnapshot(makeInitUtmSnapshot(baseTm));
 
       run(baseTm);
       run(utm);

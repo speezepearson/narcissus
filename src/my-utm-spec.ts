@@ -1,8 +1,9 @@
-import type {
-  Dir,
-  TuringMachineSnapshot,
-  TuringMachineSpec,
-  UtmSpec,
+import {
+  makeInitSnapshot,
+  type Dir,
+  type TuringMachineSnapshot,
+  type TuringMachineSpec,
+  type UtmSpec,
 } from "./types";
 
 // ════════════════════════════════════════════════════════════════════
@@ -1413,3 +1414,7 @@ export const myUtmSpec: UtmSpec<MyUtmState, MyUtmSymbol> = {
   encode,
   decode,
 };
+
+export function makeInitUtmSnapshot<State extends string, Symbol extends string>(snapshot: TuringMachineSnapshot<State, Symbol> ): TuringMachineSnapshot<MyUtmState, MyUtmSymbol> {
+  return makeInitSnapshot(myUtmSpec, myUtmSpec.encode(snapshot));
+}
