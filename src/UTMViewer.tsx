@@ -71,6 +71,115 @@ function sectionForIndex(
   return undefined;
 }
 
+// ── Section collapsing ──
+// For sections longer than CAP, show: first BOOKEND + sliding middle + last BOOKEND.
+// The middle shrinks by ELLIPSIS_WIDTH when it's disjoint from both bookends,
+// so the total visual width (chars + ellipses) stays constant.
+
+type IndexRange = { from: number; to: number }; // inclusive
+
+const SECTION_CAP = 100;
+const SECTION_BOOKEND = 20;
+const ELLIPSIS_WIDTH = 3; // visual width of "..." in monospace chars
+
+function collapseSection(
+  start: number,
+  end: number,
+  headPos: number,
+): IndexRange[] {
+  const len = end - start + 1;
+  if (len <= SECTION_CAP) return [{ from: start, to: end }];
+
+  const aTo = start + SECTION_BOOKEND - 1;
+  const cFrom = end - SECTION_BOOKEND + 1;
+
+  // When middle is disjoint from both bookends, there are 2 internal gaps (2 ellipses).
+  // When adjacent to one bookend, 1 gap. Budget the middle so total visual width is constant:
+  // baseline = SECTION_CAP + 1 ellipsis (prefix...suffix when merged with middle).
+  // With 2 gaps we need middleBudget + ELLIPSIS_WIDTH = fullMiddleBudget, so
+  // middleBudget = fullMiddleBudget - ELLIPSIS_WIDTH.
+  const fullMiddleBudget = SECTION_CAP - 2 * SECTION_BOOKEND;
+
+  // First compute position with full budget to determine adjacency
+  const bMinStart = aTo + 1;
+  const bMaxEnd = cFrom - 1;
+  const fullBMaxStart = bMaxEnd - fullMiddleBudget + 1;
+
+  let bFrom: number;
+  if (headPos < bMinStart) {
+    bFrom = bMinStart;
+  } else if (headPos > fullBMaxStart + fullMiddleBudget - 1) {
+    bFrom = fullBMaxStart;
+  } else {
+    bFrom = Math.max(bMinStart, Math.min(fullBMaxStart, headPos - Math.floor(fullMiddleBudget / 2)));
+  }
+
+  // Check adjacency with full budget
+  const adjacentToPrefix = bFrom === bMinStart;
+  const adjacentToSuffix = bFrom + fullMiddleBudget - 1 === bMaxEnd;
+
+  if (adjacentToPrefix || adjacentToSuffix) {
+    // 1 internal gap — use full budget
+    return [
+      { from: start, to: aTo },
+      { from: bFrom, to: bFrom + fullMiddleBudget - 1 },
+      { from: cFrom, to: end },
+    ];
+  }
+
+  // 2 internal gaps — shrink middle to compensate for extra ellipsis
+  const shrunkBudget = fullMiddleBudget - ELLIPSIS_WIDTH;
+  const shrunkBMaxStart = bMaxEnd - shrunkBudget + 1;
+  bFrom = Math.max(bMinStart, Math.min(shrunkBMaxStart, headPos - Math.floor(shrunkBudget / 2)));
+
+  return [
+    { from: start, to: aTo },
+    { from: bFrom, to: bFrom + shrunkBudget - 1 },
+    { from: cFrom, to: end },
+  ];
+}
+
+function computeVisibleRanges(
+  tapeLen: number,
+  headPos: number,
+  sections: { name: SectionName; start: number; end: number }[] | undefined,
+  visibleRadius: number | undefined,
+): IndexRange[] {
+  let ranges: IndexRange[];
+
+  if (sections && sections.length > 0) {
+    ranges = [];
+    for (const s of sections) {
+      ranges.push(...collapseSection(s.start, s.end, headPos));
+    }
+  } else {
+    ranges = [{ from: 0, to: tapeLen - 1 }];
+  }
+
+  // Intersect with global radius
+  if (visibleRadius != null) {
+    const gFrom = Math.max(0, headPos - visibleRadius);
+    const gTo = Math.min(tapeLen - 1, headPos + visibleRadius);
+    ranges = ranges
+      .map((r) => ({ from: Math.max(r.from, gFrom), to: Math.min(r.to, gTo) }))
+      .filter((r) => r.from <= r.to);
+  }
+
+  // Merge adjacent/overlapping
+  if (ranges.length === 0) return [];
+  ranges.sort((a, b) => a.from - b.from);
+  const merged: IndexRange[] = [{ ...ranges[0] }];
+  for (let i = 1; i < ranges.length; i++) {
+    const last = merged[merged.length - 1];
+    if (ranges[i].from <= last.to + 1) {
+      last.to = Math.max(last.to, ranges[i].to);
+    } else {
+      merged.push({ ...ranges[i] });
+    }
+  }
+  return merged;
+}
+
 /** Render a tape as a wrapping grid of colored characters with head highlight. */
 function TapeDisplay({
   tape,
@@ -87,57 +196,71 @@ function TapeDisplay({
   stateLabel?: string;
   visibleRadius?: number;
 }) {
-  // Compute visible range
-  const showFrom = visibleRadius != null ? Math.max(0, headPos - visibleRadius) : 0;
-  const showTo = visibleRadius != null ? Math.min(tape.length - 1, headPos + visibleRadius) : tape.length - 1;
+  const visibleRanges = useMemo(
+    () => computeVisibleRanges(tape.length, headPos, sections, visibleRadius),
+    [tape.length, headPos, sections, visibleRadius],
+  );
 
-  // Build labeled section starts
-  const sectionStarts = new Map<number, SectionName>();
-  if (sections) {
+  // Build section label positions: label at first visible index of each section
+  const sectionLabelAt = useMemo(() => {
+    const map = new Map<number, SectionName>();
+    if (!sections) return map;
     for (const s of sections) {
-      if (s.name === "$") {
-        if (0 >= showFrom && 0 <= showTo) sectionStarts.set(0, "$");
-      } else {
-        // If the section's # is before our window, label at the window start if we're inside that section
-        if (s.start >= showFrom && s.start <= showTo) {
-          sectionStarts.set(s.start, s.name);
-        } else if (s.start < showFrom && s.end >= showFrom) {
-          sectionStarts.set(showFrom, s.name);
-        }
+      if (s.name === "$") continue;
+      // Find the first visible index within this section
+      for (const r of visibleRanges) {
+        if (r.to < s.start || r.from > s.end) continue;
+        const firstVisible = Math.max(r.from, s.start);
+        map.set(firstVisible, s.name);
+        break;
       }
+    }
+    return map;
+  }, [sections, visibleRanges]);
+
+  const elements: React.ReactNode[] = [];
+
+  for (let ri = 0; ri < visibleRanges.length; ri++) {
+    const range = visibleRanges[ri];
+
+    // Leading ellipsis
+    if (ri === 0 && range.from > 0) {
+      elements.push(<span key="pre-ellipsis" className="utm-ellipsis">...</span>);
+    } else if (ri > 0) {
+      elements.push(<span key={`gap-${ri}`} className="utm-ellipsis">...</span>);
+    }
+
+    for (let i = range.from; i <= range.to; i++) {
+      const section = sections ? sectionForIndex(sections, i) : undefined;
+      const color = section ? SECTION_COLORS[section] : "var(--text)";
+      const isHead = i === headPos;
+      const sLabel = sectionLabelAt.get(i);
+
+      elements.push(
+        <span key={i} style={{ position: "relative", display: "inline" }}>
+          {sLabel && (
+            <span className="utm-section-label" style={{ color }}>{sLabel}</span>
+          )}
+          <span
+            className={isHead ? "utm-cell utm-cell-head" : "utm-cell"}
+            style={isHead ? undefined : { color }}
+          >
+            {tape[i]}
+          </span>
+        </span>,
+      );
     }
   }
 
-  const clipped = showFrom > 0 || showTo < tape.length - 1;
+  // Trailing ellipsis
+  if (visibleRanges.length > 0 && visibleRanges[visibleRanges.length - 1].to < tape.length - 1) {
+    elements.push(<span key="post-ellipsis" className="utm-ellipsis">...</span>);
+  }
 
   return (
     <div style={{ marginBottom: 12 }}>
       <div className="utm-tape-label">{label}{stateLabel && <span style={{ color: "var(--text)" }}>{stateLabel}</span>}</div>
-      <div className="utm-tape-wrap">
-        {clipped && showFrom > 0 && <span className="utm-ellipsis">...</span>}
-        {tape.map((ch, i) => {
-          if (i < showFrom || i > showTo) return null;
-          const section = sections ? sectionForIndex(sections, i) : undefined;
-          const color = section ? SECTION_COLORS[section] : "var(--text)";
-          const isHead = i === headPos;
-          const sectionLabel = sectionStarts.get(i);
-
-          return (
-            <span key={i} style={{ position: "relative", display: "inline" }}>
-              {sectionLabel && sectionLabel !== "$" && (
-                <span className="utm-section-label" style={{ color }}>{sectionLabel}</span>
-              )}
-              <span
-                className={isHead ? "utm-cell utm-cell-head" : "utm-cell"}
-                style={isHead ? undefined : { color }}
-              >
-                {ch}
-              </span>
-            </span>
-          );
-        })}
-        {clipped && showTo < tape.length - 1 && <span className="utm-ellipsis">...</span>}
-      </div>
+      <div className="utm-tape-wrap">{elements}</div>
     </div>
   );
 }
