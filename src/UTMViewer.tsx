@@ -217,6 +217,34 @@ export function UTMViewer<
     }
   }, [utmSpec, simSpec, stepOnce]);
 
+  const doStepState = useCallback(() => {
+    if (statusRef.current !== "running") return;
+    const snap = copySnapshot(utmRef.current);
+    const startState = snap.state;
+    let st: "accept" | "reject" | "running" = "running";
+    let steps = 0;
+    while (st === "running" && snap.state === startState) {
+      st = stepOnce(snap);
+      steps++;
+    }
+
+    utmRef.current = snap;
+    statusRef.current = st;
+    setUtmSnapshot(snap);
+    setUtmStatus(st);
+    setStepCount((c) => c + steps);
+
+    const decoded = utmSpec.decode(simSpec, snap);
+    if (decoded) {
+      lastDecodedRef.current = decoded;
+      setLastDecoded(decoded);
+    }
+
+    if (st !== "running") {
+      setPlaying(false);
+    }
+  }, [utmSpec, simSpec, stepOnce]);
+
   const reset = useCallback(() => {
     const { utmSnapshot: snap, decoded } = makeInitial();
     utmRef.current = snap;
@@ -325,6 +353,9 @@ export function UTMViewer<
       <div className="tm-controls">
         <button onClick={doStep} disabled={halted}>
           Step
+        </button>
+        <button onClick={doStepState} disabled={halted}>
+          Step State
         </button>
         <button onClick={() => setPlaying((p) => !p)} disabled={halted}>
           {playing ? "Pause" : "Play"}
