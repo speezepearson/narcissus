@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
 import { UTMViewer } from "./UTMViewer";
-import { checkPalindromeSpec, write1sForeverSpec } from "./toy-machines";
+import { checkPalindromeSpec, flipBitsSpec, write1sForeverSpec } from "./toy-machines";
 import { myUtmSpec } from "./my-utm-spec";
 import "./App.css";
+import { makeInitSnapshot } from "./types";
 
 function App() {
   const [tapeInput, setTapeInput] = useState("abba");
@@ -40,8 +41,8 @@ function App() {
       <UTMViewer
         key={tapeInput + "-utm"}
         utmSpec={myUtmSpec}
-        simSpec={checkPalindromeSpec}
-        initialSimTape={initialTape}
+        simSpec={myUtmSpec}
+        initialSimTape={myUtmSpec.encode(makeInitSnapshot(flipBitsSpec, ["0", "1"]))}
       />
     </div>
   );

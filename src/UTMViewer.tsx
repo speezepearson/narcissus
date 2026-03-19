@@ -306,10 +306,27 @@ export function UTMViewer<
   const utmRef = useRef(utmSnapshot);
   const statusRef = useRef(utmStatus);
   const lastDecodedRef = useRef(lastDecoded);
+  const stepCountRef = useRef(0);
 
   useEffect(() => { utmRef.current = utmSnapshot; }, [utmSnapshot]);
   useEffect(() => { statusRef.current = utmStatus; }, [utmStatus]);
   useEffect(() => { lastDecodedRef.current = lastDecoded; }, [lastDecoded]);
+  useEffect(() => { stepCountRef.current = stepCount; }, [stepCount]);
+
+  const MAX_HISTORY = 20;
+  const historyRef = useRef<{ snap: TuringMachineSnapshot<UState, USymbol>; decoded: TuringMachineSnapshot<SimState, SimSymbol> | null; stepCount: number }[]>([]);
+  const [canRewind, setCanRewind] = useState(false);
+
+  const pushHistory = useCallback(() => {
+    const h = historyRef.current;
+    h.push({
+      snap: copySnapshot(utmRef.current),
+      decoded: lastDecodedRef.current ? copySnapshot(lastDecodedRef.current) : null,
+      stepCount: stepCountRef.current,
+    });
+    if (h.length > MAX_HISTORY) h.shift();
+    setCanRewind(true);
+  }, []);
 
   const stepOnce = useCallback((snap: TuringMachineSnapshot<UState, USymbol>) => {
     padTape(snap, utmSpec.blank);
@@ -320,6 +337,7 @@ export function UTMViewer<
 
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
+    pushHistory();
     const next = copySnapshot(utmRef.current);
     const st = stepOnce(next);
 
@@ -338,10 +356,11 @@ export function UTMViewer<
     if (st !== "running") {
       setPlaying(false);
     }
-  }, [utmSpec, simSpec, stepOnce]);
+  }, [utmSpec, simSpec, stepOnce, pushHistory]);
 
   const doStepState = useCallback(() => {
     if (statusRef.current !== "running") return;
+    pushHistory();
     const snap = copySnapshot(utmRef.current);
     const startState = snap.state;
     let st: "accept" | "reject" | "running" = "running";
@@ -366,7 +385,7 @@ export function UTMViewer<
     if (st !== "running") {
       setPlaying(false);
     }
-  }, [utmSpec, simSpec, stepOnce]);
+  }, [utmSpec, simSpec, stepOnce, pushHistory]);
 
   const reset = useCallback(() => {
     const { utmSnapshot: snap, decoded } = makeInitial();
@@ -378,13 +397,28 @@ export function UTMViewer<
     setLastDecoded(decoded ?? null);
     setPlaying(false);
     setStepCount(0);
+    historyRef.current = [];
+    setCanRewind(false);
   }, [makeInitial]);
+
+  const rewind = useCallback(() => {
+    const h = historyRef.current;
+    const entry = h.pop();
+    if (!entry) return;
+    utmRef.current = entry.snap;
+    statusRef.current = "running";
+    lastDecodedRef.current = entry.decoded;
+    setUtmSnapshot(entry.snap);
+    setUtmStatus("running");
+    setLastDecoded(entry.decoded);
+    setStepCount(entry.stepCount);
+    setPlaying(false);
+    setCanRewind(h.length > 0);
+  }, []);
 
   const fpsRef = useRef(fps);
   useEffect(() => { fpsRef.current = fps; }, [fps]);
   const accumRef = useRef(0);
-  const stepCountRef = useRef(0);
-  useEffect(() => { stepCountRef.current = stepCount; }, [stepCount]);
 
   useEffect(() => {
     if (!playing) {
@@ -399,6 +433,7 @@ export function UTMViewer<
       accumRef.current -= stepsThisFrame;
       if (stepsThisFrame === 0) return;
 
+      pushHistory();
       const snap = copySnapshot(utmRef.current);
       let st: "accept" | "reject" | "running" = "running";
       for (let i = 0; i < stepsThisFrame; i++) {
@@ -425,7 +460,7 @@ export function UTMViewer<
       }
     }, 1000 / MAX_RENDER_FPS);
     return () => clearInterval(interval);
-  }, [playing, stepOnce, utmSpec, simSpec]);
+  }, [playing, stepOnce, utmSpec, simSpec, pushHistory]);
 
   const halted = utmStatus !== "running";
 
@@ -482,6 +517,9 @@ export function UTMViewer<
         </button>
         <button onClick={() => setPlaying((p) => !p)} disabled={halted}>
           {playing ? "Pause" : "Play"}
+        </button>
+        <button onClick={rewind} disabled={!canRewind}>
+          Rewind
         </button>
         <button onClick={reset}>Reset</button>
         <label className="tm-fps">
