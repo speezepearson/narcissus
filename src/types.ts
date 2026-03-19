@@ -4,20 +4,10 @@ export type TuringMachineSpec<State extends string, Symbol extends string> = {
   readonly allStates: ReadonlyArray<State>;
   readonly allSymbols: ReadonlyArray<Symbol>;
   readonly initial: State;
+  readonly acceptingStates: ReadonlySet<State>;
   readonly blank: Symbol;
-  readonly rules: Readonly<
-    Record<
-      State,
-      Readonly<
-        Record<
-          Symbol,
-          | { type: "accept" }
-          | { type: "reject" }
-          | { type: "step"; newState: State; newSymbol: Symbol; dir: Dir }
-        >
-      >
-    >
-  >;
+  // Not necessarily total; machine halts when no rule is applicable
+  readonly rules: ReadonlyMap<State, ReadonlyMap<Symbol, [State, Symbol, Dir]>>;
 };
 
 export type TuringMachineSnapshot<
@@ -52,43 +42,54 @@ export function copySnapshot<State extends string, Symbol extends string>(
   };
 }
 
-export function step<State extends string, Symbol extends string>(
+export function getRule<State extends string, Symbol extends string>(
   snapshot: TuringMachineSnapshot<State, Symbol>,
-): "accept" | "reject" | "continue" {
-  const { spec, state, tape, pos } = snapshot;
-  const symbol = pos < tape.length ? tape[pos] : spec.blank;
-  const rule = spec.rules[state][symbol];
-  switch (rule.type) {
-    case "accept":
-      return "accept";
-    case "reject":
-      return "reject";
-    case "step": {
-      snapshot.state = rule.newState;
-      while (snapshot.tape.length <= pos) {
-        snapshot.tape.push(spec.blank);
-      }
-      snapshot.tape[pos] = rule.newSymbol;
-      if (rule.dir === "L" && pos === 0) {
-        throw new Error("Can't step machine; already at left edge of tape");
-      }
-      snapshot.pos = { L: pos - 1, R: pos + 1 }[rule.dir];
-      return "continue";
-    }
+): [State, Symbol, Dir] | undefined {
+  while (snapshot.tape.length <= snapshot.pos) {
+    snapshot.tape.push(snapshot.spec.blank);
   }
+  return snapshot.spec.rules
+    .get(snapshot.state)
+    ?.get(snapshot.tape[snapshot.pos]);
 }
-export function run<State extends string, Symbol extends string>(snapshot: TuringMachineSnapshot<State, Symbol>): "accept" | "reject" {
-  while (true) {
-    switch (step(snapshot)) {
-      case "accept":
-        return "accept";
-      case "reject":
-        return "reject";
-      case "continue":
-        // noop
-        break;
-    }
+export function getStatus<State extends string, Symbol extends string>(
+  snapshot: TuringMachineSnapshot<State, Symbol>,
+): "accept" | "reject" | "running" {
+  const rule = getRule(snapshot);
+  if (rule) return "running";
+  if (snapshot.spec.acceptingStates.has(snapshot.state)) return "accept";
+  return "reject";
+}
+
+export function step<State extends string, Symbol extends string>(
+  tm: TuringMachineSnapshot<State, Symbol>,
+): TuringMachineSnapshot<State, Symbol> {
+  const rule = getRule(tm);
+  if (!rule) return tm;
+
+  const pos = tm.pos;
+
+  const [newState, newSymbol, dir] = rule;
+  tm.state = newState;
+  tm.tape[pos] = newSymbol;
+  if (dir === "L" && pos === 0) {
+    throw new Error("Can't step machine; already at left edge of tape");
   }
+  tm.pos = { L: pos - 1, R: pos + 1 }[dir];
+
+  return tm;
+}
+export function run<State extends string, Symbol extends string>(
+  snapshot: TuringMachineSnapshot<State, Symbol>,
+  { gas = 1e9 }: { gas?: number } = {},
+): TuringMachineSnapshot<State, Symbol> {
+  while (getStatus(snapshot) === "running") {
+    if (gas <= 0) break;
+    step(snapshot);
+    gas--;
+  }
+
+  return snapshot;
 }
 
 export type UtmSpec<

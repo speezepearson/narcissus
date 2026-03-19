@@ -5,12 +5,16 @@ export const write1sForeverSpec: TuringMachineSpec<"init", "_" | "1"> = {
   allSymbols: ["_", "1"] as const,
   initial: "init",
   blank: "_",
-  rules: {
-    init: {
-      _: { type: "step", newState: "init", newSymbol: "1", dir: "R" },
-      "1": { type: "step", newState: "init", newSymbol: "1", dir: "R" },
-    },
-  },
+  acceptingStates: new Set(["init"]),
+  rules: new Map([
+    [
+      "init",
+      new Map([
+        ["_", ["init", "1", "R"]],
+        ["1", ["init", "1", "R"]],
+      ]),
+    ],
+  ]),
 };
 
 export const acceptImmediatelySpec: TuringMachineSpec<"init", "_"> = {
@@ -18,105 +22,201 @@ export const acceptImmediatelySpec: TuringMachineSpec<"init", "_"> = {
   allSymbols: ["_"] as const,
   initial: "init",
   blank: "_",
-  rules: {
-    init: {
-      _: { type: "accept" },
-    },
-  },
+  acceptingStates: new Set(["init"]),
+  rules: new Map([]),
 };
 
 export const rejectImmediatelySpec: TuringMachineSpec<"init", "_"> = {
   allStates: ["init"] as const,
   allSymbols: ["_"] as const,
   initial: "init",
+  acceptingStates: new Set([]),
   blank: "_",
-  rules: {
-    init: {
-      _: { type: "reject" },
-    },
-  },
+  rules: new Map(),
 };
 
-export const flipBitsSpec: TuringMachineSpec<"init", "_" | '0' | '1'> = {
+export const flipBitsSpec: TuringMachineSpec<"init", "_" | "0" | "1"> = {
   allStates: ["init"] as const,
   allSymbols: ["_", "0", "1"] as const,
   initial: "init",
   blank: "_",
-  rules: {
-    init: {
-      _: { type: "accept" },
-      0: { type: "step", newState: "init", newSymbol: "1", dir: "R" },
-      1: { type: "step", newState: "init", newSymbol: "0", dir: "R" },
-    },
-  },
+  acceptingStates: new Set(["init"]),
+  rules: new Map([
+    [
+      "init",
+      new Map([
+        ["0", ["init", "1", "R"]],
+        ["1", ["init", "0", "R"]],
+      ]),
+    ],
+  ]),
 };
 
-type PalState =
+type Letter =
+  | "a"
+  | "b"
+  | "c"
+  | "d"
+  | "e"
+  | "f"
+  | "g"
+  | "h"
+  | "i"
+  | "j"
+  | "k"
+  | "l"
+  | "m"
+  | "n"
+  | "o"
+  | "p"
+  | "q"
+  | "r"
+  | "s"
+  | "t"
+  | "u"
+  | "v"
+  | "w"
+  | "x"
+  | "y"
+  | "z";
+
+type PalindromeSymbol = "_" | Letter;
+type PalindromeState =
   | "start"
-  | `going_right_a` // erased left char, scanning right (remembers which letter)
-  | `going_right_b`
-  | `check_right_a` // at right boundary, about to compare (remembers which letter)
-  | `check_right_b`
-  | "going_left"; // matched pair, scanning back left
+  | "accept"
+  | "seekL"
+  | `seekR_${Letter}`
+  | `check_${Letter}`;
 
-type PalSymbol = "_" | "a" | "b";
+export const checkPalindromeSpec = ((): TuringMachineSpec<
+  PalindromeState,
+  PalindromeSymbol
+> => {
+  // The classic approach: repeatedly match & erase the outermost pair of characters.
+  //
+  // States:
+  //   start     – read (and erase) the leftmost symbol
+  //   seekR_x   – scan right to find the end, carrying letter x
+  //   check_x   – at the rightmost symbol, verify it matches x
+  //   seekL     – scan left back to the start
+  //   accept    – halting accept state
 
-export const checkPalindromeSpec: TuringMachineSpec<PalState, PalSymbol> = {
-  allStates: [
+  type Letter =
+    | "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o"
+    | "p"
+    | "q"
+    | "r"
+    | "s"
+    | "t"
+    | "u"
+    | "v"
+    | "w"
+    | "x"
+    | "y"
+    | "z";
+
+  type PalindromeSymbol = "_" | Letter;
+  type PalindromeState =
+    | "start"
+    | "accept"
+    | "seekL"
+    | `seekR_${Letter}`
+    | `check_${Letter}`;
+  type Dir = "L" | "R";
+
+  const letters: readonly Letter[] = [
+    ..."abcdefghijklmnopqrstuvwxyz",
+  ] as Letter[];
+
+  const allSymbols: readonly PalindromeSymbol[] = ["_", ...letters];
+
+  const allStates: readonly PalindromeState[] = [
     "start",
-    "going_right_a",
-    "going_right_b",
-    "check_right_a",
-    "check_right_b",
-    "going_left",
-  ] as const,
-  allSymbols: ["_", "a", "b"] as const,
-  initial: "start",
-  blank: "_",
-  rules: {
-    // ── start ──────────────────────────────────────────────────────────────
-    // All blanks consumed → accept (even-length palindrome fully processed).
-    // Otherwise erase the leftmost character and remember it in the state.
-    start: {
-      _: { type: "accept" },
-      a: { type: "step", newState: "going_right_a", newSymbol: "_", dir: "R" },
-      b: { type: "step", newState: "going_right_b", newSymbol: "_", dir: "R" },
-    },
-    // ── going_right_X ──────────────────────────────────────────────────────
-    // Pass over all remaining characters rightward; on blank, step back left.
-    going_right_a: {
-      _: { type: "step", newState: "check_right_a", newSymbol: "_", dir: "L" },
-      a: { type: "step", newState: "going_right_a", newSymbol: "a", dir: "R" },
-      b: { type: "step", newState: "going_right_a", newSymbol: "b", dir: "R" },
-    },
-    going_right_b: {
-      _: { type: "step", newState: "check_right_b", newSymbol: "_", dir: "L" },
-      a: { type: "step", newState: "going_right_b", newSymbol: "a", dir: "R" },
-      b: { type: "step", newState: "going_right_b", newSymbol: "b", dir: "R" },
-    },
-    // ── check_right_X ──────────────────────────────────────────────────────
-    // Now at the rightmost remaining character (or blank if only X was left).
-    // Blank  → only the middle character existed → accept (odd palindrome).
-    // Match  → erase, head left to find new left boundary.
-    // Differ → not a palindrome → reject.
-    check_right_a: {
-      _: { type: "accept" },
-      a: { type: "step", newState: "going_left", newSymbol: "_", dir: "L" },
-      b: { type: "reject" },
-    },
-    check_right_b: {
-      _: { type: "accept" },
-      a: { type: "reject" },
-      b: { type: "step", newState: "going_left", newSymbol: "_", dir: "L" },
-    },
-    // ── going_left ─────────────────────────────────────────────────────────
-    // Scan left over all remaining characters until we hit a blank (the
-    // erased left edge), then step right to place the head on the new
-    // leftmost unprocessed character.
-    going_left: {
-      _: { type: "step", newState: "start", newSymbol: "_", dir: "R" },
-      a: { type: "step", newState: "going_left", newSymbol: "a", dir: "L" },
-      b: { type: "step", newState: "going_left", newSymbol: "b", dir: "L" },
-    },
-  },
-};
+    "accept",
+    "seekL",
+    ...letters.map((l): `seekR_${Letter}` => `seekR_${l}`),
+    ...letters.map((l): `check_${Letter}` => `check_${l}`),
+  ];
+
+  function buildRules(): ReadonlyMap<
+    PalindromeState,
+    ReadonlyMap<PalindromeSymbol, [PalindromeState, PalindromeSymbol, Dir]>
+  > {
+    const rules = new Map<
+      PalindromeState,
+      Map<PalindromeSymbol, [PalindromeState, PalindromeSymbol, Dir]>
+    >();
+
+    // ── start: read leftmost symbol, erase it, seek right ──
+    const startRules = new Map<
+      PalindromeSymbol,
+      [PalindromeState, PalindromeSymbol, Dir]
+    >();
+    startRules.set("_", ["accept", "_", "R"]); // empty tape → palindrome
+    for (const l of letters) {
+      startRules.set(l, [`seekR_${l}`, "_", "R"]); // erase & remember
+    }
+    rules.set("start", startRules);
+
+    // ── seekR_x: scan right past all letters until blank ──
+    for (const l of letters) {
+      const m = new Map<
+        PalindromeSymbol,
+        [PalindromeState, PalindromeSymbol, Dir]
+      >();
+      m.set("_", [`check_${l}`, "_", "L"]); // hit the end, step back
+      for (const l2 of letters) {
+        m.set(l2, [`seekR_${l}`, l2, "R"]); // keep scanning
+      }
+      rules.set(`seekR_${l}`, m);
+    }
+
+    // ── check_x: verify rightmost symbol matches x ──
+    for (const l of letters) {
+      const m = new Map<
+        PalindromeSymbol,
+        [PalindromeState, PalindromeSymbol, Dir]
+      >();
+      m.set("_", ["accept", "_", "R"]); // single char was left → ok
+      m.set(l, ["seekL", "_", "L"]); // match → erase & go back
+      // any other letter → no rule → halt & reject
+      rules.set(`check_${l}`, m);
+    }
+
+    // ── seekL: scan left back to the erased region ──
+    const seekLRules = new Map<
+      PalindromeSymbol,
+      [PalindromeState, PalindromeSymbol, Dir]
+    >();
+    seekLRules.set("_", ["start", "_", "R"]); // reached left edge, restart
+    for (const l of letters) {
+      seekLRules.set(l, ["seekL", l, "L"]); // keep scanning
+    }
+    rules.set("seekL", seekLRules);
+
+    return rules;
+  }
+
+  return {
+    allStates,
+    allSymbols,
+    initial: "start",
+    blank: "_",
+    acceptingStates: new Set<PalindromeState>(["accept"]),
+    rules: buildRules(),
+  };
+})();
