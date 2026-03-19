@@ -5,9 +5,8 @@ import {
   copySnapshot,
   makeInitSnapshot,
   step,
+  getStatus,
 } from "./types";
-
-type StepResult = "accept" | "reject" | "continue";
 
 function padTape<State extends string, Symbol extends string>(
   snapshot: TuringMachineSnapshot<State, Symbol>,
@@ -27,32 +26,32 @@ function useTuringMachine<State extends string, Symbol extends string>(
     padTape(s, spec.blank);
     return s;
   });
-  const [result, setResult] = useState<StepResult>("continue");
+  const [status, setStatus] = useState<"accept" | "reject" | "running">("running");
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(5);
 
   const snapshotRef = useRef(snapshot);
-  const resultRef = useRef(result);
+  const statusRef = useRef(status);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
 
   useEffect(() => {
-    resultRef.current = result;
-  }, [result]);
+    statusRef.current = status;
+  }, [status]);
 
   const doStep = useCallback(() => {
-    if (resultRef.current !== "continue") return;
+    if (statusRef.current !== "running") return;
     const next = copySnapshot(snapshotRef.current);
     padTape(next, spec.blank);
-    const r = step(next);
+    const status = getStatus(step(next));
     padTape(next, spec.blank);
     snapshotRef.current = next;
-    resultRef.current = r;
+    statusRef.current = status;
     setSnapshot(next);
-    setResult(r);
-    if (r !== "continue") {
+    setStatus(status);
+    if (status !== "running") {
       setPlaying(false);
     }
   }, [spec.blank]);
@@ -61,7 +60,7 @@ function useTuringMachine<State extends string, Symbol extends string>(
     const s = makeInitSnapshot(spec, initialTape);
     padTape(s, spec.blank);
     setSnapshot(s);
-    setResult("continue");
+    setStatus("running");
     setPlaying(false);
   }, [spec, initialTape]);
 
@@ -71,7 +70,7 @@ function useTuringMachine<State extends string, Symbol extends string>(
     return () => clearInterval(interval);
   }, [playing, fps, doStep]);
 
-  return { snapshot, result, playing, setPlaying, fps, setFps, doStep, reset };
+  return { snapshot, status, playing, setPlaying, fps, setFps, doStep, reset };
 }
 
 type TuringMachineViewerProps<State extends string, Symbol extends string> = {
@@ -83,10 +82,10 @@ export function TuringMachineViewer<
   State extends string,
   Symbol extends string,
 >({ spec, initialTape }: TuringMachineViewerProps<State, Symbol>) {
-  const { snapshot, result, playing, setPlaying, fps, setFps, doStep, reset } =
+  const { snapshot, status, playing, setPlaying, fps, setFps, doStep, reset } =
     useTuringMachine(spec, initialTape);
 
-  const halted = result !== "continue";
+  const halted = status !== "running";
 
   // Build tape display — pad with blanks so head is always visible
   const tape = snapshot.tape;
@@ -114,8 +113,8 @@ export function TuringMachineViewer<
       </pre>
 
       {halted && (
-        <div className={`tm-result tm-result-${result}`}>
-          {result.toUpperCase()}
+        <div className={`tm-result tm-result-${status}`}>
+          {status.toUpperCase()}
         </div>
       )}
 
