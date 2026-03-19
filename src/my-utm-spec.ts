@@ -254,13 +254,13 @@ function decode<SimState extends string, SimSymbol extends string>(
 // UTM State Machine Builder
 // ════════════════════════════════════════════════════════════════════
 
-type RuleMap = Map<string, Map<MyUtmSymbol, [string, MyUtmSymbol, Dir]>>;
+type RuleMap = Map<MyUtmState, Map<MyUtmSymbol, [MyUtmState, MyUtmSymbol, Dir]>>;
 
 function addRule(
   rules: RuleMap,
-  state: string,
+  state: MyUtmState,
   sym: MyUtmSymbol,
-  newState: string,
+  newState: MyUtmState,
   newSym: MyUtmSymbol,
   dir: Dir,
 ) {
@@ -276,7 +276,7 @@ function addRule(
 
 function scanRight(
   rules: RuleMap,
-  state: string,
+  state: MyUtmState,
   syms: readonly MyUtmSymbol[],
 ) {
   for (const s of syms) {
@@ -286,7 +286,7 @@ function scanRight(
 
 function scanLeft(
   rules: RuleMap,
-  state: string,
+  state: MyUtmState,
   syms: readonly MyUtmSymbol[],
 ) {
   for (const s of syms) {
@@ -294,15 +294,10 @@ function scanLeft(
   }
 }
 
-function buildUtmRules(): {
-  rules: RuleMap;
-  states: string[];
-} {
+function buildUtmRules(): RuleMap {
   const rules: RuleMap = new Map();
-  const stateSet = new Set<string>();
 
-  function st(name: string): string {
-    stateSet.add(name);
+  function st(name: MyUtmState): MyUtmState {
     return name;
   }
 
@@ -323,37 +318,8 @@ function buildUtmRules(): {
   const markedBits: MyUtmSymbol[] = ["X", "Y"];
   const bitsAndMarked: MyUtmSymbol[] = ["0", "1", "X", "Y"];
 
-  // ══════════════════════════════════════════════════════════════
-  // Helper: "navigate from rules section to a specific # section"
-  // From inside the rules section, scan right through:
-  //   rest of rules → #ACC → #STATE → #TLEN → #BLANK → #TAPE
-  // sections = number of # to pass (1=ACC, 2=STATE, 3=TLEN, 4=BLANK, 5=TAPE)
-  // ══════════════════════════════════════════════════════════════
-  function navFromRulesToSection(
-    prefix: string,
-    numHashes: number,
-    startSyms?: readonly MyUtmSymbol[],
-  ): string {
-    // First, skip the rest of the rules section
-    const firstState = st(`${prefix}_nr0`);
-    scanRight(rules, firstState, startSyms ?? ruleAll);
-    // Hit # -> start counting
-    let prev = firstState;
-    for (let h = 1; h <= numHashes; h++) {
-      const next = st(`${prefix}_nr${h}`);
-      addRule(rules, prev, "#", next, "#", "R");
-      if (h < numHashes) {
-        // Scan through intermediate section content
-        // ACC has bits and ;, STATE has bits, TLEN has bits, BLANK has bits
-        scanRight(rules, next, [...bitsAndMarked, ";"]);
-        prev = next;
-      }
-    }
-    return st(`${prefix}_nr${numHashes}`);
-  }
-
   // Navigate from current position back to $ (left boundary)
-  function seekHome(fromState: string, toState: string) {
+  function seekHome(fromState: MyUtmState, toState: MyUtmState) {
     // Scan left past everything until we hit $
     scanLeft(rules, fromState, [
       "0", "1", "X", "Y", "#", "|", ";", ",", "^", ".", "*", ">", "l", "d",
@@ -362,7 +328,7 @@ function buildUtmRules(): {
   }
 
   // Navigate from inside rules back to the * rule
-  function seekStar(fromState: string, targetState: string) {
+  function seekStar(fromState: MyUtmState, targetState: MyUtmState) {
     scanLeft(rules, fromState, [
       "0", "1", "X", "Y", "#", "|", ";", ",", "^", ".", "l", "d",
     ]);
@@ -1387,29 +1353,26 @@ function buildUtmRules(): {
   }
   seekHome(st("rej_final_home"), st("reject"));
 
-  return { rules, states: [...stateSet] };
+  return rules;
 }
 
 // ════════════════════════════════════════════════════════════════════
 // Build and export
 // ════════════════════════════════════════════════════════════════════
 
-const { rules: builtRules, states: builtStates } = buildUtmRules();
+const rules = buildUtmRules();
 
-const utmStates = builtStates as MyUtmState[];
+const allStates = ["accept","reject","init","init_skip","mark_rule","cmp_st_read","chk_acc_init","cmp_st_c0","cmp_st_c1","st_match_cleanup","cmp_st_c0_sk1","cmp_st_c0_find","cmp_st_ok","cmp_st_fail","cmp_st_c1_sk1","cmp_st_c1_find","cmp_st_nextbit","stm_go_left","stm_restore_rule","stm_goto_state","stm_gs_sk1","stm_restore_state","stm_back_to_rule","sym_skip_state","cmp_sym_read","stf_restore_state","stf_find_star","stf_restore_rule","stf_skip_rest","cmp_sym_c0","cmp_sym_c1","sym_match_cleanup","cmp_sym_c0_s1","cmp_sym_c0_s2","cmp_sym_c0_s3","cmp_sym_c0_s4","cmp_sym_c0_fh","cmp_sym_c0_fb","cmp_sym_ok","cmp_sym_fail","cmp_sym_c1_s1","cmp_sym_c1_s2","cmp_sym_c1_s3","cmp_sym_c1_s4","cmp_sym_c1_fh","cmp_sym_c1_fb","cmp_sym_nextbit","cmp_sym_nb2","symf_rest_head","symf_seek_star","symf_skip_st","symf_rest_sym","symf_deactivate","symf_skip_rest","smc_s1","smc_s2","smc_s3","smc_s4","smc_fh","smc_rest_head","smc_rest_done","smc_skip_st","smc_rest_sym","apply_read_nst","cp_nst_c0","cp_nst_c1","cp_nst_done","cp_nst_c0_s1","cp_nst_c0_w","cp_nst_ret","cp_nst_c1_s1","cp_nst_c1_w","cp_nst_next","cp_nst_next2","cp_nst_next3","cp_nst_rest_nav","cp_nst_rest_s1","cp_nst_rest_do","cp_nsym_seek","cp_nsym_nav","cp_nsym_nav2","cp_nsym_nav3","cp_nsym_read","cp_nsym_c0","cp_nsym_c1","cp_nsym_done","cp_nsym_c0_s1","cp_nsym_c0_s2","cp_nsym_c0_s3","cp_nsym_c0_s4","cp_nsym_c0_fh","cp_nsym_c0_fb","cp_nsym_ret","cp_nsym_c1_s1","cp_nsym_c1_s2","cp_nsym_c1_s3","cp_nsym_c1_s4","cp_nsym_c1_fh","cp_nsym_c1_fb","cp_nsym_fnext","cp_nsym_fn2","cp_nsym_fn3","cp_nsym_fn4","cp_nsym_rest_nav","cp_nsym_rn_s1","cp_nsym_rn_s2","cp_nsym_rn_s3","cp_nsym_rn_s4","cp_nsym_rn_fh","cp_nsym_rn_do","read_dir","rd_skip_to_dir","rd_sk2","rd_sk3","rd_sk4","rd_read","move_left","move_right","mr_nav","mr_s1","mr_s2","mr_s3","mr_s4","mr_find_head","mr_skip_cell","mr_place_head","mr_extend_init","done_seek_home","mr_ext_to_blank","mr_ext_write_head","mr_ext_home","mr_ext_h1","mr_ext_h2","mr_ext_h3","mr_ext_h4","mr_ext_read_blank","mr_ext_bc0","mr_ext_bc1","mr_ext_rest_blank","mr_ext_bc_ret","mr_ext_bc_next","ml_nav","ml_s1","ml_s2","ml_s3","ml_s4","ml_find_head","ml_mark","ml_restore","rej_final_home","chk_acc_c0","chk_acc_c1","chk_acc_c0_find","chk_acc_ok","chk_acc_fail_bit","chk_acc_c1_find","chk_acc_ok_acc","chk_acc_ok_find","chk_acc_ok_skip","accept_seek_home","chk_acc_rest_state","chk_acc_back2acc","chk_acc_into_acc","chk_acc_do_rest","chk_acc_do_rest2","chk_acc_next_entry","reject_seek_home","acc_rest_acc","acc_rest_state","acc_final_home","rej_rest_acc","rej_rest_state"] as const;
 
 export type MyUtmState = string;
 
 export const myUtmSpec: UtmSpec<MyUtmState, MyUtmSymbol> = {
-  allStates: utmStates,
+  allStates,
   allSymbols: [...allSymbols],
   initial: "init",
   blank: "_",
   acceptingStates: new Set<MyUtmState>(["accept"]),
-  rules: builtRules as ReadonlyMap<
-    MyUtmState,
-    ReadonlyMap<MyUtmSymbol, [MyUtmState, MyUtmSymbol, Dir]>
-  >,
+  rules,
 
   encode,
   decode,
