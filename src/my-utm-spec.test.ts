@@ -19,7 +19,7 @@ export const myUtmSpec: UtmSpec<MyUtmState, MyUtmSymbol> = {
     throw new Error("Not implemented");
   },
 
-  decode(spec, tape) {
+  decode(spec, utm) {
     throw new Error("Not implemented");
   },
 };

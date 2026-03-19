@@ -111,7 +111,7 @@ export type UtmSpec<
    */
   decode<SimState extends string, SimSymbol extends string>(
     spec: TuringMachineSpec<SimState, SimSymbol>,
-    uTape: readonly USymbol[],
+    utm: TuringMachineSnapshot<UState, USymbol>,
   ): undefined | TuringMachineSnapshot<SimState, SimSymbol>;
 };
 

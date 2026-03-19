@@ -52,7 +52,7 @@ describe("myUtmSpec gold standard tests", () => {
   describe("decode", () => {
     it.each(variousSnapshots)("inverts encode", (tm) => {
       const encoded = myUtmSpec.encode(tm);
-      const decoded = myUtmSpec.decode(tm.spec, encoded);
+      const decoded = myUtmSpec.decode(tm.spec, makeInitSnapshot(myUtmSpec, encoded));
       expect(decoded).toEqual(tm);
     });
   });
@@ -63,17 +63,17 @@ describe("myUtmSpec gold standard tests", () => {
       (tm) => {
         const utm = makeInitSnapshot(myUtmSpec, myUtmSpec.encode(tm));
 
-        const snap0 = myUtmSpec.decode(tm.spec, utm.tape);
+        const snap0 = myUtmSpec.decode(tm.spec, utm);
         expect(snap0).toEqual(tm);
 
-        while (isDeepStrictEqual(snap0, myUtmSpec.decode(tm.spec, utm.tape)) && getStatus(utm) === "running") {
+        while (isDeepStrictEqual(snap0, myUtmSpec.decode(tm.spec, utm)) && getStatus(utm) === "running") {
           step(utm);
         }
-        while (myUtmSpec.decode(tm.spec, utm.tape) === undefined && getStatus(utm) === "running") {
+        while (myUtmSpec.decode(tm.spec, utm) === undefined && getStatus(utm) === "running") {
           step(utm);
         }
 
-        const snap1 = myUtmSpec.decode(tm.spec, utm.tape);
+        const snap1 = myUtmSpec.decode(tm.spec, utm);
         expect(snap1).not.toEqual(snap0);
         expect(snap1).toEqual(step(tm));
       },
@@ -95,7 +95,7 @@ describe("myUtmSpec gold standard tests", () => {
       run(tm);
       run(utm);
 
-      expect(myUtmSpec.decode(tm.spec, utm.tape)).toEqual(tm);
+      expect(myUtmSpec.decode(tm.spec, utm)).toEqual(tm);
     });
   });
 
@@ -111,9 +111,9 @@ describe("myUtmSpec gold standard tests", () => {
       run(utm);
 
       expect(getStatus(utm)).toBe(getStatus(baseTm));
-      const dec1 = myUtmSpec.decode(myUtmSpec, utm.tape);
+      const dec1 = myUtmSpec.decode(myUtmSpec, utm);
       expect(dec1).not.toBeUndefined();
-      const dec2 = myUtmSpec.decode(baseTm.spec, dec1!.tape);
+      const dec2 = myUtmSpec.decode(baseTm.spec, dec1!);
       expect(dec2).toEqual(baseTm);
     });
   });
