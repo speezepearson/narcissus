@@ -201,10 +201,6 @@ function decode<SimState extends string, SimSymbol extends string>(
   if (stIdx >= spec.allStates.length) return undefined;
   const simState = spec.allStates[stIdx];
 
-  // TAPELEN section
-  const tlenEnd = must(indexOf(tape, "#", tlenStart));
-  const tapeLen = fromBinary(tape.slice(tlenStart, tlenEnd));
-
   // TAPE section
 
   // Parse cells
@@ -224,20 +220,9 @@ function decode<SimState extends string, SimSymbol extends string>(
     i += symBits;
   }
 
-  // Determine tape trimming:
-  // - "init" state (initial or between steps): trim to tapeLen
-  //   The UTM may extend the tape for head movement, but step(tm) doesn't
-  //   extend for the NEW position, only for the OLD position (via getRule).
-  // - "accept"/"reject" state (halted): keep max(tapeLen, headPos+1)
-  //   This mimics getRule extending the tape before finding no matching rule.
-  const utmHalted = utmState === "accept" || utmState === "reject";
-  const minKeep = utmHalted ? Math.max(tapeLen, headPos + 1) : tapeLen;
   const resultTape = cells.slice();
-  while (
-    resultTape.length > minKeep &&
-    resultTape[resultTape.length - 1] === spec.blank
-  ) {
-    resultTape.pop();
+  while (resultTape.length <= headPos) {
+    resultTape.push(spec.blank);
   }
 
   return {
