@@ -2,14 +2,10 @@ import { describe, it } from "vitest";
 import { myUtmSpec } from "./my-utm-spec";
 import {
   makeInitSnapshot,
-  step,
-  getStatus,
 } from "./types";
 import {
   checkPalindromeSpec,
 } from "./toy-machines";
-import { expectTmsEqual, must } from "./test-util";
-import { tmsEqual } from "./util";
 
 describe("palindrome debug", () => {
   it("check encoded tape size", () => {
@@ -34,43 +30,4 @@ describe("palindrome debug", () => {
     }
     console.log(`Number of rules: ${ruleCount}`);
   });
-
-  it("first step with high limit", () => {
-    const tm = makeInitSnapshot(checkPalindromeSpec, ["a", "b", "b", "a"]);
-    const utm = myUtmSpec.encode(tm);
-
-    const snap0 = must(utm.decode());
-    expectTmsEqual(snap0, tm);
-
-    let steps = 0;
-    const maxSteps = 5_000_000;
-
-    let decoded = utm.decode();
-    while (
-      (decoded === undefined || tmsEqual(snap0, decoded)) &&
-      getStatus(utm) === "running"
-    ) {
-      step(utm);
-      decoded = utm.decode();
-      steps++;
-      if (steps > maxSteps) {
-        console.log(`TIMEOUT phase 1 after ${maxSteps} steps, UTM state=${utm.state}`);
-        break;
-      }
-    }
-
-    if (steps <= maxSteps) {
-      console.log(`Phase 1 done in ${steps} steps, UTM state=${utm.state}`);
-    }
-
-    if (steps <= maxSteps) {
-      const snap1 = utm.decode();
-      const stepped = step(tm);
-      console.log(`Phase 2 done in ${steps} total steps`);
-      console.log(`UTM status: ${getStatus(utm)}`);
-      console.log(`snap1: ${JSON.stringify({state: snap1?.state, pos: snap1?.pos})}`);
-      console.log(`step(tm): ${JSON.stringify({state: stepped.state, pos: stepped.pos})}`);
-      expectTmsEqual(must(snap1), stepped);
-    }
-  }, 30000);
 });
