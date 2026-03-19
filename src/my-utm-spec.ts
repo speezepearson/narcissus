@@ -180,9 +180,9 @@ function decode<SimState extends string, SimSymbol extends string>(
   // STATE section
   const stateEnd = must(indexOf(tape, "#", stateStart));
   const stateBitsArr = tape.slice(stateStart, stateEnd);
-  if (stateBitsArr.length !== sBits) return undefined;
+  if (stateBitsArr.length !== sBits) throw new Error(`nonsensical decode: state bits length mismatch: ${stateBitsArr.length} !== ${sBits}`);
   const stIdx = fromBinary(stateBitsArr);
-  if (stIdx >= spec.allStates.length) return undefined;
+  if (stIdx >= spec.allStates.length) throw new Error(`nonsensical decode: state index out of bounds: ${stIdx} >= ${spec.allStates.length}`);
   const simState = spec.allStates[stIdx];
 
   // TAPE section
@@ -199,7 +199,7 @@ function decode<SimState extends string, SimSymbol extends string>(
     if (i + symBits > tape.length) break;
     const bits = tape.slice(i, i + symBits);
     const symIdx = fromBinary(bits);
-    if (symIdx >= spec.allSymbols.length) return undefined;
+    if (symIdx >= spec.allSymbols.length) throw new Error(`nonsensical decode: symbol index out of bounds: ${symIdx} >= ${spec.allSymbols.length}`);
     cells.push(spec.allSymbols[symIdx]);
     i += symBits;
   }
