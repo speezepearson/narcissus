@@ -93,3 +93,66 @@
   background: var(--code-bg);
   color: var(--text-h);
 }
+
+/* UTM Viewer styles */
+
+.utm-status-line {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.utm-tape-label {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+
+.utm-tape-wrap {
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.8;
+  background: var(--code-bg);
+  padding: 8px 10px;
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.utm-cell {
+  display: inline;
+  letter-spacing: 0;
+}
+
+.utm-cell-head {
+  background: #fff;
+  color: #000;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  .utm-cell-head {
+    background: #e5e7eb;
+    color: #111;
+  }
+}
+
+.utm-ellipsis {
+  color: var(--text);
+  opacity: 0.4;
+  margin: 0 2px;
+}
+
+.utm-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: super;
+  margin-left: 2px;
+  margin-right: 1px;
+  opacity: 0.85;
+}

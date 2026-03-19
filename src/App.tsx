@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
+import { UTMViewer } from "./UTMViewer";
 import { checkPalindromeSpec, write1sForeverSpec } from "./toy-machines";
+import { myUtmSpec } from "./my-utm-spec";
 import "./App.css";
 
 function App() {
@@ -33,6 +35,14 @@ function App() {
 
       <h2 style={{ marginTop: "32px" }}>Write 1s Forever</h2>
       <TuringMachineViewer spec={write1sForeverSpec} initialTape={[]} />
+
+      <h2 style={{ marginTop: "32px" }}>UTM Simulation</h2>
+      <UTMViewer
+        key={tapeInput + "-utm"}
+        utmSpec={myUtmSpec}
+        simSpec={checkPalindromeSpec}
+        initialSimTape={initialTape}
+      />
     </div>
   );
 }

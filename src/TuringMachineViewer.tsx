@@ -28,7 +28,8 @@ function useTuringMachine<State extends string, Symbol extends string>(
   });
   const [status, setStatus] = useState<"accept" | "reject" | "running">("running");
   const [playing, setPlaying] = useState(false);
-  const [fps, setFps] = useState(5);
+  const [logFps, setLogFps] = useState(Math.log10(5));
+  const fps = Math.round(10 ** logFps);
 
   const snapshotRef = useRef(snapshot);
   const statusRef = useRef(status);
@@ -70,7 +71,7 @@ function useTuringMachine<State extends string, Symbol extends string>(
     return () => clearInterval(interval);
   }, [playing, fps, doStep]);
 
-  return { snapshot, status, playing, setPlaying, fps, setFps, doStep, reset };
+  return { snapshot, status, playing, setPlaying, fps, logFps, setLogFps, doStep, reset };
 }
 
 type TuringMachineViewerProps<State extends string, Symbol extends string> = {
@@ -82,7 +83,7 @@ export function TuringMachineViewer<
   State extends string,
   Symbol extends string,
 >({ spec, initialTape }: TuringMachineViewerProps<State, Symbol>) {
-  const { snapshot, status, playing, setPlaying, fps, setFps, doStep, reset } =
+  const { snapshot, status, playing, setPlaying, fps, logFps, setLogFps, doStep, reset } =
     useTuringMachine(spec, initialTape);
 
   const halted = status !== "running";
@@ -130,10 +131,11 @@ export function TuringMachineViewer<
           FPS:
           <input
             type="range"
-            min={1}
-            max={60}
-            value={fps}
-            onChange={(e) => setFps(Number(e.target.value))}
+            min={0}
+            max={6}
+            step={0.1}
+            value={logFps}
+            onChange={(e) => setLogFps(Number(e.target.value))}
           />
           <span>{fps}</span>
         </label>
