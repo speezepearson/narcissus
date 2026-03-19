@@ -65,7 +65,7 @@ describe("myUtmSpec gold standard tests", () => {
     })
   });
 
-  describe("rules", () => {
+  describe("rules", {timeout: 20_000}, () => {
     it.each(variousSnapshots)(
       "decodes to (original snapshot / undefined) for a while, then stepped snapshot",
       (tm) => {
@@ -106,12 +106,12 @@ describe("myUtmSpec gold standard tests", () => {
   });
 
   describe("recursion", () => {
-    it("can simulate itself", () => {
-      const simulator = makeInitUtmSnapshot(makeInitSnapshot(flipBitsSpec, ["0"]));
+    it("can simulate itself", {timeout: 600_000}, () => {
+      const simulator = makeInitUtmSnapshot(makeInitUtmSnapshot(makeInitUtmSnapshot(makeInitSnapshot(flipBitsSpec, ["0"]))));
       const doubleSimulator = makeInitUtmSnapshot(simulator);
 
       let decoded;
-      for (let i=0; i<1e7; i++) {
+      for (let i=0; i<1e9; i++) {
         expect(getStatus(step(doubleSimulator))).toBe('running');
         decoded = myUtmSpec.decode(myUtmSpec, doubleSimulator);
         if (decoded && (decoded.pos !== simulator.pos)) {
