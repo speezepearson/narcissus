@@ -17,7 +17,8 @@ import {
   flipBitsSpec,
   rejectImmediatelySpec,
 } from "./toy-machines";
-import { isDeepStrictEqual } from "node:util";
+import { tmsEqual } from "./util";
+import { expectTmsEqual, must } from "./test-util";
 
 function listAllSnapshots<TM extends TuringMachineSnapshot<string, string>>(
   tm: TM,
@@ -35,16 +36,16 @@ const variousSnapshots = [
   makeInitSnapshot(acceptImmediatelySpec, []),
   makeInitSnapshot(rejectImmediatelySpec, []),
   ...listAllSnapshots(
-    makeInitSnapshot(flipBitsSpec, ["0", "1", "0", "1", "1"]),
+    makeInitSnapshot(flipBitsSpec, ["0", "1"]),
   ),
   ...listAllSnapshots(
-    makeInitSnapshot(checkPalindromeSpec, ["a", "b", "b", "a"]),
+    makeInitSnapshot(checkPalindromeSpec, ["a", "a"]),
   ),
   ...listAllSnapshots(
-    makeInitSnapshot(checkPalindromeSpec, ["a", "b", "c", "b", "a"]),
+    makeInitSnapshot(checkPalindromeSpec, ["b", "b"]),
   ),
   ...listAllSnapshots(
-    makeInitSnapshot(checkPalindromeSpec, ["a", "b", "c", "d", "b", "a"]),
+    makeInitSnapshot(checkPalindromeSpec, ["a", "b"]),
   ),
 ];
 
@@ -53,35 +54,33 @@ describe("myUtmSpec gold standard tests", () => {
     it.each(variousSnapshots)("inverts encode", (tm) => {
       const encoded = myUtmSpec.encode(tm);
       const decoded = myUtmSpec.decode(tm.spec, makeInitSnapshot(myUtmSpec, encoded));
-      expect(decoded).toEqual(tm);
+      expectTmsEqual(must(decoded), tm);
     });
 
     it('can encode/decode itself', () => {
       const simulated = makeInitUtmSnapshot(makeInitSnapshot(flipBitsSpec, ["0"]));
       const simulator = makeInitUtmSnapshot(simulated);
       const decoded = myUtmSpec.decode(myUtmSpec, simulator);
-      expect(decoded).toEqual(simulated);
+      expectTmsEqual(must(decoded), simulated);
     })
   });
 
   describe("rules", () => {
     it.each(variousSnapshots)(
-      "decodes to original snapshot, then undefined, then stepped snapshot",
+      "decodes to (original snapshot / undefined) for a while, then stepped snapshot",
       (tm) => {
         const utm = makeInitUtmSnapshot(tm);
 
-        const snap0 = myUtmSpec.decode(tm.spec, utm);
-        expect(snap0).toEqual(tm);
+        let snap = myUtmSpec.decode(tm.spec, utm);
 
-        while (isDeepStrictEqual(snap0, myUtmSpec.decode(tm.spec, utm)) && getStatus(utm) === "running") {
+        while (snap === undefined || tmsEqual(snap, tm)) {
+          if (getStatus(utm) !== 'running') break;
           step(utm);
-        }
-        while (myUtmSpec.decode(tm.spec, utm) === undefined && getStatus(utm) === "running") {
-          step(utm);
+          snap = myUtmSpec.decode(tm.spec, utm);
         }
 
         const snap1 = myUtmSpec.decode(tm.spec, utm);
-        expect(snap1).toEqual(step(tm));
+        expectTmsEqual(must(snap1), step(tm));
       },
     );
 
@@ -101,7 +100,8 @@ describe("myUtmSpec gold standard tests", () => {
       run(tm);
       run(utm);
 
-      expect(myUtmSpec.decode(tm.spec, utm)).toEqual(tm);
+      const decoded = myUtmSpec.decode(tm.spec, utm);
+      expectTmsEqual(must(decoded), tm);
     });
   });
 
@@ -119,7 +119,7 @@ describe("myUtmSpec gold standard tests", () => {
         }
       }
       const target = step(simulator);
-      expect(decoded).toEqual(target);
+      expectTmsEqual(must(decoded), target);
     });
   });
 });

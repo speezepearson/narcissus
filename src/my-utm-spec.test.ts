@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 import { myUtmSpec } from "./my-utm-spec";
 import {
   makeInitSnapshot,
@@ -9,6 +9,8 @@ import {
   checkPalindromeSpec,
 } from "./toy-machines";
 import { isDeepStrictEqual } from "node:util";
+import { expectTmsEqual, must } from "./test-util";
+import { tmsEqual } from "./util";
 
 describe("palindrome debug", () => {
   it("check encoded tape size", () => {
@@ -38,18 +40,19 @@ describe("palindrome debug", () => {
     const tm = makeInitSnapshot(checkPalindromeSpec, ["a", "b", "b", "a"]);
     const utm = makeInitSnapshot(myUtmSpec, myUtmSpec.encode(tm));
 
-    const snap0 = myUtmSpec.decode(tm.spec, utm);
-    expect(snap0).toEqual(tm);
+    const snap0 = must(myUtmSpec.decode(tm.spec, utm));
+    expectTmsEqual(snap0, tm);
 
     let steps = 0;
     const maxSteps = 5_000_000;
 
-    // Phase 1: wait for snap0 to change
+    let decoded = myUtmSpec.decode(tm.spec, utm);
     while (
-      isDeepStrictEqual(snap0, myUtmSpec.decode(tm.spec, utm)) &&
+      (decoded === undefined || tmsEqual(snap0, decoded)) &&
       getStatus(utm) === "running"
     ) {
       step(utm);
+      decoded = myUtmSpec.decode(tm.spec, utm);
       steps++;
       if (steps > maxSteps) {
         console.log(`TIMEOUT phase 1 after ${maxSteps} steps, UTM state=${utm.state}`);
@@ -61,19 +64,6 @@ describe("palindrome debug", () => {
       console.log(`Phase 1 done in ${steps} steps, UTM state=${utm.state}`);
     }
 
-    // Phase 2: wait for undefined to resolve
-    while (
-      myUtmSpec.decode(tm.spec, utm) === undefined &&
-      getStatus(utm) === "running"
-    ) {
-      step(utm);
-      steps++;
-      if (steps > maxSteps) {
-        console.log(`TIMEOUT phase 2 after ${maxSteps} steps, UTM state=${utm.state}`);
-        break;
-      }
-    }
-
     if (steps <= maxSteps) {
       const snap1 = myUtmSpec.decode(tm.spec, utm);
       const stepped = step(tm);
@@ -81,7 +71,7 @@ describe("palindrome debug", () => {
       console.log(`UTM status: ${getStatus(utm)}`);
       console.log(`snap1: ${JSON.stringify({state: snap1?.state, pos: snap1?.pos})}`);
       console.log(`step(tm): ${JSON.stringify({state: stepped.state, pos: stepped.pos})}`);
-      expect(snap1).toEqual(stepped);
+      expectTmsEqual(must(snap1), stepped);
     }
   }, 30000);
 });
