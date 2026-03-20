@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { flipBitsSpec } from "../src/toy-machines";
-import { copySnapshot, getStatus, makeInitSnapshot, step } from "../src/types";
+import {
+  type TapeOverlay,
+  copySnapshot,
+  getStatus,
+  makeInitSnapshot,
+  step,
+} from "../src/types";
 import {
   MyUtmSnapshot,
   type MyUtmState,
@@ -8,6 +14,17 @@ import {
 } from "../src/my-utm-spec";
 import { makeArrayTapeOverlay, runUntilInnerStep } from "../src/util";
 import { isDeepStrictEqual } from "node:util";
+
+/** Materialize a TapeOverlay into a concrete array (reads until get() returns undefined). */
+function materializeTape<S extends string>(tape: TapeOverlay<S>): S[] {
+  const result: S[] = [];
+  for (let i = 0; ; i++) {
+    const v = tape.get(i);
+    if (v === undefined) break;
+    result.push(v);
+  }
+  return result;
+}
 
 const SAVEPOINT_FILE = "verify-nesting.savepoint.json";
 
@@ -34,7 +51,11 @@ let innerSteps: number;
 const loadArg = process.argv.includes("--load");
 if (loadArg && existsSync(SAVEPOINT_FILE)) {
   const data: Savepoint = JSON.parse(readFileSync(SAVEPOINT_FILE, "utf-8"));
-  sim = new MyUtmSnapshot({ ...data.simulator, simSpec: flipBitsSpec });
+  sim = new MyUtmSnapshot({
+    ...data.sim,
+    tape: makeArrayTapeOverlay(data.sim.tape),
+    simSpec: flipBitsSpec,
+  });
   real = MyUtmSnapshot.fromSimSnapshot(sim);
   innerSteps = data.innerSteps;
   console.log(`Loaded savepoint: innerSteps=${innerSteps}`);
@@ -64,11 +85,11 @@ while (true) {
   const { decoded } = innerStepResult;
   innerSteps++;
   step(sim);
-  const simWindow = [-3, -2, -1, 0, 1, 2, 3].map((i) =>
-    sim.tape.get(sim.pos + i),
+  const simWindow = [-3, -2, -1, 0, 1, 2, 3].map(
+    (i) => sim.tape.get(sim.pos + i) ?? sim.spec.blank,
   );
-  const decodedWindow = [-3, -2, -1, 0, 1, 2, 3].map((i) =>
-    decoded.tape.get(decoded.pos + i),
+  const decodedWindow = [-3, -2, -1, 0, 1, 2, 3].map(
+    (i) => decoded.tape.get(decoded.pos + i) ?? decoded.spec.blank,
   );
   if (
     !isDeepStrictEqual(
@@ -94,7 +115,7 @@ while (true) {
     `ticked the simulated machine! (dur=${padN(Math.round(now - lastInnerTickT), 4)}ms)`,
   );
   console.log(
-    `${padN(innerSteps, 6)}/${padN(expectedInnerSteps, 6)} : ${decoded.tape.join("")} => ${new MyUtmSnapshot({ ...decoded, simSpec: flipBitsSpec }).tape.join("")}`,
+    `${padN(innerSteps, 6)}/${padN(expectedInnerSteps, 6)} : ${materializeTape(decoded.tape).join("")} => ${materializeTape(new MyUtmSnapshot({ ...decoded, simSpec: flipBitsSpec }).tape).join("")}`,
   );
   console.log(
     Array(6 + 1 + 6 + 3 + decoded.pos)
@@ -107,7 +128,11 @@ while (true) {
   }
   const savepoint: Savepoint = {
     innerSteps,
-    sim,
+    sim: {
+      state: sim.state,
+      tape: materializeTape(sim.tape),
+      pos: sim.pos,
+    },
   };
   writeFileSync(SAVEPOINT_FILE, JSON.stringify(savepoint));
 }

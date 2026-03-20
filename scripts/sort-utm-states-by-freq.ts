@@ -5,6 +5,7 @@ import {
 } from "../src/my-utm-spec";
 import { flipBitsSpec } from "../src/toy-machines";
 import { getStatus, makeInitSnapshot, step, type UtmSpec } from "../src/types";
+import { makeArrayTapeOverlay } from "../src/util";
 
 type Stats<State extends string, Symbol extends string> = {
   steps: number;
@@ -24,7 +25,7 @@ type Stats<State extends string, Symbol extends string> = {
   };
   symbols: {
     counts: Partial<Record<Symbol, number>>;
-    sortedByFreqAsc: Symbol[];
+    sortedByFreqDesc: Symbol[];
     freqStats: Partial<
       Record<
         Symbol,
@@ -62,7 +63,7 @@ function getStats<State extends string, Symbol extends string>(
 ): Stats<State, Symbol> {
   let base;
   {
-    base = makeInitSnapshot(flipBitsSpec, ["0", "1"]);
+    base = makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0", "1"]));
     base = myUtmSpec.encode(base);
     base = utmSpec.encode(base);
   }
@@ -78,9 +79,9 @@ function getStats<State extends string, Symbol extends string>(
       break;
     }
     stateCounts[doubleSimulator.state] =
-      (stateCounts[doubleSimulator.state] || 0) + 1;
-    symbolCounts[doubleSimulator.tape[doubleSimulator.pos]] =
-      (symbolCounts[doubleSimulator.tape[doubleSimulator.pos]] || 0) + 1;
+      (stateCounts[doubleSimulator.state] ?? 0) + 1;
+    const sym = doubleSimulator.tape.get(doubleSimulator.pos) ?? utmSpec.blank;
+    symbolCounts[sym] = (symbolCounts[sym] ?? 0) + 1;
 
     const decoded = doubleSimulator.decode();
     if (decoded && decoded.pos !== simulator.pos) {
@@ -107,9 +108,9 @@ function getStats<State extends string, Symbol extends string>(
     },
     symbols: {
       counts: symbolCounts,
-      sortedByFreqAsc: utmSpec.allSymbols
+      sortedByFreqDesc: utmSpec.allSymbols
         .slice()
-        .sort((a, b) => symbolFreqs[a].freq - symbolFreqs[b].freq),
+        .sort((a, b) => symbolFreqs[b].freq - symbolFreqs[a].freq),
       freqStats: symbolFreqs,
     },
   };
@@ -131,7 +132,7 @@ while (true) {
   console.log("states recommendation:");
   console.log("  ", JSON.stringify(stats.states.sortedByFreqAsc));
   console.log("symbols recommendation:");
-  console.log("  ", JSON.stringify(stats.symbols.sortedByFreqAsc));
+  console.log("  ", JSON.stringify(stats.symbols.sortedByFreqDesc));
   if (lastStats) {
     const lastStatsConst = lastStats;
 
@@ -181,7 +182,7 @@ while (true) {
   spec = {
     ...spec,
     allStates: stats.states.sortedByFreqAsc,
-    allSymbols: stats.symbols.sortedByFreqAsc,
+    allSymbols: stats.symbols.sortedByFreqDesc,
   };
   nInnerSteps *= 2;
 }
