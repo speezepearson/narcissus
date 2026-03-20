@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  type TuringMachineSpec,
-  type TuringMachineSnapshot,
   copySnapshot,
+  getStatus,
   makeInitSnapshot,
   step,
-  getStatus,
   type TapeOverlay,
+  type TuringMachineSnapshot,
+  type TuringMachineSpec,
 } from "./types";
-import { makeArrayTapeOverlay } from "./util";
 
 function useTuringMachine<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
@@ -134,28 +133,33 @@ export function TuringMachineViewer<
   const halted = status !== "running";
 
   // Build tape display — pad with blanks so head is always visible
-  const tape = snapshot.tape;
-  const displayCells =
-    tape.length > snapshot.pos
-      ? tape
-      : [
-          ...tape,
-          ...Array.from<string>({
-            length: snapshot.pos - tape.length + 1,
-          }).fill(snapshot.spec.blank),
-        ];
-  const displayTape = displayCells.join("");
+  const charOffset = 15;
+  const displayTape = useMemo(
+    () =>
+      Array.from({ length: 2 * charOffset + 1 }, (_, i) => {
+        const ind = snapshot.pos + i - charOffset;
+        if (ind < 0) return " ";
+        return snapshot.tape.get(ind) ?? spec.blank;
+      }).join(""),
+    [snapshot, spec],
+  );
+  const moreLeft = snapshot.pos > charOffset;
 
-  // Compute character offset of the head position
-  const charOffset = displayCells.slice(0, snapshot.pos).join("").length;
-  const pointerLine = " ".repeat(charOffset) + `^ (state=${snapshot.state})`;
+  const pointerLine =
+    " ".repeat(charOffset) + `^ (state=${snapshot.state}, pos=${snapshot.pos})`;
 
   return (
     <div className="tm-viewer">
       <pre className="tm-tape">
-        <code>{displayTape}</code>
+        <code>
+          {moreLeft ? "... " : <>&nbsp;&nbsp;&nbsp;&nbsp;</>}
+          {displayTape} ...
+        </code>
         {"\n"}
-        <code>{pointerLine}</code>
+        <code>
+          <>&nbsp;&nbsp;&nbsp;&nbsp;</>
+          {pointerLine}
+        </code>
       </pre>
 
       {halted && (
