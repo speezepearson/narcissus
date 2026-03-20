@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LogSlider } from "./LogSlider";
 import { TapeView } from "./TapeView";
 import {
   getStatus,
@@ -8,6 +9,7 @@ import {
   type TuringMachineSnapshot,
   type TuringMachineSpec,
 } from "./types";
+import { usePlayPause } from "./usePlayPause";
 
 function useTuringMachine<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
@@ -19,9 +21,6 @@ function useTuringMachine<State extends string, Symbol extends string>(
   const [status, setStatus] = useState<"accept" | "reject" | "running">(
     "running",
   );
-  const [playing, setPlaying] = useState(false);
-  const [logFps, setLogFps] = useState(Math.log10(5));
-  const fps = Math.round(10 ** logFps);
 
   const snapRef = useRef(snapshot);
   const statusRef = useRef(status);
@@ -39,7 +38,6 @@ function useTuringMachine<State extends string, Symbol extends string>(
     statusRef.current = st;
     setSnapshot({ ...snap });
     setStatus(st);
-    if (st !== "running") setPlaying(false);
   }, []);
 
   const doStep = useCallback(() => {
@@ -53,45 +51,28 @@ function useTuringMachine<State extends string, Symbol extends string>(
     publish(snap);
   }, [spec, initialTape, publish]);
 
-  const fpsRef = useRef(fps);
-  useEffect(() => {
-    fpsRef.current = fps;
-  }, [fps]);
-  const accumRef = useRef(0);
-
-  useEffect(() => {
-    if (!playing) {
-      accumRef.current = 0;
-      return;
-    }
-    const MAX_RENDER_FPS = 30;
-    const interval = setInterval(() => {
-      if (statusRef.current !== "running") return;
-      accumRef.current += fpsRef.current / MAX_RENDER_FPS;
-      const stepsThisFrame = Math.floor(accumRef.current);
-      accumRef.current -= stepsThisFrame;
-      if (stepsThisFrame === 0) return;
-
+  const onSteps = useCallback(
+    (count: number) => {
+      if (statusRef.current !== "running") return false;
       const snap = snapRef.current;
-      for (let i = 0; i < stepsThisFrame; i++) {
+      for (let i = 0; i < count; i++) {
         step(snap);
         if (getStatus(snap) !== "running") break;
       }
       publish(snap);
-    }, 1000 / MAX_RENDER_FPS);
-    return () => clearInterval(interval);
-  }, [playing, publish]);
+      return getStatus(snap) === "running";
+    },
+    [publish],
+  );
+
+  const playPause = usePlayPause({ onSteps });
 
   return {
     snapshot,
     status,
-    playing,
-    setPlaying,
-    fps,
-    logFps,
-    setLogFps,
     doStep,
     reset,
+    ...playPause,
   };
 }
 
@@ -104,17 +85,8 @@ export function TuringMachineViewer<
   State extends string,
   Symbol extends string,
 >({ spec, initialTape }: TuringMachineViewerProps<State, Symbol>) {
-  const {
-    snapshot,
-    status,
-    playing,
-    setPlaying,
-    fps,
-    logFps,
-    setLogFps,
-    doStep,
-    reset,
-  } = useTuringMachine(spec, initialTape);
+  const { snapshot, status, playing, toggle, fps, setFps, doStep, reset } =
+    useTuringMachine(spec, initialTape);
 
   const halted = status !== "running";
 
@@ -132,22 +104,17 @@ export function TuringMachineViewer<
         <button onClick={doStep} disabled={halted}>
           Step
         </button>
-        <button onClick={() => setPlaying((p) => !p)} disabled={halted}>
+        <button onClick={toggle} disabled={halted}>
           {playing ? "Pause" : "Play"}
         </button>
         <button onClick={reset}>Reset</button>
-        <label className="tm-fps">
-          FPS:
-          <input
-            type="range"
-            min={0}
-            max={7}
-            step={0.1}
-            value={logFps}
-            onChange={(e) => setLogFps(Number(e.target.value))}
-          />
-          <span>{fps}</span>
-        </label>
+        <LogSlider
+          label="FPS"
+          value={fps}
+          onChange={setFps}
+          min={1}
+          max={10000000}
+        />
       </div>
     </div>
   );

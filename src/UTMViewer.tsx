@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LogSlider } from "./LogSlider";
 import { MyUtmSnapshot, myUtmSpec } from "./my-utm-spec";
 import { TapeView } from "./TapeView";
 import {
@@ -7,6 +8,7 @@ import {
   getStatus,
   step,
 } from "./types";
+import { usePlayPause } from "./usePlayPause";
 
 type MyUTMViewerProps<SimState extends string, SimSymbol extends string> = {
   initialSim: TuringMachineSnapshot<SimState, SimSymbol>;
@@ -38,11 +40,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     SimState,
     SimSymbol
   > | null>(() => makeInitial().decoded ?? null);
-  const [playing, setPlaying] = useState(false);
-  const [logFps, setLogFps] = useState(Math.log10(5));
-  const fps = Math.round(10 ** logFps);
-  const [logRadius, setLogRadius] = useState(1.4);
-  const visibleRadius = Math.round(10 ** logRadius);
+  const [visibleRadius, setVisibleRadius] = useState(25);
   const [stepCount, setStepCount] = useState(0);
 
   const utmRef = useRef(utmSnapshot);
@@ -86,29 +84,31 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setCanRewind(true);
   }, []);
 
-  // Single step — overhead of compile/writeBack not worth it for 1 step
+  const publishUtm = useCallback(
+    (snap: MyUtmSnapshot<SimState, SimSymbol>, steps: number) => {
+      const st = getStatus(snap);
+      utmRef.current = snap;
+      statusRef.current = st;
+      setUtmSnapshot(snap);
+      setUtmStatus(st);
+      setStepCount((c) => c + steps);
+      const decoded = snap.decode({ sparse: false });
+      if (decoded) {
+        lastDecodedRef.current = decoded;
+        setLastDecoded(decoded);
+      }
+    },
+    [],
+  );
+
+  // Single step
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
     pushHistory();
     const next = utmRef.current;
-    const st = getStatus(step(next));
-
-    utmRef.current = next;
-    statusRef.current = st;
-    setUtmSnapshot(next);
-    setUtmStatus(st);
-    setStepCount((c) => c + 1);
-
-    const decoded = next.decode({ sparse: false });
-    if (decoded) {
-      lastDecodedRef.current = decoded;
-      setLastDecoded(decoded);
-    }
-
-    if (st !== "running") {
-      setPlaying(false);
-    }
-  }, [pushHistory]);
+    step(next);
+    publishUtm(next, 1);
+  }, [pushHistory, publishUtm]);
 
   // Step until UTM state changes
   const doStepState = useCallback(() => {
@@ -124,24 +124,8 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
       if (snap.state !== startState) break;
     }
 
-    const st = getStatus(snap);
-
-    utmRef.current = snap;
-    statusRef.current = st;
-    setUtmSnapshot(snap);
-    setUtmStatus(st);
-    setStepCount((c) => c + steps);
-
-    const decoded = snap.decode({ sparse: false });
-    if (decoded) {
-      lastDecodedRef.current = decoded;
-      setLastDecoded(decoded);
-    }
-
-    if (st !== "running") {
-      setPlaying(false);
-    }
-  }, [pushHistory]);
+    publishUtm(snap, steps);
+  }, [pushHistory, publishUtm]);
 
   const reset = useCallback(() => {
     const { utmSnapshot: snap, decoded } = makeInitial();
@@ -151,7 +135,6 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setUtmSnapshot(snap);
     setUtmStatus("running");
     setLastDecoded(decoded ?? null);
-    setPlaying(false);
     setStepCount(0);
     historyRef.current = [];
     setCanRewind(false);
@@ -168,36 +151,17 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setUtmStatus("running");
     setLastDecoded(entry.decoded);
     setStepCount(entry.stepCount);
-    setPlaying(false);
     setCanRewind(h.length > 0);
   }, []);
 
-  const fpsRef = useRef(fps);
-  useEffect(() => {
-    fpsRef.current = fps;
-  }, [fps]);
-  const accumRef = useRef(0);
-
-  useEffect(() => {
-    if (!playing) {
-      accumRef.current = 0;
-      return;
-    }
-    const MAX_RENDER_FPS = 30;
-    const interval = setInterval(() => {
-      if (statusRef.current !== "running") return;
-      accumRef.current += fpsRef.current / MAX_RENDER_FPS;
-      const stepsThisFrame = Math.floor(accumRef.current);
-      accumRef.current -= stepsThisFrame;
-      if (stepsThisFrame === 0) return;
+  const onSteps = useCallback(
+    (count: number) => {
+      if (statusRef.current !== "running") return false;
       pushHistory();
       const snap = new MyUtmSnapshot(utmRef.current);
-      // const compiled = compileSnapshot(snap, machine);
-      // const breaker = makeBreaker();
-      for (let i = 0; i < stepsThisFrame; i++) {
+      for (let i = 0; i < count; i++) {
         stepCountRef.current++;
         if (getStatus(step(snap)) !== "running") break;
-        // await breaker();
       }
       const st = getStatus(snap);
       utmRef.current = snap;
@@ -210,12 +174,12 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
         lastDecodedRef.current = decoded;
         setLastDecoded(decoded);
       }
-      if (st !== "running") {
-        setPlaying(false);
-      }
-    }, 1000 / MAX_RENDER_FPS);
-    return () => clearInterval(interval);
-  }, [playing, pushHistory]);
+      return st === "running";
+    },
+    [pushHistory],
+  );
+
+  const { playing, toggle, fps, setFps } = usePlayPause({ onSteps });
 
   const halted = utmStatus !== "running";
 
@@ -243,37 +207,27 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
         <button onClick={doStepState} disabled={halted}>
           Step State
         </button>
-        <button onClick={() => setPlaying((p) => !p)} disabled={halted}>
+        <button onClick={toggle} disabled={halted}>
           {playing ? "Pause" : "Play"}
         </button>
         <button onClick={rewind} disabled={!canRewind}>
           Rewind
         </button>
         <button onClick={reset}>Reset</button>
-        <label className="tm-fps">
-          FPS:
-          <input
-            type="range"
-            min={0}
-            max={7}
-            step={0.1}
-            value={logFps}
-            onChange={(e) => setLogFps(Number(e.target.value))}
-          />
-          <span>{fps}</span>
-        </label>
-        <label className="tm-fps">
-          Radius:
-          <input
-            type="range"
-            min={0}
-            max={3}
-            step={0.01}
-            value={logRadius}
-            onChange={(e) => setLogRadius(Number(e.target.value))}
-          />
-          <span>{visibleRadius}</span>
-        </label>
+        <LogSlider
+          label="FPS"
+          value={fps}
+          onChange={setFps}
+          min={1}
+          max={10000000}
+        />
+        <LogSlider
+          label="Radius"
+          value={visibleRadius}
+          onChange={setVisibleRadius}
+          min={1}
+          max={1000}
+        />
       </div>
     </div>
   );
