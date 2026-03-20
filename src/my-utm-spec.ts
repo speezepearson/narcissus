@@ -7,6 +7,7 @@ import {
   type UtmSpec,
 } from "./types";
 import { must, tapeIndexOf } from "./util";
+
 // ════════════════════════════════════════════════════════════════════
 // UTM Alphabet
 // ════════════════════════════════════════════════════════════════════
@@ -29,26 +30,6 @@ const allSymbols = [
   "$", // left boundary marker (position 0)
 ] as const;
 export type MyUtmSymbol = (typeof allSymbols)[number];
-
-// The ~optimal order of symbols is computed by `npx tsx src/sort-utm-states-by-freq.ts`.
-const allSymbolsOrderOptimized = [
-  "_",
-  ">",
-  "$",
-  "^",
-  "*",
-  "#",
-  "X",
-  "Y",
-  ",",
-  "d",
-  "l",
-  ";",
-  ".",
-  "|",
-  "1",
-  "0",
-] as const;
 
 // ════════════════════════════════════════════════════════════════════
 // Binary encoding helpers
@@ -105,6 +86,7 @@ function fromBinaryAt(
 // ════════════════════════════════════════════════════════════════════
 function encodeToTape<SimState extends string, SimSymbol extends string>(
   snapshot: TuringMachineSnapshot<SimState, SimSymbol>,
+  optimizationHints: Array<[SimState, SimSymbol]> = [],
 ): TapeOverlay<MyUtmSymbol> {
   const { spec, state, tape, pos } = snapshot;
   const stateIdx = spec.allStates.indexOf(state);
@@ -119,29 +101,39 @@ function encodeToTape<SimState extends string, SimSymbol extends string>(
   header.push("$");
 
   // RULES section
+  const transitionOrder = new Map<SimState, Map<SimSymbol, number>>();
+  for (let i = 0; i < optimizationHints.length; i++) {
+    const [st, sym] = optimizationHints[i];
+    if (!transitionOrder.has(st)) transitionOrder.set(st, new Map());
+    transitionOrder.get(st)!.set(sym, i);
+  }
+  const transitions: Array<[SimState, SimSymbol, [SimState, SimSymbol, Dir]]> =
+    [...spec.rules.entries()].flatMap(([st, ruleMap]) =>
+      [...ruleMap.entries()].map(([sym, rule]) => [st, sym, rule]),
+    );
+  transitions.sort(
+    (a, b) =>
+      (transitionOrder.get(a[0])?.get(a[1]) ?? 0) -
+      (transitionOrder.get(b[0])?.get(b[1]) ?? 0),
+  );
+
   header.push("#");
   let first = true;
-  for (const st of spec.allStates) {
+  for (const [st, sym, rule] of transitions) {
     const stIdx = spec.allStates.indexOf(st);
-    const ruleMap = spec.rules.get(st);
-    if (!ruleMap) continue;
-    for (const sym of spec.allSymbols) {
-      const rule = ruleMap.get(sym);
-      if (!rule) continue;
-      if (!first) header.push(";");
-      first = false;
-      const [newSt, newSym, dir] = rule;
-      header.push(".");
-      header.push(...toBinary(stIdx, sBits));
-      header.push("|");
-      header.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
-      header.push("|");
-      header.push(...toBinary(spec.allStates.indexOf(newSt), sBits));
-      header.push("|");
-      header.push(...toBinary(spec.allSymbols.indexOf(newSym), symBits));
-      header.push("|");
-      header.push(dir === "L" ? "l" : "d");
-    }
+    if (!first) header.push(";");
+    first = false;
+    const [newSt, newSym, dir] = rule;
+    header.push(".");
+    header.push(...toBinary(stIdx, sBits));
+    header.push("|");
+    header.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
+    header.push("|");
+    header.push(...toBinary(spec.allStates.indexOf(newSt), sBits));
+    header.push("|");
+    header.push(...toBinary(spec.allSymbols.indexOf(newSym), symBits));
+    header.push("|");
+    header.push(dir === "L" ? "l" : "d");
   }
 
   // ACCEPTSTATES section
@@ -1468,7 +1460,6 @@ function buildUtmRules(): RuleMap {
 
 const rules = buildUtmRules();
 
-// The ~optimal order of states is computed by `npx tsx src/sort-utm-states-by-freq.ts`.
 const allStates = [
   "acc_final_home",
   "acc_rest_acc",
@@ -1668,11 +1659,14 @@ export class MyUtmSnapshot<
 
   static fromSimSnapshot<SimState extends string, SimSymbol extends string>(
     simSnapshot: TuringMachineSnapshot<SimState, SimSymbol>,
+    {
+      optimizationHints = [],
+    }: { optimizationHints?: Array<[SimState, SimSymbol]> } = {},
   ): MyUtmSnapshot<SimState, SimSymbol> {
     return new MyUtmSnapshot({
       pos: 0,
       state: myUtmSpec.initial,
-      tape: encodeToTape(simSnapshot),
+      tape: encodeToTape(simSnapshot, optimizationHints),
       simSpec: simSnapshot.spec,
     });
   }
@@ -1688,17 +1682,11 @@ export class MyUtmSnapshot<
 
 export const myUtmSpec: UtmSpec<MyUtmState, MyUtmSymbol> = {
   allStates,
-  allSymbols: allSymbols
-    .slice()
-    .sort(
-      (a, b) =>
-        allSymbolsOrderOptimized.indexOf(a) -
-        allSymbolsOrderOptimized.indexOf(b),
-    ),
+  allSymbols,
   initial: "init",
   blank: "_",
   acceptingStates: new Set<MyUtmState>(["accept"]),
   rules,
 
-  encode: MyUtmSnapshot.fromSimSnapshot,
+  encode: (snap, opts) => MyUtmSnapshot.fromSimSnapshot(snap, opts),
 };

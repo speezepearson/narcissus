@@ -11,6 +11,7 @@ import {
 import { makeInitSnapshot } from "./types";
 import { makeArrayTapeOverlay } from "./util";
 import { myUtmSpec } from "./my-utm-spec";
+import myUtmOptimizationHints from "./my-utm-spec-transition-optimization-hints";
 
 function App() {
   const [tapeInput, setTapeInput] = useState("abba");
@@ -67,7 +68,9 @@ function App() {
             flipBitsSpec,
             makeArrayTapeOverlay(["0", "1", "0", "1"]),
           ),
+          { optimizationHints: myUtmOptimizationHints },
         )}
+        optimizationHints={myUtmOptimizationHints}
       />
     </div>
   );

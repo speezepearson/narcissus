@@ -21,6 +21,7 @@ import {
 } from "./toy-machines";
 import { makeArrayTapeOverlay, runUntilInnerStep } from "./util";
 import { must } from "./test-util";
+import myUtmOptimizationHints from "./my-utm-spec-transition-optimization-hints";
 
 function listAllSnapshots<State extends string, Symbol extends string>(
   tm: TuringMachineSnapshot<State, Symbol>,
@@ -150,6 +151,7 @@ describe("myUtmSpec gold standard tests", () => {
           myUtmSpec.encode(
             makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
           ),
+          { optimizationHints: myUtmOptimizationHints },
         ),
       );
       const doubleSimulator = myUtmSpec.encode(simulator);

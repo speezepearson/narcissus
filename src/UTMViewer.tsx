@@ -10,22 +10,23 @@ import {
 
 type MyUTMViewerProps<SimState extends string, SimSymbol extends string> = {
   initialSim: TuringMachineSnapshot<SimState, SimSymbol>;
+  optimizationHints?: Array<[SimState, SimSymbol]>;
 };
 
 export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
   initialSim,
+  optimizationHints,
 }: MyUTMViewerProps<SimState, SimSymbol>) {
   const makeInitial = useCallback(() => {
-    const utmSnapshot = myUtmSpec.encode(initialSim) as MyUtmSnapshot<
-      SimState,
-      SimSymbol
-    >;
+    const utmSnapshot = myUtmSpec.encode(initialSim, {
+      optimizationHints,
+    }) as MyUtmSnapshot<SimState, SimSymbol>;
     if (!(utmSnapshot instanceof MyUtmSnapshot)) {
       throw new Error("utmSnapshot is not a MyUtmSnapshot???");
     }
     const decoded = utmSnapshot.decode();
     return { utmSnapshot, decoded };
-  }, [initialSim]);
+  }, [initialSim, optimizationHints]);
 
   const [utmSnapshot, setUtmSnapshot] = useState(
     () => makeInitial().utmSnapshot,

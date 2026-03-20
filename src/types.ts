@@ -121,6 +121,7 @@ export type UtmSpec<
 > = TuringMachineSpec<UState, USymbol> & {
   encode<SimState extends string, SimSymbol extends string>(
     snapshot: TuringMachineSnapshot<SimState, SimSymbol>,
+    opts?: { optimizationHints?: Array<[SimState, SimSymbol]> },
   ): UtmSnapshot<UState, USymbol, SimState, SimSymbol>;
 };
 
