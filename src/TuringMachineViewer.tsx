@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  compile,
+  compileSnapshot,
+  decompileSnapshot,
+  fastRun,
+  type CompiledSnapshot,
+} from "./fast-run";
 import { TapeView } from "./TapeView";
 import {
-  copySnapshot,
-  getStatus,
   makeInitSnapshot,
-  step,
   type TapeOverlay,
-  type TuringMachineSnapshot,
   type TuringMachineSpec,
 } from "./types";
 
@@ -14,10 +17,19 @@ function useTuringMachine<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
   initialTape: TapeOverlay<Symbol>,
 ) {
-  const [snapshot, setSnapshot] = useState(() => {
-    const s = makeInitSnapshot(spec, initialTape);
-    return s;
-  });
+  const machine = useMemo(() => compile(spec), [spec]);
+
+  const makeInitCompiled = useCallback(
+    () => compileSnapshot(makeInitSnapshot(spec, initialTape), machine),
+    [spec, initialTape, machine],
+  );
+
+  const compiledRef = useRef<CompiledSnapshot>(makeInitCompiled());
+  const statusRef = useRef<"accept" | "reject" | "running">("running");
+
+  const [snapshot, setSnapshot] = useState(() =>
+    makeInitSnapshot(spec, initialTape),
+  );
   const [status, setStatus] = useState<"accept" | "reject" | "running">(
     "running",
   );
@@ -25,41 +37,29 @@ function useTuringMachine<State extends string, Symbol extends string>(
   const [logFps, setLogFps] = useState(Math.log10(5));
   const fps = Math.round(10 ** logFps);
 
-  const snapshotRef = useRef(snapshot);
-  const statusRef = useRef(status);
-
-  useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  const stepOnce = useCallback((snap: TuringMachineSnapshot<State, Symbol>) => {
-    const st = getStatus(step(snap));
-    return st;
-  }, []);
+  const publish = useCallback(
+    (st: "accept" | "reject" | "running") => {
+      setSnapshot(decompileSnapshot(compiledRef.current, spec));
+      setStatus(st);
+      statusRef.current = st;
+      if (st !== "running") setPlaying(false);
+    },
+    [spec],
+  );
 
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
-    const next = copySnapshot(snapshotRef.current);
-    const st = stepOnce(next);
-    snapshotRef.current = next;
-    statusRef.current = st;
-    setSnapshot(next);
-    setStatus(st);
-    if (st !== "running") {
-      setPlaying(false);
-    }
-  }, [stepOnce]);
+    const result = fastRun(compiledRef.current, { gas: 1 });
+    publish(result.halted ? result.status : "running");
+  }, [publish]);
 
   const reset = useCallback(() => {
-    const s = makeInitSnapshot(spec, initialTape.clone());
-    setSnapshot(s);
-    setStatus("running");
-    setPlaying(false);
-  }, [spec, initialTape]);
+    compiledRef.current = compileSnapshot(
+      makeInitSnapshot(spec, initialTape.clone()),
+      machine,
+    );
+    publish("running");
+  }, [spec, initialTape, machine, publish]);
 
   const fpsRef = useRef(fps);
   useEffect(() => {
@@ -80,22 +80,11 @@ function useTuringMachine<State extends string, Symbol extends string>(
       accumRef.current -= stepsThisFrame;
       if (stepsThisFrame === 0) return;
 
-      const snap = copySnapshot(snapshotRef.current);
-      let st: "accept" | "reject" | "running" = "running";
-      for (let i = 0; i < stepsThisFrame; i++) {
-        st = stepOnce(snap);
-        if (st !== "running") break;
-      }
-      snapshotRef.current = snap;
-      statusRef.current = st;
-      setSnapshot(snap);
-      setStatus(st);
-      if (st !== "running") {
-        setPlaying(false);
-      }
+      const result = fastRun(compiledRef.current, { gas: stepsThisFrame });
+      publish(result.halted ? result.status : "running");
     }, 1000 / MAX_RENDER_FPS);
     return () => clearInterval(interval);
-  }, [playing, stepOnce]);
+  }, [playing, publish]);
 
   return {
     snapshot,
@@ -156,7 +145,7 @@ export function TuringMachineViewer<
           <input
             type="range"
             min={0}
-            max={6}
+            max={7}
             step={0.1}
             value={logFps}
             onChange={(e) => setLogFps(Number(e.target.value))}

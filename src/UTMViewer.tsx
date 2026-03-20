@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MyUtmSnapshot, myUtmSpec } from "./my-utm-spec";
 import { TapeView } from "./TapeView";
 import {
@@ -7,6 +7,13 @@ import {
   getStatus,
   step,
 } from "./types";
+import {
+  compile,
+  compileSnapshot,
+  fastRun,
+  fastStep,
+  writeBack,
+} from "./fast-run";
 
 type MyUTMViewerProps<SimState extends string, SimSymbol extends string> = {
   initialSim: TuringMachineSnapshot<SimState, SimSymbol>;
@@ -17,6 +24,8 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
   initialSim,
   optimizationHints,
 }: MyUTMViewerProps<SimState, SimSymbol>) {
+  const machine = useMemo(() => compile(myUtmSpec), []);
+
   const makeInitial = useCallback(() => {
     const utmSnapshot = myUtmSpec.encode(initialSim, {
       optimizationHints,
@@ -86,6 +95,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setCanRewind(true);
   }, []);
 
+  // Single step — overhead of compile/writeBack not worth it for 1 step
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
     pushHistory();
@@ -101,7 +111,6 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     const decoded = next.decode();
     if (decoded) {
       lastDecodedRef.current = decoded;
-      console.log("decoded", decoded);
       setLastDecoded(decoded);
     }
 
@@ -110,17 +119,23 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     }
   }, [pushHistory]);
 
+  // Step until UTM state changes — can be many steps, use fast path
   const doStepState = useCallback(() => {
     if (statusRef.current !== "running") return;
     pushHistory();
     const snap = new MyUtmSnapshot(utmRef.current);
-    const startState = snap.state;
-    let st: "accept" | "reject" | "running" = "running";
+    const compiled = compileSnapshot(snap, machine);
+    const startState = compiled.state;
+
     let steps = 0;
-    while (st === "running" && snap.state === startState) {
-      st = getStatus(step(snap));
+    while (true) {
+      if (!fastStep(compiled)) break;
       steps++;
+      if (compiled.state !== startState) break;
     }
+
+    writeBack(compiled, snap);
+    const st = getStatus(snap);
 
     utmRef.current = snap;
     statusRef.current = st;
@@ -137,7 +152,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     if (st !== "running") {
       setPlaying(false);
     }
-  }, [pushHistory]);
+  }, [machine, pushHistory]);
 
   const reset = useCallback(() => {
     const { utmSnapshot: snap, decoded } = makeInitial();
@@ -189,30 +204,23 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
 
       pushHistory();
       const snap = new MyUtmSnapshot(utmRef.current);
-      let st: "accept" | "reject" | "running" = "running";
-      let mostRecentDecodeThisFrame:
-        | TuringMachineSnapshot<SimState, SimSymbol>
-        | undefined = undefined;
-      for (let i = 0; i < stepsThisFrame; i++) {
-        st = getStatus(step(snap));
-        const decoded = snap.decode();
-        if (decoded) {
-          mostRecentDecodeThisFrame = decoded;
-        }
-        if (st !== "running") break;
-      }
+      const compiled = compileSnapshot(snap, machine);
+      const result = fastRun(compiled, { gas: stepsThisFrame });
+      writeBack(compiled, snap);
+
+      const st = result.halted ? result.status : "running";
 
       utmRef.current = snap;
       statusRef.current = st;
-      stepCountRef.current += stepsThisFrame;
+      stepCountRef.current += result.steps;
       setUtmSnapshot(snap);
       setUtmStatus(st);
       setStepCount(stepCountRef.current);
 
-      if (mostRecentDecodeThisFrame) {
-        lastDecodedRef.current = mostRecentDecodeThisFrame;
-        console.log("decoded", mostRecentDecodeThisFrame);
-        setLastDecoded(mostRecentDecodeThisFrame);
+      const decoded = snap.decode();
+      if (decoded) {
+        lastDecodedRef.current = decoded;
+        setLastDecoded(decoded);
       }
 
       if (st !== "running") {
@@ -220,7 +228,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
       }
     }, 1000 / MAX_RENDER_FPS);
     return () => clearInterval(interval);
-  }, [playing, pushHistory]);
+  }, [playing, machine, pushHistory]);
 
   const halted = utmStatus !== "running";
 
