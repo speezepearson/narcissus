@@ -9,7 +9,17 @@ import { usePlayPause } from "./usePlayPause";
 
 export function useTuringMachine<State extends string, Symbol extends string>(
   init: TuringMachineSnapshot<State, Symbol>,
+  opts?: {
+    onStateChange?: (
+      oldState: State,
+      cur: TuringMachineSnapshot<State, Symbol>,
+    ) => void;
+  },
 ) {
+  const onStateChangeRef = useRef(opts?.onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = opts?.onStateChange;
+  }, [opts?.onStateChange]);
   const [snapshot, setSnapshot] = useState(() => copySnapshot(init));
   const [status, setStatus] = useState<"accept" | "reject" | "running">(
     "running",
@@ -35,8 +45,13 @@ export function useTuringMachine<State extends string, Symbol extends string>(
 
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
-    step(snapRef.current);
-    publish(snapRef.current);
+    const snap = snapRef.current;
+    const oldState = snap.state;
+    step(snap);
+    if (snap.state !== oldState) {
+      onStateChangeRef.current?.(oldState, snap);
+    }
+    publish(snap);
   }, [publish]);
 
   const reset = useCallback(() => {
@@ -49,7 +64,11 @@ export function useTuringMachine<State extends string, Symbol extends string>(
       if (statusRef.current !== "running") return false;
       const snap = snapRef.current;
       for (let i = 0; i < count; i++) {
+        const oldState = snap.state;
         step(snap);
+        if (snap.state !== oldState) {
+          onStateChangeRef.current?.(oldState, snap);
+        }
         if (getStatus(snap) !== "running") break;
         if (i % 1e4 === 0 && performance.now() >= stopAtMs) break;
       }

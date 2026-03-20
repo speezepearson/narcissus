@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import "./App.css";
 import { TuringMachineViewer } from "./TuringMachineViewer";
 import { UTMViewer } from "./UTMViewer";
-import { myUtmSpec } from "./my-utm-spec";
+import { MyUtmSnapshot } from "./my-utm-spec";
 import {
   checkPalindromeSpec,
   doubleXSpec,
@@ -47,7 +47,7 @@ function App() {
 
   const initUtmSnapshot = useMemo(
     () =>
-      myUtmSpec.encode(
+      MyUtmSnapshot.fromSimSnapshot(
         makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0", "1"])),
       ),
     [],
