@@ -142,22 +142,4 @@ describe("myUtmSpec gold standard tests", () => {
       expectTmsEqual(must(decoded), tm);
     });
   });
-
-  // describe.concurrent("recursion", () => {
-  //   it.concurrent("can simulate itself", { timeout: 600_000 }, async () => {
-  //     const simulator = myUtmSpec.encode(
-  //       myUtmSpec.encode(
-  //         myUtmSpec.encode(
-  //           makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
-  //         ),
-  //         { optimizationHints: myUtmOptimizationHints },
-  //       ),
-  //     );
-  //     const doubleSimulator = myUtmSpec.encode(simulator);
-
-  //     await run(doubleSimulator);
-  //     const target = step(simulator);
-  //     expectTmsEqual(must(doubleSimulator.decode()), target);
-  //   });
-  // });
 });
