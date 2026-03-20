@@ -1,55 +1,12 @@
-import {
-  MyUtmSnapshot,
-  myUtmSpec,
-  numBits,
-  toBinary,
-  type MyUtmState,
-  type MyUtmSymbol,
-} from "./my-utm-spec";
+import { myUtmSpec, numBits, toBinary, type MyUtmSymbol } from "./my-utm-spec";
 import myUtmOptimizationHints from "./my-utm-spec-transition-optimization-hints";
-import {
-  makeInitSnapshot,
-  makeSimpleTapeOverlay,
-  type TapeIdx,
-  type TapeOverlay,
-} from "./types";
+import { makeInitSnapshot, type TapeIdx } from "./types";
 import {
   makeArrayTapeOverlay,
   must,
   mustSymbolIndex,
   tapeIndexOf,
 } from "./util";
-
-export class InfiniteUtm extends MyUtmSnapshot<MyUtmState, MyUtmSymbol> {
-  constructor({
-    pos = 0,
-    state = myUtmSpec.initial,
-    tape = makeSimpleTapeOverlay(infiniteUtmTapeBackground),
-  }: {
-    pos?: TapeIdx;
-    state?: MyUtmState;
-    tape?: TapeOverlay<MyUtmSymbol>;
-  } = {}) {
-    super({
-      simSpec: myUtmSpec,
-      pos,
-      state,
-      tape,
-    });
-  }
-
-  override decode(optimizationHints?: {
-    sparse?: boolean;
-  }): InfiniteUtm | undefined {
-    const plain = super.decode(optimizationHints);
-    if (plain === undefined) return undefined;
-    return new InfiniteUtm({
-      pos: plain.pos,
-      state: plain.state,
-      tape: plain.tape, // TODO: do we need to manipulate this?
-    });
-  }
-}
 
 const header = (() => {
   const baseUtm = myUtmSpec.encode(
@@ -62,7 +19,7 @@ const header = (() => {
 const nSymBits = numBits(myUtmSpec.allSymbols.length);
 const cellSize = 1 + nSymBits;
 
-function infiniteUtmTapeBackground(idx: TapeIdx): MyUtmSymbol {
+export function infiniteUtmTapeBackground(idx: TapeIdx): MyUtmSymbol {
   if (idx < header.length) return header[idx];
   const cellIdx = Math.floor((idx - header.length) / cellSize);
   const within = (idx - header.length) % cellSize;

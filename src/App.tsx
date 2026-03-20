@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 import "./App.css";
 import { TuringMachineViewer } from "./TuringMachineViewer";
 import { MyUTMViewer } from "./UTMViewer";
-import { InfiniteUtm } from "./infinite-utm";
+import { infiniteUtmTapeBackground } from "./infinite-utm";
+import { myUtmSpec } from "./my-utm-spec";
 import myUtmOptimizationHints from "./my-utm-spec-transition-optimization-hints";
 import {
   checkPalindromeSpec,
   doubleXSpec,
   write1sForeverSpec,
 } from "./toy-machines";
+import { makeInitSnapshot, makeSimpleTapeOverlay } from "./types";
 import { makeArrayTapeOverlay } from "./util";
 
 function App() {
@@ -61,7 +63,10 @@ function App() {
       <h2 style={{ marginTop: "32px" }}>UTM Simulation</h2>
       <MyUTMViewer
         key={tapeInput + "-utm"}
-        initialSim={new InfiniteUtm()}
+        initialSim={makeInitSnapshot(
+          myUtmSpec,
+          makeSimpleTapeOverlay(infiniteUtmTapeBackground),
+        )}
         optimizationHints={myUtmOptimizationHints}
       />
     </div>
