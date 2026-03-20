@@ -1,4 +1,10 @@
-import type { TuringMachineSnapshot } from "./types";
+import {
+  getStatus,
+  step,
+  type TapeOverlay,
+  type TuringMachineSnapshot,
+  type UtmSnapshot,
+} from "./types";
 
 export function tapesEqual<Tape extends readonly string[]>(
   a: Tape,
@@ -14,17 +20,6 @@ export function tapesEqual<Tape extends readonly string[]>(
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
   }
-  return true;
-}
-
-export function tmsEqual<State extends string, Symbol extends string>(
-  a: TuringMachineSnapshot<State, Symbol>,
-  b: TuringMachineSnapshot<State, Symbol>,
-): boolean {
-  if (a.spec !== b.spec) return false; // object equality is fine here at time of writing, since the spec is readonly and unique, never reconstructed
-  if (a.state !== b.state) return false;
-  if (a.pos !== b.pos) return false;
-  if (!tapesEqual(a.tape, b.tape, a.spec.blank)) return false;
   return true;
 }
 
@@ -45,4 +40,43 @@ export function indexOf<T>(
     return undefined;
   }
   return index;
+}
+
+export function makeArrayTapeOverlay<Symbol extends string>(
+  array: Symbol[],
+): TapeOverlay<Symbol> {
+  return {
+    get(i: number): Symbol | undefined {
+      return array[i];
+    },
+    set(i: number, sym: Symbol): void {
+      array[i] = sym;
+    },
+    clone(): TapeOverlay<Symbol> {
+      return makeArrayTapeOverlay(array);
+    },
+  };
+}
+
+export function runUntilInnerStep<
+  UState extends string,
+  USymbol extends string,
+  SimState extends string,
+  SimSymbol extends string,
+>(
+  utm: UtmSnapshot<UState, USymbol, SimState, SimSymbol>,
+):
+  | { type: "halt"; status: "accept" | "reject" }
+  | { type: "stepped"; decoded: TuringMachineSnapshot<SimState, SimSymbol> } {
+  const initPos = utm.decode()?.pos;
+  let status: "accept" | "reject" | "running" = "running";
+  while (status === "running") {
+    status = getStatus(utm);
+    const decoded = utm.decode();
+    if (decoded && decoded.pos !== initPos) {
+      return { type: "stepped", decoded };
+    }
+    step(utm);
+  }
+  return { type: "halt", status };
 }

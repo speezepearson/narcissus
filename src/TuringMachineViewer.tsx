@@ -6,24 +6,16 @@ import {
   makeInitSnapshot,
   step,
   getStatus,
+  type TapeOverlay,
 } from "./types";
-
-function padTape<State extends string, Symbol extends string>(
-  snapshot: TuringMachineSnapshot<State, Symbol>,
-  blank: Symbol,
-) {
-  while (snapshot.tape.length <= snapshot.pos) {
-    snapshot.tape.push(blank);
-  }
-}
+import { makeArrayTapeOverlay } from "./util";
 
 function useTuringMachine<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
-  initialTape: readonly Symbol[],
+  initialTape: TapeOverlay<Symbol>,
 ) {
   const [snapshot, setSnapshot] = useState(() => {
     const s = makeInitSnapshot(spec, initialTape);
-    padTape(s, spec.blank);
     return s;
   });
   const [status, setStatus] = useState<"accept" | "reject" | "running">(
@@ -44,15 +36,10 @@ function useTuringMachine<State extends string, Symbol extends string>(
     statusRef.current = status;
   }, [status]);
 
-  const stepOnce = useCallback(
-    (snap: TuringMachineSnapshot<State, Symbol>) => {
-      padTape(snap, spec.blank);
-      const st = getStatus(step(snap));
-      padTape(snap, spec.blank);
-      return st;
-    },
-    [spec.blank],
-  );
+  const stepOnce = useCallback((snap: TuringMachineSnapshot<State, Symbol>) => {
+    const st = getStatus(step(snap));
+    return st;
+  }, []);
 
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
@@ -68,8 +55,7 @@ function useTuringMachine<State extends string, Symbol extends string>(
   }, [stepOnce]);
 
   const reset = useCallback(() => {
-    const s = makeInitSnapshot(spec, initialTape);
-    padTape(s, spec.blank);
+    const s = makeInitSnapshot(spec, initialTape.clone());
     setSnapshot(s);
     setStatus("running");
     setPlaying(false);
@@ -126,7 +112,7 @@ function useTuringMachine<State extends string, Symbol extends string>(
 
 type TuringMachineViewerProps<State extends string, Symbol extends string> = {
   spec: TuringMachineSpec<State, Symbol>;
-  initialTape: readonly Symbol[];
+  initialTape: TapeOverlay<Symbol>;
 };
 
 export function TuringMachineViewer<

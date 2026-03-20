@@ -221,8 +221,8 @@ export const checkPalindromeSpec = ((): TuringMachineSpec<
   };
 })();
 
-type DoubleXSymbol = "_" | "$" | "X" | "Y" | "Z";
-type DoubleXState =
+export type DoubleXSymbol = "_" | "$" | "X" | "Y" | "Z";
+export type DoubleXState =
   | "start"
   | "findX"
   | "goRight"

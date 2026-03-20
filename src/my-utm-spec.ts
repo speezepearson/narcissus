@@ -1,5 +1,6 @@
 import {
   type Dir,
+  type TapeOverlay,
   type TuringMachineSnapshot,
   type TuringMachineSpec,
   type UtmSnapshot,
@@ -98,20 +99,21 @@ function fromBinary(bits: readonly MyUtmSymbol[]): number {
 // ════════════════════════════════════════════════════════════════════
 function encodeToTape<SimState extends string, SimSymbol extends string>(
   snapshot: TuringMachineSnapshot<SimState, SimSymbol>,
-): MyUtmSymbol[] {
+): TapeOverlay<MyUtmSymbol> {
   const { spec, state, tape, pos } = snapshot;
   const stateIdx = spec.allStates.indexOf(state);
   const sBits = numBits(spec.allStates.length);
   const symBits = numBits(spec.allSymbols.length);
   const blankIdx = spec.allSymbols.indexOf(spec.blank);
 
-  const result: MyUtmSymbol[] = [];
+  /** The immediately-realized portion of the UTM's tape. The tape section is lazily loaded. */
+  const real: MyUtmSymbol[] = [];
 
   // Boundary marker
-  result.push("$");
+  real.push("$");
 
   // RULES section
-  result.push("#");
+  real.push("#");
   let first = true;
   for (const st of spec.allStates) {
     const stIdx = spec.allStates.indexOf(st);
@@ -120,48 +122,49 @@ function encodeToTape<SimState extends string, SimSymbol extends string>(
     for (const sym of spec.allSymbols) {
       const rule = ruleMap.get(sym);
       if (!rule) continue;
-      if (!first) result.push(";");
+      if (!first) real.push(";");
       first = false;
       const [newSt, newSym, dir] = rule;
-      result.push(".");
-      result.push(...toBinary(stIdx, sBits));
-      result.push("|");
-      result.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
-      result.push("|");
-      result.push(...toBinary(spec.allStates.indexOf(newSt), sBits));
-      result.push("|");
-      result.push(...toBinary(spec.allSymbols.indexOf(newSym), symBits));
-      result.push("|");
-      result.push(dir === "L" ? "l" : "d");
+      real.push(".");
+      real.push(...toBinary(stIdx, sBits));
+      real.push("|");
+      real.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
+      real.push("|");
+      real.push(...toBinary(spec.allStates.indexOf(newSt), sBits));
+      real.push("|");
+      real.push(...toBinary(spec.allSymbols.indexOf(newSym), symBits));
+      real.push("|");
+      real.push(dir === "L" ? "l" : "d");
     }
   }
 
   // ACCEPTSTATES section
-  result.push("#");
+  real.push("#");
   const accStates = spec.allStates.filter((s) => spec.acceptingStates.has(s));
   for (let i = 0; i < accStates.length; i++) {
-    if (i > 0) result.push(";");
-    result.push(...toBinary(spec.allStates.indexOf(accStates[i]), sBits));
+    if (i > 0) real.push(";");
+    real.push(...toBinary(spec.allStates.indexOf(accStates[i]), sBits));
   }
 
   // STATE section
-  result.push("#");
-  result.push(...toBinary(stateIdx, sBits));
+  real.push("#");
+  real.push(...toBinary(stateIdx, sBits));
 
   // BLANK section
-  result.push("#");
-  result.push(...toBinary(blankIdx, symBits));
+  real.push("#");
+  real.push(...toBinary(blankIdx, symBits));
 
   // TAPE section
-  result.push("#");
+  real.push("#");
+
+  // TODO: make some TapeOverlay instance that begins with the realized portion and then lazy-loads this stuff from the sim's tape.
   const cellCount = Math.max(tape.length, pos + 1);
   for (let i = 0; i < cellCount; i++) {
-    result.push(i === pos ? "^" : ",");
+    real.push(i === pos ? "^" : ",");
     const sym = i < tape.length ? tape[i] : spec.blank;
-    result.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
+    real.push(...toBinary(spec.allSymbols.indexOf(sym), symBits));
   }
-
-  return result;
+  return real;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -177,13 +180,6 @@ function decode<SimState extends string, SimSymbol extends string>(
   const utmState = utm.state as string;
   if (utmState !== "init" && utmState !== "accept" && utmState !== "reject") {
     return undefined;
-  }
-
-  // Check for marker symbols indicating mid-operation
-  for (const sym of tape) {
-    if (sym === "X" || sym === "Y" || sym === "*" || sym === ">") {
-      return undefined;
-    }
   }
 
   const sBits = numBits(spec.allStates.length);
@@ -213,7 +209,8 @@ function decode<SimState extends string, SimSymbol extends string>(
 
   // TAPE section
 
-  // Parse cells
+  // TODO: instead of eagerly parsing all the cells in the UTM's (possibly infinite) tape,
+  //  construst a TapeOverlay instance that lazily loads each simulated cell from the correct chunk of the UTM's tape.
   const cells: SimSymbol[] = [];
   let headPos = 0;
   let i = tapeSecStart;
@@ -1543,7 +1540,7 @@ export class MyUtmSnapshot<
 > implements UtmSnapshot<MyUtmState, MyUtmSymbol, SimState, SimSymbol> {
   pos: number;
   state: MyUtmState;
-  tape: MyUtmSymbol[];
+  tape: TapeOverlay<MyUtmSymbol>;
   simSpec: TuringMachineSpec<SimState, SimSymbol>;
 
   constructor({
@@ -1554,12 +1551,12 @@ export class MyUtmSnapshot<
   }: {
     pos: number;
     state: MyUtmState;
-    tape: MyUtmSymbol[];
+    tape: TapeOverlay<MyUtmSymbol>;
     simSpec: TuringMachineSpec<SimState, SimSymbol>;
   }) {
     this.pos = pos;
     this.state = state;
-    this.tape = tape.slice();
+    this.tape = tape.clone();
     this.simSpec = simSpec;
   }
 

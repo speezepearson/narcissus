@@ -13,28 +13,41 @@ export interface TuringMachineSpec<
   readonly rules: ReadonlyMap<State, ReadonlyMap<Symbol, [State, Symbol, Dir]>>;
 }
 
+/** A TapeOverlay represents an overlay on top of a tape full of blanks.
+ * It can be lazily loaded; it can stretch off to infinity; it can have holes in it.
+ * (The overlay does not know what the blank symbol is: that's the job of the TuringMachineSpec.)
+ *
+ * An expected normal use case:
+ * - a TapeOverlay is instantiated to describe a Turing machine's initial tape
+ *   (e.g. for "the machine flipBitsSpec starting with tape `01101____...`," the TapeOverlay is where the "01101" lives.)
+ * - The machine runs, `set()`ting  symbols in the overlay.
+ *   (e.g. after three steps, ^that machine has flipped the first three bits of the tape, so the TapeOverlay now "contains" "10001";
+ *    that is, `overlay.get(0) === 1`, `overlay.get(1) === 0`, etc.)
+ */
+export type TapeOverlay<Symbol extends string> = {
+  get(i: number): Symbol | undefined;
+  set(i: number, sym: Symbol): void;
+  clone(): TapeOverlay<Symbol>;
+};
+
 export type TuringMachineSnapshot<
   State extends string,
   Symbol extends string,
 > = {
   spec: TuringMachineSpec<State, Symbol>;
   state: State;
-  tape: Symbol[];
+  tape: TapeOverlay<Symbol>;
   pos: number;
 };
 
 export function makeInitSnapshot<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
-  tape: readonly Symbol[] = [],
+  tape: TapeOverlay<Symbol>,
 ): TuringMachineSnapshot<State, Symbol> {
-  const tapeCopy = tape.slice();
-  if (tapeCopy.length === 0) {
-    tapeCopy.push(spec.blank);
-  }
   return {
     spec,
     state: spec.initial,
-    tape: tapeCopy,
+    tape,
     pos: 0,
   };
 }
@@ -44,7 +57,7 @@ export function copySnapshot<State extends string, Symbol extends string>(
   return {
     spec: snapshot.spec,
     state: snapshot.state,
-    tape: snapshot.tape.slice(),
+    tape: snapshot.tape.clone(),
     pos: snapshot.pos,
   };
 }
@@ -52,12 +65,9 @@ export function copySnapshot<State extends string, Symbol extends string>(
 export function getRule<State extends string, Symbol extends string>(
   snapshot: TuringMachineSnapshot<State, Symbol>,
 ): [State, Symbol, Dir] | undefined {
-  if (snapshot.pos >= snapshot.tape.length) {
-    throw new Error("head is beyond end of tape");
-  }
   return snapshot.spec.rules
     .get(snapshot.state)
-    ?.get(snapshot.tape[snapshot.pos]);
+    ?.get(snapshot.tape.get(snapshot.pos) ?? snapshot.spec.blank);
 }
 export function getStatus<State extends string, Symbol extends string>(
   snapshot: TuringMachineSnapshot<State, Symbol>,
@@ -74,18 +84,15 @@ export function step<State extends string, Symbol extends string>(
   const rule = getRule(tm);
   if (!rule) return tm;
 
-  const { spec, pos } = tm;
+  const { pos } = tm;
 
   const [newState, newSymbol, dir] = rule;
   tm.state = newState;
-  tm.tape[pos] = newSymbol;
+  tm.tape.set(pos, newSymbol);
   if (dir === "L" && pos === 0) {
     throw new Error("Can't step machine; already at left edge of tape");
   }
   tm.pos = { L: pos - 1, R: pos + 1 }[dir];
-  if (tm.tape.length <= tm.pos) {
-    tm.tape.push(spec.blank);
-  }
 
   return tm;
 }

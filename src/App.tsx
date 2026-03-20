@@ -9,6 +9,7 @@ import {
 import "./App.css";
 import { makeInitSnapshot } from "./types";
 import { myUtmSpec } from "./my-utm-spec";
+import { makeArrayTapeOverlay } from "./util";
 
 function App() {
   const [tapeInput, setTapeInput] = useState("abba");
@@ -45,7 +46,7 @@ function App() {
       <MyUTMViewer
         key={tapeInput + "-utm"}
         initialSim={myUtmSpec.encode(
-          makeInitSnapshot(flipBitsSpec, ["0", "1"]),
+          makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0", "1"])),
         )}
       />
     </div>
