@@ -14,16 +14,17 @@ import { makeInitSnapshot, makeSimpleTapeOverlay } from "./types";
 import { makeArrayTapeOverlay } from "./util";
 
 function App() {
-  const [tapeInput, setTapeInput] = useState("abba");
+  const [palindromeInput, setPalindromeInput] = useState("abba");
+  const [doubleXCount, setDoubleXCount] = useState(5);
 
   const initialTape = useMemo(
     () =>
       makeArrayTapeOverlay(
-        tapeInput
+        palindromeInput
           .split("")
           .filter((c): c is "a" | "b" => c === "a" || c === "b"),
       ),
-    [tapeInput],
+    [palindromeInput],
   );
 
   return (
@@ -33,14 +34,14 @@ function App() {
         Tape:
         <input
           type="text"
-          value={tapeInput}
-          onChange={(e) => setTapeInput(e.target.value)}
+          value={palindromeInput}
+          onChange={(e) => setPalindromeInput(e.target.value)}
           placeholder="e.g. abba"
           spellCheck={false}
         />
       </label>
       <TuringMachineViewer
-        key={tapeInput}
+        key={palindromeInput}
         spec={checkPalindromeSpec}
         initialTape={initialTape}
       />
@@ -52,17 +53,30 @@ function App() {
       />
 
       <h2 style={{ marginTop: "32px" }}>Double X</h2>
+      <label className="tm-tape-input">
+        {" "}
+        Number of X's:
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          value={doubleXCount}
+          onChange={(e) => setDoubleXCount(Number(e.target.value))}
+        />
+      </label>
       <TuringMachineViewer
+        key={doubleXCount}
         spec={doubleXSpec}
         initialTape={makeArrayTapeOverlay([
           "$",
-          ...Array.from({ length: 100 }, () => "X"),
+          ...Array.from({ length: doubleXCount }, () => "X"),
         ])}
       />
 
       <h2 style={{ marginTop: "32px" }}>UTM Simulation</h2>
       <MyUTMViewer
-        key={tapeInput + "-utm"}
+        key={palindromeInput + "-utm"}
         initialSim={makeInitSnapshot(
           myUtmSpec,
           makeSimpleTapeOverlay(infiniteUtmTapeBackground),
