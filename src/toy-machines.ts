@@ -1,4 +1,4 @@
-import { type TuringMachineSpec } from "./types";
+import { type Dir, type TuringMachineSpec } from "./types";
 
 export const write1sForeverSpec: TuringMachineSpec<"init", "_" | "1"> = {
   allStates: ["init"] as const,
@@ -52,33 +52,7 @@ export const flipBitsSpec: TuringMachineSpec<"init", "_" | "0" | "1"> = {
   ]),
 };
 
-type Letter =
-  | "a"
-  | "b"
-  | "c"
-  | "d"
-  | "e"
-  | "f"
-  | "g"
-  | "h"
-  | "i"
-  | "j"
-  | "k"
-  | "l"
-  | "m"
-  | "n"
-  | "o"
-  | "p"
-  | "q"
-  | "r"
-  | "s"
-  | "t"
-  | "u"
-  | "v"
-  | "w"
-  | "x"
-  | "y"
-  | "z";
+type Letter = "a" | "b" | "c";
 
 type PalindromeSymbol = "_" | Letter;
 type PalindromeState =
@@ -101,46 +75,7 @@ export const checkPalindromeSpec = ((): TuringMachineSpec<
   //   seekL     – scan left back to the start
   //   accept    – halting accept state
 
-  type Letter =
-    | "a"
-    | "b"
-    | "c"
-    | "d"
-    | "e"
-    | "f"
-    | "g"
-    | "h"
-    | "i"
-    | "j"
-    | "k"
-    | "l"
-    | "m"
-    | "n"
-    | "o"
-    | "p"
-    | "q"
-    | "r"
-    | "s"
-    | "t"
-    | "u"
-    | "v"
-    | "w"
-    | "x"
-    | "y"
-    | "z";
-
-  type PalindromeSymbol = "_" | Letter;
-  type PalindromeState =
-    | "start"
-    | "accept"
-    | "seekL"
-    | `seekR_${Letter}`
-    | `check_${Letter}`;
-  type Dir = "L" | "R";
-
-  const letters: readonly Letter[] = [
-    ..."abcdefghijklmnopqrstuvwxyz",
-  ] as Letter[];
+  const letters = ["a", "b", "c"] as const;
 
   const allSymbols: readonly PalindromeSymbol[] = ["_", ...letters];
 

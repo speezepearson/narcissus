@@ -1,3 +1,5 @@
+import { makeBreaker } from "./test-util";
+
 export type Dir = "L" | "R";
 
 export interface TuringMachineSpec<
@@ -96,15 +98,17 @@ export function step<State extends string, Symbol extends string>(
 
   return tm;
 }
-export function run<TM extends TuringMachineSnapshot<string, string>>(
+export async function run<TM extends TuringMachineSnapshot<string, string>>(
   snapshot: TM,
   { gas = 1e10 }: { gas?: number } = {},
-): TM {
+): Promise<TM> {
+  const breaker = makeBreaker();
   while (getStatus(snapshot) === "running") {
     if (gas <= 0) {
       throw new Error("Gas limit exceeded");
     }
     step(snapshot);
+    await breaker();
     gas--;
   }
 

@@ -37,8 +37,8 @@ describe("rejectImmediatelySpec", () => {
 });
 
 describe("flipBitsSpec", () => {
-  it("flips bits", () => {
-    const tm = run(
+  it("flips bits", async () => {
+    const tm = await run(
       makeInitSnapshot(
         flipBitsSpec,
         makeArrayTapeOverlay(["0", "1", "0", "1", "1"]),
@@ -65,8 +65,8 @@ describe("doubleXSpec", () => {
     return ["$", ...Array.from({ length: 2 * n }, (): "X" => "X"), "_"];
   }
 
-  it.each([0, 1, 2, 3])("doubles %i X's", (n) => {
-    const tm = run(makeInitSnapshot(doubleXSpec, makeXTape(n)));
+  it.each([0, 1, 2, 3])("doubles %i X's", async (n) => {
+    const tm = await run(makeInitSnapshot(doubleXSpec, makeXTape(n)));
     expect(getStatus(tm)).toBe("accept");
     [...expectedTape(n), undefined].forEach((sym, i) => {
       expect(tm.tape.get(i)).toBe(sym);
@@ -75,8 +75,8 @@ describe("doubleXSpec", () => {
 });
 
 describe("checkPalindromeSpec", () => {
-  it("accepts an even-length palindrome", () => {
-    const tm = run(
+  it("accepts an even-length palindrome", async () => {
+    const tm = await run(
       makeInitSnapshot(
         checkPalindromeSpec,
         makeArrayTapeOverlay(["a", "b", "b", "a"]),
@@ -84,8 +84,8 @@ describe("checkPalindromeSpec", () => {
     );
     expect(getStatus(tm)).toBe("accept");
   });
-  it("accepts an odd-length palindrome", () => {
-    const tm = run(
+  it("accepts an odd-length palindrome", async () => {
+    const tm = await run(
       makeInitSnapshot(
         checkPalindromeSpec,
         makeArrayTapeOverlay(["a", "b", "b", "b", "a"]),
@@ -93,8 +93,8 @@ describe("checkPalindromeSpec", () => {
     );
     expect(getStatus(tm)).toBe("accept");
   });
-  it("rejects a non-palindrome", () => {
-    const tm = run(
+  it("rejects a non-palindrome", async () => {
+    const tm = await run(
       makeInitSnapshot(
         checkPalindromeSpec,
         makeArrayTapeOverlay(["a", "b", "b", "a", "b"]),

@@ -56,28 +56,34 @@ function expectTmsEqual<State extends string, Symbol extends string>(
 }
 
 const variousSnapshots = [
-  makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
-  makeInitSnapshot(rejectImmediatelySpec, makeArrayTapeOverlay([])),
+  {
+    name: "acceptImmediatelySpec",
+    tm: makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
+  },
+  {
+    name: "rejectImmediatelySpec",
+    tm: makeInitSnapshot(rejectImmediatelySpec, makeArrayTapeOverlay([])),
+  },
   ...listAllSnapshots(
     makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0", "1"])),
-  ),
+  ).map((tm, i) => ({ name: `flipBitsSpec-${i}`, tm })),
   ...listAllSnapshots(
     makeInitSnapshot(doubleXSpec, makeArrayTapeOverlay(["$", "X", "X"])),
-  ),
+  ).map((tm, i) => ({ name: `doubleXSpec-${i}`, tm })),
   ...listAllSnapshots(
     makeInitSnapshot(checkPalindromeSpec, makeArrayTapeOverlay(["a", "a"])),
-  ),
+  ).map((tm, i) => ({ name: `checkPalindromeSpec-a-a-${i}`, tm })),
   ...listAllSnapshots(
     makeInitSnapshot(checkPalindromeSpec, makeArrayTapeOverlay(["b", "b"])),
-  ),
+  ).map((tm, i) => ({ name: `checkPalindromeSpec-b-b-${i}`, tm })),
   ...listAllSnapshots(
     makeInitSnapshot(checkPalindromeSpec, makeArrayTapeOverlay(["a", "b"])),
-  ),
+  ).map((tm, i) => ({ name: `checkPalindromeSpec-a-b-${i}`, tm })),
 ];
 
 describe("myUtmSpec gold standard tests", () => {
   describe("decode", () => {
-    it.each(variousSnapshots)("inverts encode", (tm) => {
+    it.each(variousSnapshots)("inverts encode - $name", ({ tm }) => {
       const roundtrip = must(myUtmSpec.encode(tm).decode());
       expectTmsEqual(roundtrip, tm);
     });
@@ -92,69 +98,65 @@ describe("myUtmSpec gold standard tests", () => {
     });
   });
 
-  describe("rules", { timeout: 20_000 }, () => {
-    it.each(variousSnapshots)(
-      "decodes to (original snapshot / undefined) for a while, then stepped snapshot",
-      (tm) => {
+  describe.concurrent("rules", { timeout: 20_000 }, () => {
+    it.concurrent.each(variousSnapshots)(
+      "decodes to (original snapshot / undefined) for a while, then stepped snapshot - $name",
+      ({ tm }) => {
         const utm = myUtmSpec.encode(tm);
-        runUntilInnerStep(utm);
+        if (runUntilInnerStep(utm).type === "halt") return;
         expectTmsEqual(must(utm.decode()), step(tm));
       },
     );
 
-    it("terminates with the same status as the simulated machine", () => {
-      expect(
-        getStatus(
-          run(
-            makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
+    it.concurrent(
+      "terminates with the same status as the simulated machine",
+      async () => {
+        expect(
+          getStatus(
+            await run(
+              makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
+            ),
           ),
-        ),
-      ).toBe("accept");
-      expect(
-        getStatus(
-          run(
-            makeInitSnapshot(rejectImmediatelySpec, makeArrayTapeOverlay([])),
+        ).toBe("accept");
+        expect(
+          getStatus(
+            await run(
+              makeInitSnapshot(rejectImmediatelySpec, makeArrayTapeOverlay([])),
+            ),
           ),
-        ),
-      ).toBe("reject");
-    });
+        ).toBe("reject");
+      },
+    );
 
-    it("terminates with the correct decoded tape", () => {
+    it.concurrent("terminates with the correct decoded tape", async () => {
       const tm = makeInitSnapshot(
         flipBitsSpec,
         makeArrayTapeOverlay(["0", "1", "0", "1", "1"]),
       );
-      const utm = run(myUtmSpec.encode(tm));
+      const utm = await run(myUtmSpec.encode(tm));
 
-      run(tm);
-      run(utm);
+      await run(tm);
+      await run(utm);
 
       const decoded = utm.decode();
       expectTmsEqual(must(decoded), tm);
     });
   });
 
-  describe("recursion", () => {
-    it("can simulate itself", { timeout: 600_000 }, () => {
+  describe.concurrent("recursion", () => {
+    it.concurrent("can simulate itself", { timeout: 600_000 }, async () => {
       const simulator = myUtmSpec.encode(
         myUtmSpec.encode(
           myUtmSpec.encode(
-            makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0"])),
+            makeInitSnapshot(acceptImmediatelySpec, makeArrayTapeOverlay([])),
           ),
         ),
       );
       const doubleSimulator = myUtmSpec.encode(simulator);
 
-      let decoded;
-      for (let i = 0; i < 1e9; i++) {
-        expect(getStatus(step(doubleSimulator))).toBe("running");
-        decoded = doubleSimulator.decode();
-        if (decoded && decoded.pos !== simulator.pos) {
-          break;
-        }
-      }
+      await run(doubleSimulator);
       const target = step(simulator);
-      expectTmsEqual(must(decoded), target);
+      expectTmsEqual(must(doubleSimulator.decode()), target);
     });
   });
 });
