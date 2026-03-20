@@ -30,9 +30,9 @@ export function must<T>(x: T | undefined): T {
   return x;
 }
 
-export function indexOf<T>(
-  array: readonly T[],
-  value: T,
+export function indexOf<Arr extends ReadonlyArray<unknown>>(
+  array: Arr,
+  value: Arr[number],
   start?: number,
 ): number | undefined {
   const index = array.indexOf(value, start);

@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { compile, compileSnapshot, fastStep, writeBack } from "./fast-run";
 import { MyUtmSnapshot, myUtmSpec } from "./my-utm-spec";
 import { TapeView } from "./TapeView";
+import { makeBreaker } from "./test-util";
 import {
   type TuringMachineSnapshot,
   copySnapshot,
   getStatus,
   step,
 } from "./types";
-import {
-  compile,
-  compileSnapshot,
-  fastRun,
-  fastStep,
-  writeBack,
-} from "./fast-run";
 
 type MyUTMViewerProps<SimState extends string, SimSymbol extends string> = {
   initialSim: TuringMachineSnapshot<SimState, SimSymbol>;
@@ -195,34 +190,32 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
       return;
     }
     const MAX_RENDER_FPS = 30;
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       if (statusRef.current !== "running") return;
       accumRef.current += fpsRef.current / MAX_RENDER_FPS;
       const stepsThisFrame = Math.floor(accumRef.current);
       accumRef.current -= stepsThisFrame;
       if (stepsThisFrame === 0) return;
-
       pushHistory();
       const snap = new MyUtmSnapshot(utmRef.current);
-      const compiled = compileSnapshot(snap, machine);
-      const result = fastRun(compiled, { gas: stepsThisFrame });
-      writeBack(compiled, snap);
-
-      const st = result.halted ? result.status : "running";
-
+      // const compiled = compileSnapshot(snap, machine);
+      const breaker = makeBreaker();
+      for (let i = 0; i < stepsThisFrame; i++) {
+        stepCountRef.current++;
+        if (getStatus(step(snap)) !== "running") break;
+        await breaker();
+      }
+      const st = getStatus(snap);
       utmRef.current = snap;
       statusRef.current = st;
-      stepCountRef.current += result.steps;
       setUtmSnapshot(snap);
       setUtmStatus(st);
       setStepCount(stepCountRef.current);
-
       const decoded = snap.decode({ sparse: false });
       if (decoded) {
         lastDecodedRef.current = decoded;
         setLastDecoded(decoded);
       }
-
       if (st !== "running") {
         setPlaying(false);
       }

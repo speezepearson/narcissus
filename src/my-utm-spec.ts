@@ -34,12 +34,12 @@ export type MyUtmSymbol = (typeof allSymbols)[number];
 // ════════════════════════════════════════════════════════════════════
 // Binary encoding helpers
 // ════════════════════════════════════════════════════════════════════
-function numBits(count: number): number {
+export function numBits(count: number): number {
   return Math.max(1, Math.ceil(Math.log2(Math.max(2, count))));
 }
 
-function toBinary(index: number, width: number): MyUtmSymbol[] {
-  const bits: MyUtmSymbol[] = [];
+export function toBinary(index: number, width: number): ("1" | "0")[] {
+  const bits: ("1" | "0")[] = [];
   for (let i = width - 1; i >= 0; i--) {
     bits.push(((index >> i) & 1) === 1 ? "1" : "0");
   }
