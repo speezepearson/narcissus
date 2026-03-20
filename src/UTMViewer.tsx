@@ -33,7 +33,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     if (!(utmSnapshot instanceof MyUtmSnapshot)) {
       throw new Error("utmSnapshot is not a MyUtmSnapshot???");
     }
-    const decoded = utmSnapshot.decode();
+    const decoded = utmSnapshot.decode({ sparse: false });
     return { utmSnapshot, decoded };
   }, [initialSim, optimizationHints]);
 
@@ -108,7 +108,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setUtmStatus(st);
     setStepCount((c) => c + 1);
 
-    const decoded = next.decode();
+    const decoded = next.decode({ sparse: false });
     if (decoded) {
       lastDecodedRef.current = decoded;
       setLastDecoded(decoded);
@@ -143,7 +143,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     setUtmStatus(st);
     setStepCount((c) => c + steps);
 
-    const decoded = snap.decode();
+    const decoded = snap.decode({ sparse: false });
     if (decoded) {
       lastDecodedRef.current = decoded;
       setLastDecoded(decoded);
@@ -217,7 +217,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
       setUtmStatus(st);
       setStepCount(stepCountRef.current);
 
-      const decoded = snap.decode();
+      const decoded = snap.decode({ sparse: false });
       if (decoded) {
         lastDecodedRef.current = decoded;
         setLastDecoded(decoded);

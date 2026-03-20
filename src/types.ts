@@ -137,8 +137,13 @@ export type UtmSnapshot<
    * - (X/undefined) for a while...
    * - then (Y/undefined) for a while...
    * - then (Z/undefined) for a while...
+   *
+   * If `optimizationHints.sparse` is true (the default), the method should try to return undefined more often (but still at least once per simulated step),
+   * in order to reduce the amount of decoding work done.
    */
-  decode(): undefined | TuringMachineSnapshot<SimState, SimSymbol>;
+  decode(optimizationHints?: {
+    sparse?: boolean;
+  }): undefined | TuringMachineSnapshot<SimState, SimSymbol>;
 };
 
 export function assertNever(x: never): never {

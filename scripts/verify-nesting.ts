@@ -14,6 +14,7 @@ import {
 } from "../src/my-utm-spec";
 import { makeArrayTapeOverlay, runUntilInnerStep } from "../src/util";
 import { isDeepStrictEqual } from "node:util";
+import myUtmOptimizationHints from "../src/my-utm-spec-transition-optimization-hints";
 
 /** Materialize a TapeOverlay into a concrete array (reads until get() returns undefined). */
 function materializeTape<S extends string>(tape: TapeOverlay<S>): S[] {
@@ -63,7 +64,9 @@ if (loadArg && existsSync(SAVEPOINT_FILE)) {
   sim = MyUtmSnapshot.fromSimSnapshot(
     makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0"])),
   );
-  real = MyUtmSnapshot.fromSimSnapshot(sim);
+  real = MyUtmSnapshot.fromSimSnapshot(sim, {
+    optimizationHints: myUtmOptimizationHints,
+  });
   innerSteps = 0;
 }
 

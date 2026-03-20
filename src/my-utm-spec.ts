@@ -55,7 +55,18 @@ function fromBinaryAt(
   let val = 0;
   for (let i = 0; i < width; i++) {
     const b = tape.get(start + i);
-    val = val * 2 + (b === "1" ? 1 : 0);
+    switch (b) {
+      case "1":
+      case "Y":
+        val = val * 2 + 1;
+        break;
+      case "0":
+      case "X":
+        val = val * 2;
+        break;
+      default:
+        throw new Error(`invalid binary symbol: ${b}`);
+    }
   }
   return val;
 }
@@ -233,10 +244,26 @@ function makeEncodeTapeOverlay<SimSymbol extends string>(
 function decode<SimState extends string, SimSymbol extends string>(
   spec: TuringMachineSpec<SimState, SimSymbol>,
   utm: TuringMachineSnapshot<MyUtmState, MyUtmSymbol>,
+  { sparse = true }: { sparse?: boolean } = {},
 ): undefined | TuringMachineSnapshot<SimState, SimSymbol> {
-  // Only decode when UTM is in a clean state (between simulated steps, or halted)
-  const utmState = utm.state as string;
-  if (utmState !== "init" && utmState !== "accept" && utmState !== "reject") {
+  if (
+    sparse &&
+    !(
+      (utm.state === "init" && utm.pos <= 1) ||
+      utm.state === "accept" ||
+      utm.state === "reject"
+    )
+  ) {
+    return undefined;
+  }
+  if (
+    utm.state.startsWith("cp_nst") ||
+    utm.state.startsWith("mr_ext") ||
+    utm.state.startsWith("cp_nsym")
+  ) {
+    // cp_nst: while copying the new state bits over the old, the state can be a frankenstein of the old and new states.
+    // cp_nsym: while overwriting a symbol, it can be a frankenstein of the old and new symbols.
+    // mr_ext: while extending the tape with the blank pattern, it can be a frankenstein of the blank pattern and the UTM's blank symbol.
     return undefined;
   }
 
@@ -278,14 +305,13 @@ function decode<SimState extends string, SimSymbol extends string>(
   for (let j = tapeSecStart; ; j += cellSize) {
     const marker = utmTapeSnapshot.get(j);
     if (marker === undefined) continue; // blank sim cell — skip
-    if (marker === "^") {
+    if (marker === "^" || marker === ">") {
       headPos = (j - tapeSecStart) / cellSize;
       break;
     }
     if (marker !== ",") {
-      throw new Error(
-        `nonsensical decode: unexpected marker '${marker}' at UTM tape index ${j}`,
-      );
+      // Mid-operation marker we don't recognise — best-effort: skip it
+      continue;
     }
   }
 
@@ -321,7 +347,7 @@ function makeDecodedTapeOverlay<SimSymbol extends string>(
       const utmIdx = tapeSecStart + cellIdx * cellSize;
       const marker = utmTape.get(utmIdx);
       if (marker === undefined) return undefined;
-      if (marker !== "," && marker !== "^") return undefined;
+      if (marker !== "," && marker !== "^" && marker !== ">") return undefined;
       const symIdx = fromBinaryAt(utmTape, utmIdx + 1, symBits);
       if (symIdx >= spec.allSymbols.length) return undefined;
       return spec.allSymbols[symIdx];
@@ -1675,8 +1701,10 @@ export class MyUtmSnapshot<
     return myUtmSpec;
   }
 
-  decode(): undefined | TuringMachineSnapshot<SimState, SimSymbol> {
-    return decode(this.simSpec, this);
+  decode(optimizationHints?: {
+    sparse?: boolean;
+  }): undefined | TuringMachineSnapshot<SimState, SimSymbol> {
+    return decode(this.simSpec, this, optimizationHints);
   }
 }
 
