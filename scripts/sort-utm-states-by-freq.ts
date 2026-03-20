@@ -1,4 +1,3 @@
-import { compile, compileSnapshot, fastStep } from "../src/fast-run";
 import {
   myUtmSpec,
   type MyUtmState,
@@ -7,9 +6,10 @@ import {
 import myUtmOptimizationHints from "../src/my-utm-spec-transition-optimization-hints";
 import { flipBitsSpec } from "../src/toy-machines";
 import {
+  getRule,
   makeInitSnapshot,
-  type StateIdx,
-  type SymbolIdx,
+  step,
+  type TuringMachineSnapshot,
   type UtmSpec,
 } from "../src/types";
 import { makeArrayTapeOverlay } from "../src/util";
@@ -93,26 +93,16 @@ function getStats<State extends string, Symbol extends string>(
   const simulator = utmSpec.encode(base, { optimizationHints });
   const doubleSimulator = utmSpec.encode(simulator, { optimizationHints });
 
-  const rawTransitionCounts: Map<StateIdx, Map<SymbolIdx, number>> = new Map();
-
-  const compiledMachine = compile(doubleSimulator.spec);
-  const compiled = compileSnapshot(doubleSimulator, compiledMachine);
-  for (let i = 0; i < maxSteps; i++) {
-    const sym = compiled.tape[compiled.pos] ?? compiledMachine.blankIdx;
-    incrementCount(rawTransitionCounts, compiled.state, sym);
-    fastStep(compiled);
-  }
-
   const transitionCounts = new Map<State, Map<Symbol, number>>();
-  for (const [stateIdx, syms] of rawTransitionCounts.entries()) {
-    const state = compiledMachine.stateNames[stateIdx] as State;
-    const m = new Map<Symbol, number>();
-    transitionCounts.set(state, m);
-    for (const [symIdx, count] of syms.entries()) {
-      const sym = compiledMachine.symbolNames[symIdx] as Symbol;
-      m.set(sym, count);
-    }
+
+  const snap: TuringMachineSnapshot<State, Symbol> = doubleSimulator;
+  for (let i = 0; i < maxSteps; i++) {
+    const sym = snap.tape.get(snap.pos) ?? snap.spec.blank;
+    incrementCount(transitionCounts, snap.state, sym);
+    if (!getRule(snap)) break;
+    step(snap);
   }
+
   const transitionFreqs = getFreqInfo(transitionCounts);
 
   return {

@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  compile,
-  compileSnapshot,
-  decompileSnapshot,
-  fastRun,
-  type CompiledSnapshot,
-} from "./fast-run";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TapeView } from "./TapeView";
 import {
+  getStatus,
   makeInitSnapshot,
+  step,
   type TapeOverlay,
+  type TuringMachineSnapshot,
   type TuringMachineSpec,
 } from "./types";
 
@@ -17,16 +13,6 @@ function useTuringMachine<State extends string, Symbol extends string>(
   spec: TuringMachineSpec<State, Symbol>,
   initialTape: TapeOverlay<Symbol>,
 ) {
-  const machine = useMemo(() => compile(spec), [spec]);
-
-  const makeInitCompiled = useCallback(
-    () => compileSnapshot(makeInitSnapshot(spec, initialTape), machine),
-    [spec, initialTape, machine],
-  );
-
-  const compiledRef = useRef<CompiledSnapshot>(makeInitCompiled());
-  const statusRef = useRef<"accept" | "reject" | "running">("running");
-
   const [snapshot, setSnapshot] = useState(() =>
     makeInitSnapshot(spec, initialTape),
   );
@@ -37,29 +23,35 @@ function useTuringMachine<State extends string, Symbol extends string>(
   const [logFps, setLogFps] = useState(Math.log10(5));
   const fps = Math.round(10 ** logFps);
 
-  const publish = useCallback(
-    (st: "accept" | "reject" | "running") => {
-      setSnapshot(decompileSnapshot(compiledRef.current, spec));
-      setStatus(st);
-      statusRef.current = st;
-      if (st !== "running") setPlaying(false);
-    },
-    [spec],
-  );
+  const snapRef = useRef(snapshot);
+  const statusRef = useRef(status);
+
+  useEffect(() => {
+    snapRef.current = snapshot;
+  }, [snapshot]);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  const publish = useCallback((snap: TuringMachineSnapshot<State, Symbol>) => {
+    const st = getStatus(snap);
+    snapRef.current = snap;
+    statusRef.current = st;
+    setSnapshot({ ...snap });
+    setStatus(st);
+    if (st !== "running") setPlaying(false);
+  }, []);
 
   const doStep = useCallback(() => {
     if (statusRef.current !== "running") return;
-    const result = fastRun(compiledRef.current, { gas: 1 });
-    publish(result.halted ? result.status : "running");
+    step(snapRef.current);
+    publish(snapRef.current);
   }, [publish]);
 
   const reset = useCallback(() => {
-    compiledRef.current = compileSnapshot(
-      makeInitSnapshot(spec, initialTape.clone()),
-      machine,
-    );
-    publish("running");
-  }, [spec, initialTape, machine, publish]);
+    const snap = makeInitSnapshot(spec, initialTape.clone());
+    publish(snap);
+  }, [spec, initialTape, publish]);
 
   const fpsRef = useRef(fps);
   useEffect(() => {
@@ -80,8 +72,12 @@ function useTuringMachine<State extends string, Symbol extends string>(
       accumRef.current -= stepsThisFrame;
       if (stepsThisFrame === 0) return;
 
-      const result = fastRun(compiledRef.current, { gas: stepsThisFrame });
-      publish(result.halted ? result.status : "running");
+      const snap = snapRef.current;
+      for (let i = 0; i < stepsThisFrame; i++) {
+        step(snap);
+        if (getStatus(snap) !== "running") break;
+      }
+      publish(snap);
     }, 1000 / MAX_RENDER_FPS);
     return () => clearInterval(interval);
   }, [playing, publish]);

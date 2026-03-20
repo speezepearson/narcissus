@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { compile, compileSnapshot, fastStep, writeBack } from "./fast-run";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MyUtmSnapshot, myUtmSpec } from "./my-utm-spec";
 import { TapeView } from "./TapeView";
 import {
@@ -18,8 +17,6 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
   initialSim,
   optimizationHints,
 }: MyUTMViewerProps<SimState, SimSymbol>) {
-  const machine = useMemo(() => compile(myUtmSpec), []);
-
   const makeInitial = useCallback(() => {
     const utmSnapshot = myUtmSpec.encode(initialSim, {
       optimizationHints,
@@ -113,22 +110,20 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     }
   }, [pushHistory]);
 
-  // Step until UTM state changes — can be many steps, use fast path
+  // Step until UTM state changes
   const doStepState = useCallback(() => {
     if (statusRef.current !== "running") return;
     pushHistory();
     const snap = new MyUtmSnapshot(utmRef.current);
-    const compiled = compileSnapshot(snap, machine);
-    const startState = compiled.state;
+    const startState = snap.state;
 
     let steps = 0;
-    while (true) {
-      if (!fastStep(compiled)) break;
+    while (getStatus(snap) === "running") {
+      step(snap);
       steps++;
-      if (compiled.state !== startState) break;
+      if (snap.state !== startState) break;
     }
 
-    writeBack(compiled, snap);
     const st = getStatus(snap);
 
     utmRef.current = snap;
@@ -146,7 +141,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
     if (st !== "running") {
       setPlaying(false);
     }
-  }, [machine, pushHistory]);
+  }, [pushHistory]);
 
   const reset = useCallback(() => {
     const { utmSnapshot: snap, decoded } = makeInitial();
@@ -220,7 +215,7 @@ export function MyUTMViewer<SimState extends string, SimSymbol extends string>({
       }
     }, 1000 / MAX_RENDER_FPS);
     return () => clearInterval(interval);
-  }, [playing, machine, pushHistory]);
+  }, [playing, pushHistory]);
 
   const halted = utmStatus !== "running";
 
