@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getStatus, makeInitSnapshot, run, step, type TapeOverlay } from "./types";
+import {
+  getStatus,
+  makeInitSnapshot,
+  run,
+  step,
+  type TapeOverlay,
+} from "./types";
 import {
   acceptImmediatelySpec,
   checkPalindromeSpec,
@@ -48,7 +54,10 @@ describe("flipBitsSpec", () => {
 
 describe("doubleXSpec", () => {
   function makeXTape(n: number): TapeOverlay<DoubleXSymbol> {
-    return makeArrayTapeOverlay(["$", ...Array.from({ length: n }, (): "X" => "X")]);
+    return makeArrayTapeOverlay([
+      "$",
+      ...Array.from({ length: n }, (): "X" => "X"),
+    ]);
   }
 
   function expectedTape(n: number): ("$" | "X" | "_")[] {
