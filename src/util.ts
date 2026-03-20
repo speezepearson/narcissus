@@ -80,3 +80,16 @@ export function runUntilInnerStep<
   }
   return { type: "halt", status };
 }
+
+/** Search a TapeOverlay for `value` starting at index `start`, scanning until `get()` returns undefined. */
+export function tapeIndexOf<Symbol extends string>(
+  tape: TapeOverlay<Symbol>,
+  value: Symbol,
+  start: number = 0,
+): number | undefined {
+  for (let i = start; ; i++) {
+    const v = tape.get(i);
+    if (v === undefined) return undefined;
+    if (v === value) return i;
+  }
+}

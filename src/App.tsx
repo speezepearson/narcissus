@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import "./App.css";
 import { TuringMachineViewer } from "./TuringMachineViewer";
 import { MyUTMViewer } from "./UTMViewer";
 import {
@@ -7,10 +8,9 @@ import {
   flipBitsSpec,
   write1sForeverSpec,
 } from "./toy-machines";
-import "./App.css";
 import { makeInitSnapshot } from "./types";
-import { myUtmSpec } from "./my-utm-spec";
 import { makeArrayTapeOverlay } from "./util";
+import { myUtmSpec } from "./my-utm-spec";
 
 function App() {
   const [tapeInput, setTapeInput] = useState("abba");
@@ -60,12 +60,15 @@ function App() {
       />
 
       <h2 style={{ marginTop: "32px" }}>UTM Simulation</h2>
-      {/* <MyUTMViewer
+      <MyUTMViewer
         key={tapeInput + "-utm"}
         initialSim={myUtmSpec.encode(
-          makeInitSnapshot(flipBitsSpec, makeArrayTapeOverlay(["0", "1"])),
+          makeInitSnapshot(
+            flipBitsSpec,
+            makeArrayTapeOverlay(["0", "1", "0", "1"]),
+          ),
         )}
-      /> */}
+      />
     </div>
   );
 }

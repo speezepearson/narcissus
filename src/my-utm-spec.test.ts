@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { myUtmSpec } from "./my-utm-spec";
-import { makeInitSnapshot, step } from "./types";
-import { flipBitsSpec } from "./toy-machines";
-import { makeArrayTapeOverlay } from "./util";
 import { must } from "./test-util";
+import { flipBitsSpec } from "./toy-machines";
+import { makeInitSnapshot } from "./types";
+import { makeArrayTapeOverlay } from "./util";
 
 describe("decode isolation", () => {
   it("decoded machine's set() does not write back to the UTM tape", () => {

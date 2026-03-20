@@ -6,7 +6,7 @@ import {
   type UtmSnapshot,
   type UtmSpec,
 } from "./types";
-import { must } from "./util";
+import { must, tapeIndexOf } from "./util";
 // ════════════════════════════════════════════════════════════════════
 // UTM Alphabet
 // ════════════════════════════════════════════════════════════════════
@@ -65,14 +65,6 @@ function toBinary(index: number, width: number): MyUtmSymbol[] {
   return bits;
 }
 
-function fromBinary(bits: readonly MyUtmSymbol[]): number {
-  let val = 0;
-  for (const b of bits) {
-    val = val * 2 + (b === "1" ? 1 : 0);
-  }
-  return val;
-}
-
 /** Read `width` bits from a TapeOverlay starting at `start` and interpret as a binary number. */
 function fromBinaryAt(
   tape: TapeOverlay<MyUtmSymbol>,
@@ -85,19 +77,6 @@ function fromBinaryAt(
     val = val * 2 + (b === "1" ? 1 : 0);
   }
   return val;
-}
-
-/** Search a TapeOverlay for `value` starting at index `start`, scanning until `get()` returns undefined. */
-function tapeIndexOf(
-  tape: TapeOverlay<MyUtmSymbol>,
-  value: MyUtmSymbol,
-  start: number = 0,
-): number | undefined {
-  for (let i = start; ; i++) {
-    const v = tape.get(i);
-    if (v === undefined) return undefined;
-    if (v === value) return i;
-  }
 }
 
 // ════════════════════════════════════════════════════════════════════

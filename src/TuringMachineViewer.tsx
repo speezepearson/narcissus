@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { TapeView } from "./TapeView";
 import {
   copySnapshot,
   getStatus,
@@ -132,35 +133,9 @@ export function TuringMachineViewer<
 
   const halted = status !== "running";
 
-  // Build tape display — pad with blanks so head is always visible
-  const charOffset = 15;
-  const displayTape = useMemo(
-    () =>
-      Array.from({ length: 2 * charOffset + 1 }, (_, i) => {
-        const ind = snapshot.pos + i - charOffset;
-        if (ind < 0) return " ";
-        return snapshot.tape.get(ind) ?? spec.blank;
-      }).join(""),
-    [snapshot, spec],
-  );
-  const moreLeft = snapshot.pos > charOffset;
-
-  const pointerLine =
-    " ".repeat(charOffset) + `^ (state=${snapshot.state}, pos=${snapshot.pos})`;
-
   return (
     <div className="tm-viewer">
-      <pre className="tm-tape">
-        <code>
-          {moreLeft ? "... " : <>&nbsp;&nbsp;&nbsp;&nbsp;</>}
-          {displayTape} ...
-        </code>
-        {"\n"}
-        <code>
-          <>&nbsp;&nbsp;&nbsp;&nbsp;</>
-          {pointerLine}
-        </code>
-      </pre>
+      <TapeView tm={snapshot} radius={40} />
 
       {halted && (
         <div className={`tm-result tm-result-${status}`}>
