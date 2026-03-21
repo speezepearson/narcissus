@@ -276,31 +276,21 @@ fn sym(name: &str) -> u8 {
         .unwrap_or_else(|| panic!("unknown UTM symbol: {}", name)) as u8
 }
 
-// ── OrderedRuleMap ──
-// Tracks insertion order of states and per-state symbol order,
-// matching JavaScript Map iteration semantics.
-struct OrderedRuleMap {
-    state_order: Vec<u8>,
-    state_registered: Vec<bool>,
-    per_state_rules: Vec<Vec<(u8, u8, u8, Dir)>>, // per state: (sym, nst, nsym, dir)
-    transitions: Vec<Option<(u8, u8, Dir)>>,       // 65536 entries
+// ── RuleSet: transition table + ordered list for encoding ──
+struct RuleSet {
+    transitions: Vec<Option<(u8, u8, Dir)>>, // 65536 entries, key = (state<<8)|sym
+    ordered: Vec<(u8, u8, u8, u8, Dir)>,     // (st, sym, nst, nsym, dir) in insertion order
 }
 
-impl OrderedRuleMap {
+impl RuleSet {
     fn new() -> Self {
         Self {
-            state_order: Vec::new(),
-            state_registered: vec![false; 256],
-            per_state_rules: (0..256).map(|_| Vec::new()).collect(),
             transitions: vec![None; 65536],
+            ordered: Vec::new(),
         }
     }
 
-    fn add_rule(&mut self, state: u8, s: u8, new_state: u8, new_sym: u8, dir: Dir) {
-        if !self.state_registered[state as usize] {
-            self.state_registered[state as usize] = true;
-            self.state_order.push(state);
-        }
+    fn add(&mut self, state: u8, s: u8, new_state: u8, new_sym: u8, dir: Dir) {
         let key = ((state as usize) << 8) | (s as usize);
         if self.transitions[key].is_some() {
             panic!(
@@ -312,45 +302,37 @@ impl OrderedRuleMap {
             );
         }
         self.transitions[key] = Some((new_state, new_sym, dir));
-        self.per_state_rules[state as usize].push((s, new_state, new_sym, dir));
+        self.ordered.push((state, s, new_state, new_sym, dir));
     }
 
+    /// Remove all rules for `state` from the transition table and ordered list.
     fn clear_state(&mut self, state: u8) {
-        for &(s, _, _, _) in &self.per_state_rules[state as usize] {
-            let key = ((state as usize) << 8) | (s as usize);
-            self.transitions[key] = None;
-        }
-        self.per_state_rules[state as usize].clear();
-    }
-
-    fn ordered_rules(&self) -> Vec<(u8, u8, u8, u8, Dir)> {
-        let mut result = Vec::new();
-        for &state in &self.state_order {
-            for &(s, ns, nsym, dir) in &self.per_state_rules[state as usize] {
-                result.push((state, s, ns, nsym, dir));
+        for &(st, s, _, _, _) in &self.ordered {
+            if st == state {
+                self.transitions[((st as usize) << 8) | (s as usize)] = None;
             }
         }
-        result
+        self.ordered.retain(|&(st, _, _, _, _)| st != state);
     }
 }
 
-fn add_rule(m: &mut OrderedRuleMap, state: u8, s: u8, ns: u8, nsym: u8, dir: Dir) {
-    m.add_rule(state, s, ns, nsym, dir);
+fn add_rule(m: &mut RuleSet, state: u8, s: u8, ns: u8, nsym: u8, dir: Dir) {
+    m.add(state, s, ns, nsym, dir);
 }
 
-fn scan_right(m: &mut OrderedRuleMap, state: u8, syms: &[u8]) {
+fn scan_right(m: &mut RuleSet, state: u8, syms: &[u8]) {
     for &s in syms {
         add_rule(m, state, s, state, s, Dir::Right);
     }
 }
 
-fn scan_left(m: &mut OrderedRuleMap, state: u8, syms: &[u8]) {
+fn scan_left(m: &mut RuleSet, state: u8, syms: &[u8]) {
     for &s in syms {
         add_rule(m, state, s, state, s, Dir::Left);
     }
 }
 
-fn seek_home(m: &mut OrderedRuleMap, from: u8, to: u8) {
+fn seek_home(m: &mut RuleSet, from: u8, to: u8) {
     scan_left(m, from, &[
         SYM_ZERO, SYM_ONE, SYM_X, SYM_Y, SYM_HASH, SYM_PIPE, SYM_SEMI, SYM_COMMA,
         SYM_CARET, SYM_DOT, SYM_STAR, SYM_GT, SYM_L, SYM_D,
@@ -358,7 +340,7 @@ fn seek_home(m: &mut OrderedRuleMap, from: u8, to: u8) {
     add_rule(m, from, SYM_DOLLAR, to, SYM_DOLLAR, Dir::Right);
 }
 
-fn seek_star(m: &mut OrderedRuleMap, from: u8, to: u8) {
+fn seek_star(m: &mut RuleSet, from: u8, to: u8) {
     scan_left(m, from, &[
         SYM_ZERO, SYM_ONE, SYM_X, SYM_Y, SYM_HASH, SYM_PIPE, SYM_SEMI, SYM_COMMA,
         SYM_CARET, SYM_DOT, SYM_L, SYM_D,
@@ -370,8 +352,8 @@ fn seek_star(m: &mut OrderedRuleMap, from: u8, to: u8) {
 // UTM Rule Builder
 // ════════════════════════════════════════════════════════════════════
 
-fn build_utm_rules() -> OrderedRuleMap {
-    let mut r = OrderedRuleMap::new();
+fn build_utm_rules() -> RuleSet {
+    let mut r = RuleSet::new();
 
     // Symbol groups (matching TypeScript exactly)
     let rule_internals: &[u8] = &[SYM_ZERO, SYM_ONE, SYM_X, SYM_Y, SYM_PIPE, SYM_L, SYM_D];
@@ -1307,7 +1289,6 @@ fn build_utm_rules() -> OrderedRuleMap {
 
 pub fn build_utm_spec() -> TuringMachineSpec {
     let r = build_utm_rules();
-    let ordered = r.ordered_rules();
 
     let mut accepting = vec![false; N_UTM_STATES];
     accepting[st("accept") as usize] = true;
@@ -1322,7 +1303,7 @@ pub fn build_utm_spec() -> TuringMachineSpec {
         transitions: r.transitions,
         state_names: STATE_NAMES.to_vec(),
         symbol_names: SYMBOL_NAMES.to_vec(),
-        ordered_rules: ordered,
+        ordered_rules: r.ordered,
     }
 }
 
