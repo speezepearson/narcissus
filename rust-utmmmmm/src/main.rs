@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::LazyLock};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Dir {
     Left,
@@ -17,33 +19,45 @@ struct TuringMachineSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct RunningTuringMachine {
-    spec: TuringMachineSpec,
+struct RunningTuringMachine<'a> {
+    spec: &'a TuringMachineSpec,
     state: State,
     pos: usize,
     tape: Vec<Symbol>,
 }
 
-fn build_utm_spec() -> TuringMachineSpec {
-    // equivalent to the TypeScript `myUtmSpec`
-    todo!()
+const UTM_SPEC: LazyLock<&'static TuringMachineSpec> = LazyLock::new(|| {
+    todo!("equivalent to the TypeScript `myUtmSpec`");
+});
+
+fn encode_tape(tape: &Vec<Symbol>) -> Vec<Symbol> {
+    todo!("roughly equivalent to the TypeScript `makeEncodeTapeOverlayBackground`")
 }
 
-fn build_header(spec: TuringMachineSpec, optimization_hints: Vec<(State, Symbol)>) -> Vec<Symbol> {
+fn build_running_utm(m: &RunningTuringMachine) -> RunningTuringMachine<'static> {
+    let mut tape = build_header(&m.spec, vec![]);
+    tape.extend(encode_tape(&m.tape));
+    RunningTuringMachine {
+        spec: (*UTM_SPEC),
+        state: m.spec.initial,
+        pos: 0,
+        tape,
+    }
+}
+
+fn build_header(spec: &TuringMachineSpec, optimization_hints: Vec<(State, Symbol)>) -> Vec<Symbol> {
     // equivalent to the TypeScript `buildHeader(myUtmSpec, myUtmSpec.initial, optimizationHints)`
     todo!()
 }
 
+const INFINITE_UTM_TAPE_HEADER: LazyLock<&Vec<Symbol>> = LazyLock::new(|| {
+    todo!("see TypeScript infiniteUtmTapeBackground");
+});
 fn extend_infinite_utm_tape(tape: &mut Vec<Symbol>) {
-    let header = build_header(
-        build_utm_spec(),
-        todo!("see TypeScript infiniteUtmTapeBackground"),
-    ); // ideally we would just compute this once, make it static or something
-
-    // Equivalent to the TypeScript `infiniteUtmTapeBackground`.
-    // Increase the tape's length by some substantial amount.
     // Do not overwrite any existing values.
-    todo!()
+    todo!(
+        "see TypeScript `infiniteUtmTapeBackground`; except increase the tape's length by a good chunk, not just one symbol at a time."
+    )
 }
 
 fn step_turing_machine(
@@ -70,10 +84,9 @@ fn step_turing_machine(
 }
 
 fn main() {
-    let spec = build_utm_spec();
     let mut machine = RunningTuringMachine {
-        spec: spec.clone(),
-        state: spec.initial,
+        spec: *UTM_SPEC,
+        state: UTM_SPEC.initial,
         pos: 0,
         tape: vec![],
     };
@@ -90,7 +103,7 @@ fn main() {
     println!(
         "halted in state {:?} ({}) after {steps} steps",
         machine.state,
-        if machine.state == spec.accept {
+        if machine.state == machine.spec.accept {
             "accept"
         } else {
             "reject"
