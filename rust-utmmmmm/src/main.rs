@@ -4,27 +4,26 @@ mod toy_machines;
 use utm::*;
 
 fn main() {
-    // Run the infinite UTM tower
+    // ══════════════════════════════════════════════════════════════
+    // Run the infinite UTM tower.
+    //
+    // The tape is self-referential: it encodes a UTM whose input tape
+    // is this very tape. That is, the tape says:
+    //   "Run the UTM on a machine whose tape is [this tape]."
+    //
+    // We materialize the tape lazily: start with an initial chunk,
+    // and extend on demand using the recursive background function.
+    // ══════════════════════════════════════════════════════════════
     let header = infinite_utm_tape_header();
     let n_sym_bits = num_bits(N_SYMBOLS);
-    let cell_size = 1 + n_sym_bits;
+    let cell_size = 1 + n_sym_bits; // each cell = 1 marker + n_sym_bits data bits
 
-    let mut tape: Vec<u8> = header.clone();
-    // Extend tape with some initial cells from the infinite background
+    // Materialize the header + initial tape cells
     let initial_cells = 4096;
-    for cell_idx in 0..initial_cells {
-        let base = header.len() + cell_idx * cell_size;
-        while tape.len() < base + cell_size {
-            tape.push(0);
-        }
-        // marker
-        tape[base] = if cell_idx == 0 { SYM_CARET } else { SYM_COMMA };
-        // bits: encode infinite_utm_tape_background(cell_idx) symbol
-        let bg_sym = infinite_utm_tape_background_sym(&header, n_sym_bits, cell_size, cell_idx);
-        let bits = to_binary(bg_sym as usize, n_sym_bits);
-        for (j, &b) in bits.iter().enumerate() {
-            tape[base + 1 + j] = b;
-        }
+    let initial_len = header.len() + initial_cells * cell_size;
+    let mut tape: Vec<u8> = Vec::with_capacity(initial_len);
+    for i in 0..initial_len {
+        tape.push(infinite_utm_tape_background(&header, n_sym_bits, cell_size, i));
     }
 
     let spec = build_utm_spec();
@@ -32,24 +31,13 @@ fn main() {
     let mut pos: usize = 0;
     let mut steps: u64 = 0;
 
+    // Extend tape rightward by computing more background symbols
     let extend = |tape: &mut Vec<u8>, header: &[u8], n_sym_bits: usize, cell_size: usize| {
-        let chunk = 1024;
-        let tape_sec_start = header.len();
-        let current_cells = (tape.len() - tape_sec_start) / cell_size;
-        let new_len = tape_sec_start + (current_cells + chunk) * cell_size;
         let old_len = tape.len();
-        tape.resize(new_len, 0);
+        let new_len = old_len + 1024 * cell_size;
+        tape.reserve(new_len - old_len);
         for i in old_len..new_len {
-            let offset = i - tape_sec_start;
-            let cell_idx = offset / cell_size;
-            let within = offset % cell_size;
-            if within == 0 {
-                tape[i] = if cell_idx == 0 { SYM_CARET } else { SYM_COMMA };
-            } else {
-                let bg_sym = infinite_utm_tape_background_sym(header, n_sym_bits, cell_size, cell_idx);
-                let bits = to_binary(bg_sym as usize, n_sym_bits);
-                tape[i] = bits[within - 1];
-            }
+            tape.push(infinite_utm_tape_background(header, n_sym_bits, cell_size, i));
         }
     };
 

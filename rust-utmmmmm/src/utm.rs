@@ -1654,41 +1654,43 @@ pub fn infinite_utm_tape_header() -> Vec<u8> {
     full_tape[..caret_pos].to_vec()
 }
 
-/// Compute the background symbol for cell `cell_idx` in the infinite UTM tape.
-/// This implements the recursive definition: cell content = encoding of the
-/// symbol at position `cell_idx` of the infinite tape itself.
-pub fn infinite_utm_tape_background_sym(
+/// Compute the background symbol at global tape position `idx` of the infinite UTM tape.
+///
+/// The infinite UTM tape encodes "a UTM simulating itself on this very tape."
+/// It is defined by a self-referential function:
+///
+///   background(idx) =
+///     if idx < header.len():  header[idx]           -- the header is literal
+///     else:
+///       cell_idx = (idx - header.len()) / cell_size -- which tape cell are we in?
+///       within   = (idx - header.len()) % cell_size -- where within that cell?
+///       if within == 0:  ^ (for cell 0) or , (for others)  -- cell separator/head marker
+///       else:  toBinary( background(cell_idx) , n_sym_bits )[within - 1]
+///                         ^^^^^^^^^^^^^^^^^^^^
+///                         RECURSIVE: the content of cell N is the binary encoding
+///                         of whatever symbol sits at global position N of this tape.
+///
+/// This is well-founded because cell N encodes position N, and for N >= header.len(),
+/// position N is inside cell (N - header.len()) / cell_size, which is always < N
+/// (since cell_size >= 2). For N < header.len(), we hit the base case.
+pub fn infinite_utm_tape_background(
     header: &[u8],
     n_sym_bits: usize,
     cell_size: usize,
-    cell_idx: usize,
+    idx: usize,
 ) -> u8 {
-    // The infinite tape background is defined recursively:
-    // infiniteUtmTapeBackground(idx):
-    //   if idx < header.len(): return header[idx]
-    //   else: cellIdx = (idx - header.len()) / cellSize
-    //         within = (idx - header.len()) % cellSize
-    //         if within == 0: return ^ if cellIdx==0, else ,
-    //         else: return toBinary(symbolIndex(infiniteUtmTapeBackground(cellIdx)), nSymBits)[within-1]
-    //
-    // For the cell content, we need: symbolIndex of the background at position cell_idx.
-    // Background at position cell_idx depends on which part of the tape it falls in.
-    fn background_sym(header: &[u8], n_sym_bits: usize, cell_size: usize, idx: usize) -> u8 {
-        if idx < header.len() {
-            return header[idx];
-        }
-        let offset = idx - header.len();
-        let ci = offset / cell_size;
-        let within = offset % cell_size;
-        if within == 0 {
-            return if ci == 0 { SYM_CARET } else { SYM_COMMA };
-        }
-        let inner = background_sym(header, n_sym_bits, cell_size, ci);
-        // Find symbol index
-        let sym_idx = inner as usize;
-        let bits = to_binary(sym_idx, n_sym_bits);
-        bits[within - 1]
+    if idx < header.len() {
+        return header[idx];
     }
-
-    background_sym(header, n_sym_bits, cell_size, cell_idx)
+    let offset = idx - header.len();
+    let cell_idx = offset / cell_size;
+    let within = offset % cell_size;
+    if within == 0 {
+        return if cell_idx == 0 { SYM_CARET } else { SYM_COMMA };
+    }
+    // Recurse: what symbol lives at global position `cell_idx`?
+    let sym = infinite_utm_tape_background(header, n_sym_bits, cell_size, cell_idx);
+    // Encode that symbol as binary, return the appropriate bit
+    let bits = to_binary(sym as usize, n_sym_bits);
+    bits[within - 1]
 }
