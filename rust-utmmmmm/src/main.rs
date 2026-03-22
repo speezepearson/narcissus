@@ -181,50 +181,6 @@ fn load_savepoint(path: &str) -> Option<(u64, u64, CState, usize, Vec<CSymbol>)>
 }
 
 // ════════════════════════════════════════════════════════════════════
-// State log: head position ranges sampled every 100K steps
-// ════════════════════════════════════════════════════════════════════
-// Header: "HLOG"
-// Records: u64 step | u64 min_pos | u64 max_pos  (24 bytes each)
-
-struct StateLog {
-    writer: std::io::BufWriter<std::fs::File>,
-    interval_min_pos: u64,
-    interval_max_pos: u64,
-}
-
-impl StateLog {
-    fn new(path: &str) -> Self {
-        let mut w = std::io::BufWriter::new(std::fs::File::create(path).expect("create state-log"));
-        w.write_all(b"HLOG").unwrap();
-        StateLog {
-            writer: w,
-            interval_min_pos: u64::MAX,
-            interval_max_pos: 0,
-        }
-    }
-
-    fn observe(&mut self, pos: usize) {
-        let pos = pos as u64;
-        self.interval_min_pos = self.interval_min_pos.min(pos);
-        self.interval_max_pos = self.interval_max_pos.max(pos);
-    }
-
-    fn flush_interval(&mut self, step: u64) {
-        if self.interval_min_pos <= self.interval_max_pos {
-            self.writer.write_all(&step.to_le_bytes()).unwrap();
-            self.writer
-                .write_all(&self.interval_min_pos.to_le_bytes())
-                .unwrap();
-            self.writer
-                .write_all(&self.interval_max_pos.to_le_bytes())
-                .unwrap();
-        }
-        self.interval_min_pos = u64::MAX;
-        self.interval_max_pos = 0;
-    }
-}
-
-// ════════════════════════════════════════════════════════════════════
 
 fn get_flag(args: &[String], flag: &str) -> Option<String> {
     args.iter()
@@ -235,7 +191,6 @@ fn get_flag(args: &[String], flag: &str) -> Option<String> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let savepoint_path = get_flag(&args, "--savepoint");
-    let state_log_path = get_flag(&args, "--state-log");
 
     let utm = &*UTM_SPEC;
     let compiled = CompiledTuringMachineSpec::compile(utm).expect("UTM should compile");
@@ -286,9 +241,6 @@ fn main() {
     }
     eprint!("{}", format_tower(&tower, total_steps));
 
-    // State log
-    let mut state_log = state_log_path.as_deref().map(StateLog::new);
-
     let print_interval = std::time::Duration::from_millis(100);
     let mut last_print = std::time::Instant::now();
     let start_time = std::time::Instant::now();
@@ -331,11 +283,6 @@ fn main() {
             return;
         }
 
-        // Track head position for state log
-        if let Some(ref mut log) = state_log {
-            log.observe(tm.pos);
-        }
-
         // Detect Init entry
         if tm.state != prev_cstate {
             if tm.state == init_cstate {
@@ -348,11 +295,6 @@ fn main() {
 
         // Periodic checks (every 100K steps to avoid syscall overhead)
         if total_steps % 100_000 == 0 {
-            // Flush state log interval
-            if let Some(ref mut log) = state_log {
-                log.flush_interval(total_steps);
-            }
-
             // Savepoint every 1B steps
             if let Some(ref sp_path) = savepoint_path {
                 if total_steps - last_savepoint_step >= 1_000_000_000 {
