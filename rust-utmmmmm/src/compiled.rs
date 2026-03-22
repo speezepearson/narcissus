@@ -186,6 +186,16 @@ impl<Guest: TuringMachineSpec> CompiledTapeExtender<Guest> {
     }
 }
 
+impl<Guest: TuringMachineSpec> TapeExtender<CSymbol> for CompiledTapeExtender<Guest> {
+    fn extend(&mut self, tape: &mut Vec<CSymbol>, min_size: usize) {
+        self.inner.extend(&mut self.shadow, min_size);
+        while tape.len() < self.shadow.len() {
+            let sym = self.shadow[tape.len()];
+            tape.push(self.sym_to_csym[&sym]);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{tm::run_tm, toy_machines::CHECK_PALINDROME_SPEC};

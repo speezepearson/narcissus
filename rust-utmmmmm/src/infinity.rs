@@ -48,7 +48,7 @@ pub fn header_len() -> usize {
 
 pub struct InfiniteTapeExtender;
 impl TapeExtender<Symbol> for InfiniteTapeExtender {
-    fn extend(&self, tape: &mut Vec<Symbol>, min_size: usize) {
+    fn extend(&mut self, tape: &mut Vec<Symbol>, min_size: usize) {
         let header = &*HEADER;
         let sym_to_idx = &*GUEST_SYM_TO_IDX;
         let n_sym_bits = *N_SYM_BITS;

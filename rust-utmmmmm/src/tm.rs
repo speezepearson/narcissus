@@ -173,6 +173,58 @@ pub fn run_tm<Spec: TuringMachineSpec>(
     Err(PartialRunReason::StepLimit)
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RunUntilResult {
+    Accepted { num_steps: usize },
+    Rejected { num_steps: usize },
+    StepLimit,
+}
+
+/// Run the TM until it enters `target_state`, taking at least one step.
+/// Returns Ok(num_steps) if the target state is reached, or Err with the reason
+/// if the machine halts or hits the step limit first.
+#[allow(dead_code)]
+pub fn run_until_enters_state<Spec: TuringMachineSpec>(
+    tm: &mut RunningTuringMachine<Spec>,
+    target_state: Spec::State,
+    max_steps: usize,
+    mut extender: Option<&mut dyn TapeExtender<Spec::Symbol>>,
+) -> Result<usize, RunUntilResult> {
+    for step_count in 1..=max_steps {
+        if tm.pos >= tm.tape.len() {
+            match extender.as_deref_mut() {
+                None => tm.tape.resize(tm.pos + 1, tm.spec.blank()),
+                Some(extender) => extender.extend(&mut tm.tape, tm.pos + 1),
+            }
+        }
+        match step(tm) {
+            RunningTMStatus::Running => {
+                if tm.state == target_state {
+                    return Ok(step_count);
+                }
+            }
+            RunningTMStatus::Accepted => {
+                if tm.state == target_state {
+                    return Ok(step_count);
+                }
+                return Err(RunUntilResult::Accepted {
+                    num_steps: step_count,
+                });
+            }
+            RunningTMStatus::Rejected => {
+                if tm.state == target_state {
+                    return Ok(step_count);
+                }
+                return Err(RunUntilResult::Rejected {
+                    num_steps: step_count,
+                });
+            }
+        }
+    }
+    Err(RunUntilResult::StepLimit)
+}
+
 pub trait TapeExtender<Symbol> {
-    fn extend(&self, tape: &mut Vec<Symbol>, min_size: usize);
+    fn extend(&mut self, tape: &mut Vec<Symbol>, min_size: usize);
 }

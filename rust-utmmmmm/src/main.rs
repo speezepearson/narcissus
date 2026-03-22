@@ -7,10 +7,12 @@ mod toy_machines;
 mod utm;
 
 use std::fmt::Debug;
-use tm::{RunningTuringMachine, TapeExtender, TuringMachineSpec};
+use tm::{
+    run_until_enters_state, RunUntilResult, RunningTuringMachine, TapeExtender, TuringMachineSpec,
+};
 use utm::*;
 
-use crate::compiled::{CompiledTapeExtender, CompiledTuringMachineSpec};
+use crate::compiled::{CState, CompiledTapeExtender, CompiledTuringMachineSpec};
 use crate::infinity::{header_len, InfiniteTapeExtender};
 
 const RADIUS: usize = 30;
@@ -67,7 +69,7 @@ fn print_tower<Spec: TuringMachineSpec<Symbol = Symbol>>(
     Spec::State: Debug,
 {
     let utm = &*UTM_SPEC;
-    let extender = InfiniteTapeExtender;
+    let mut extender = InfiniteTapeExtender;
 
     eprintln!(
         "═══ {} steps ═══════════════════════════════════════",
@@ -124,48 +126,62 @@ fn main() {
     let utm = &*UTM_SPEC;
     let compiled = CompiledTuringMachineSpec::compile(utm).expect("UTM should compile");
 
+    // Find the CState corresponding to State::Init
+    let init_cstate = compiled
+        .original_states
+        .iter()
+        .position(|&s| s == State::Init)
+        .map(|i| CState(i as u8))
+        .expect("Init state should exist");
+
     let mut tm = RunningTuringMachine::new(&compiled);
     let mut extender = CompiledTapeExtender::new(&compiled, Box::new(InfiniteTapeExtender));
     // Initialize tape with at least one cell
     extender.extend(&mut tm.tape, 1);
 
-    let mut steps: u64 = 0;
+    let mut total_steps: u64 = 0;
+    let mut guest_steps: u64 = 0;
     let decompiled = compiled.decompile(&tm);
-    print_tower(&decompiled, steps);
+    print_tower(&decompiled, total_steps);
 
     loop {
-        if tm.pos >= tm.tape.len() {
-            extender.extend(&mut tm.tape, tm.pos + 1);
-        }
-        let sym = tm.tape[tm.pos];
-        if let Some((ns, nsym, dir)) = compiled.get_transition(tm.state, sym) {
-            tm.state = ns;
-            tm.tape[tm.pos] = nsym;
-            tm.pos = match dir {
-                tm::Dir::Left => tm.pos.saturating_sub(1),
-                tm::Dir::Right => tm.pos + 1,
-            };
-            steps += 1;
-            if steps % 1_000_000 == 0 {
+        match run_until_enters_state(&mut tm, init_cstate, usize::MAX, Some(&mut extender)) {
+            Ok(steps) => {
+                total_steps += steps as u64;
+                guest_steps += 1;
                 let decompiled = compiled.decompile(&tm);
-                print_tower(&decompiled, steps);
+                eprintln!(
+                    "Guest step {} completed after {} UTM steps (total: {})",
+                    guest_steps, steps, total_steps
+                );
+                print_tower(&decompiled, total_steps);
             }
-        } else {
-            break;
+            Err(RunUntilResult::Accepted { num_steps }) => {
+                total_steps += num_steps as u64;
+                let decompiled = compiled.decompile(&tm);
+                print_tower(&decompiled, total_steps);
+                println!(
+                    "halted (accept) in state {:?} after {} UTM steps ({} guest steps)",
+                    decompiled.state, total_steps, guest_steps
+                );
+                break;
+            }
+            Err(RunUntilResult::Rejected { num_steps }) => {
+                total_steps += num_steps as u64;
+                let decompiled = compiled.decompile(&tm);
+                print_tower(&decompiled, total_steps);
+                println!(
+                    "halted (reject) in state {:?} after {} UTM steps ({} guest steps)",
+                    decompiled.state, total_steps, guest_steps
+                );
+                break;
+            }
+            Err(RunUntilResult::StepLimit) => {
+                eprintln!("step limit reached after {} UTM steps", total_steps);
+                break;
+            }
         }
     }
-
-    let decompiled = compiled.decompile(&tm);
-    print_tower(&decompiled, steps);
-    let status = if compiled.is_accepting(tm.state) {
-        "accept"
-    } else {
-        "reject"
-    };
-    println!(
-        "halted in state {:?} ({}) after {} steps",
-        decompiled.state, status, steps
-    );
 }
 
 #[cfg(test)]
