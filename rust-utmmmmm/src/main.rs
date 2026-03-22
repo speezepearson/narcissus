@@ -6,7 +6,8 @@ mod tm;
 mod toy_machines;
 mod utm;
 
-use std::fmt::Debug;
+use std::cmp::max;
+use std::fmt::Write;
 use tm::{
     run_until_enters_state, RunUntilResult, RunningTuringMachine, TapeExtender, TuringMachineSpec,
 };
@@ -14,14 +15,14 @@ use utm::*;
 
 use crate::compiled::{CState, CompiledTapeExtender, CompiledTuringMachineSpec};
 use crate::infinity::{header_len, InfiniteTapeExtender};
+use crate::tm::SimpleTuringMachineSpec;
+
+type UtmTm<'a> = RunningTuringMachine<'a, SimpleTuringMachineSpec<State, Symbol>>;
 
 const RADIUS: usize = 30;
 
 /// Format a tape view: 30 symbols on each side of the head, with ^ below.
-fn tape_view<Spec: TuringMachineSpec<Symbol = Symbol>>(tm: &RunningTuringMachine<Spec>) -> String
-where
-    Spec::State: Debug,
-{
+fn tape_view(tm: &UtmTm) -> String {
     let mut top = String::new();
     let mut bot = String::new();
 
@@ -56,70 +57,83 @@ where
     format!("{}\n{}", top, bot)
 }
 
-/// Must be larger than the UTM header to allow decode to find all 5 `#` delimiters.
-fn min_display_tape_len() -> usize {
-    // Header + some extra cells so decode has tape content to work with.
-    header_len() + 1_000
+/// Decode tower[level+1] from tower[level], extending the tape as needed.
+/// Returns None if decoding fails (tape too short, etc.)
+fn decode_next_level<'a>(
+    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
+    parent: &mut UtmTm<'a>,
+    extender: &mut InfiniteTapeExtender,
+) -> Option<UtmTm<'a>> {
+    // Ensure parent tape is long enough for decoding
+    let min_len = max(header_len(), parent.pos + 100);
+    extender.extend(&mut parent.tape, min_len);
+    MyUtmEncodingScheme::decode(utm, &parent.tape).ok()
 }
 
-fn print_tower<Spec: TuringMachineSpec<Symbol = Symbol>>(
-    tm: &RunningTuringMachine<Spec>,
-    steps: u64,
-) where
-    Spec::State: Debug,
-{
-    let utm = &*UTM_SPEC;
-    let mut extender = InfiniteTapeExtender;
+/// Build the tower by decoding each level from the previous.
+/// tower[0] = decompiled L0, tower[1] = decode(tower[0]), etc.
+/// Re-decodes level i+1 when level i entered Init (compared to prev_states).
+/// Grows the tower by at most one new level per call.
+fn update_tower<'a>(
+    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
+    tower: &mut Vec<UtmTm<'a>>,
+    prev_states: &mut Vec<State>,
+    extender: &mut InfiniteTapeExtender,
+) {
+    // Walk the tower: re-decode level+1 from level when level entered Init.
+    // Level 0 is always freshly set by the caller, so always decode level 1.
+    let mut level = 0;
+    loop {
+        // Check whether this level just entered Init
+        let entered_init = if level < prev_states.len() {
+            tower[level].state == State::Init && prev_states[level] != State::Init
+        } else {
+            // New level we haven't seen before — don't cascade further
+            false
+        };
 
-    eprintln!(
-        "═══ {} steps ═══════════════════════════════════════",
-        steps
-    );
-
-    eprintln!("Level 0 (outermost UTM):");
-    let tape_str = format_tape(&tm.tape);
-    eprintln!("{}", &tape_str[..tape_str.len().min(1000)]);
-
-    eprintln!("Level 0 tape view:");
-    eprintln!("{}", tape_view(tm));
-
-    // Extend a copy of the tape so decode can see the full encoding
-    let mut full_tape = tm.tape.clone();
-    extender.extend(&mut full_tape, min_display_tape_len());
-
-    match MyUtmEncodingScheme::decode(utm, &full_tape) {
-        Ok(mut level1) => {
-            // Level 1's tape contains the guest symbols of the simulated UTM.
-            // To decode level 2, we need the full UTM encoding of level 1's machine,
-            // which we get by re-encoding level 1 and extending it.
-            extender.extend(&mut level1.tape, min_display_tape_len());
-            eprintln!("Level 1 (simulated UTM, {} symbols):", level1.tape.len());
-            eprintln!("{}", tape_view(&level1));
-
-            let mut level1_encoded = MyUtmEncodingScheme::encode(&level1);
-            extender.extend(&mut level1_encoded, min_display_tape_len());
-
-            match MyUtmEncodingScheme::decode(utm, &level1_encoded) {
-                Ok(mut level2) => {
-                    extender.extend(&mut level2.tape, min_display_tape_len());
-                    eprintln!(
-                        "Level 2 (simulated simulated UTM, {} symbols):",
-                        level2.tape.len()
-                    );
-                    eprintln!("{}", tape_view(&level2));
-                }
-                Err(e) => {
-                    eprintln!("Level 2: (unable to decode: {})", e);
-                }
-            }
+        // Level 0 always triggers decoding of level 1 (caller just set it).
+        // Deeper levels only trigger if they entered Init.
+        if level > 0 && !entered_init {
+            break;
         }
-        Err(e) => {
-            eprintln!("Level 1: (unable to decode: {})", e);
-            eprintln!("Level 2: (unable to decode)");
+
+        // Decode the next level from this one
+        if let Some(next) = decode_next_level(utm, &mut tower[level], extender) {
+            if level + 1 < tower.len() {
+                tower[level + 1] = next;
+            } else {
+                // Grow the tower by one
+                tower.push(next);
+                break; // Don't cascade into the brand-new level
+            }
+            level += 1;
+        } else {
+            break;
         }
     }
 
-    eprintln!();
+    // Snapshot current states for next comparison
+    prev_states.clear();
+    for tm in tower.iter() {
+        prev_states.push(tm.state);
+    }
+}
+
+fn format_tower(tower: &[UtmTm], total_steps: u64) -> String {
+    let mut buf = String::new();
+    writeln!(
+        buf,
+        "═══ {} steps ═══════════════════════════════════════",
+        total_steps
+    )
+    .unwrap();
+
+    for (i, tm) in tower.iter().enumerate() {
+        writeln!(buf, "Level {} ({} symbols):", i, tm.tape.len()).unwrap();
+        writeln!(buf, "{}", tape_view(tm)).unwrap();
+    }
+    buf
 }
 
 fn main() {
@@ -136,43 +150,48 @@ fn main() {
 
     let mut tm = RunningTuringMachine::new(&compiled);
     let mut extender = CompiledTapeExtender::new(&compiled, Box::new(InfiniteTapeExtender));
-    // Initialize tape with at least one cell
     extender.extend(&mut tm.tape, 1);
 
     let mut total_steps: u64 = 0;
     let mut guest_steps: u64 = 0;
-    let decompiled = compiled.decompile(&tm);
-    print_tower(&decompiled, total_steps);
+    let mut inf_extender = InfiniteTapeExtender;
+
+    // Initialize tower from the starting state
+    let mut tower: Vec<UtmTm> = vec![compiled.decompile(&tm)];
+    let mut prev_states: Vec<State> = Vec::new();
+    update_tower(utm, &mut tower, &mut prev_states, &mut inf_extender);
+    eprint!("{}", format_tower(&tower, total_steps));
 
     loop {
         match run_until_enters_state(&mut tm, init_cstate, usize::MAX, Some(&mut extender)) {
             Ok(steps) => {
                 total_steps += steps as u64;
                 guest_steps += 1;
-                let decompiled = compiled.decompile(&tm);
+
+                tower[0] = compiled.decompile(&tm);
+                update_tower(utm, &mut tower, &mut prev_states, &mut inf_extender);
+
                 eprintln!(
-                    "Guest step {} completed after {} UTM steps (total: {})",
+                    "Guest step {} after {} UTM steps (total: {})",
                     guest_steps, steps, total_steps
                 );
-                print_tower(&decompiled, total_steps);
+                eprint!("{}", format_tower(&tower, total_steps));
             }
-            Err(RunUntilResult::Accepted { num_steps }) => {
+            Err(
+                RunUntilResult::Accepted { num_steps } | RunUntilResult::Rejected { num_steps },
+            ) => {
                 total_steps += num_steps as u64;
-                let decompiled = compiled.decompile(&tm);
-                print_tower(&decompiled, total_steps);
+                tower[0] = compiled.decompile(&tm);
+                update_tower(utm, &mut tower, &mut prev_states, &mut inf_extender);
+                eprint!("{}", format_tower(&tower, total_steps));
+                let status = if compiled.is_accepting(tm.state) {
+                    "accept"
+                } else {
+                    "reject"
+                };
                 println!(
-                    "halted (accept) in state {:?} after {} UTM steps ({} guest steps)",
-                    decompiled.state, total_steps, guest_steps
-                );
-                break;
-            }
-            Err(RunUntilResult::Rejected { num_steps }) => {
-                total_steps += num_steps as u64;
-                let decompiled = compiled.decompile(&tm);
-                print_tower(&decompiled, total_steps);
-                println!(
-                    "halted (reject) in state {:?} after {} UTM steps ({} guest steps)",
-                    decompiled.state, total_steps, guest_steps
+                    "halted ({}) in state {:?} after {} UTM steps ({} guest steps)",
+                    status, tower[0].state, total_steps, guest_steps
                 );
                 break;
             }
