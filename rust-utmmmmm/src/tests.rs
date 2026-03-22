@@ -70,7 +70,7 @@ fn strip_trailing_blanks<Spec: TuringMachineSpec>(tm: &mut RunningTuringMachine<
 /// - Assert accept/reject status matches
 /// - Assert final tapes match (modulo trailing blanks)
 fn assert_faithful<Spec: TuringMachineSpec + std::fmt::Debug>(
-    mut guest_tm: RunningTuringMachine<Spec>,
+    guest_tm: RunningTuringMachine<Spec>,
     max_direct_steps: usize,
     max_utm_steps: usize,
 ) where

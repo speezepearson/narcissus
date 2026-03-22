@@ -103,12 +103,14 @@ impl<'a, Spec: TuringMachineSpec> RunningTuringMachine<'a, Spec> {
 // Run a TM
 // ════════════════════════════════════════════════════════════════════
 
+#[allow(dead_code)]
 pub enum RunningTMStatus {
     Accepted,
     Rejected,
     Running,
 }
 
+#[allow(dead_code)]
 pub fn step<Spec: TuringMachineSpec>(machine: &mut RunningTuringMachine<Spec>) -> RunningTMStatus {
     let sym = machine.tape[machine.pos];
     if let Some((ns, nsym, dir)) = machine.spec.get_transition(machine.state, sym) {
@@ -128,17 +130,20 @@ pub fn step<Spec: TuringMachineSpec>(machine: &mut RunningTuringMachine<Spec>) -
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HaltReason {
     Accepted { num_steps: usize },
     Rejected { num_steps: usize },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartialRunReason {
     StepLimit,
 }
 
+#[allow(dead_code)]
 pub fn run_tm<Spec: TuringMachineSpec>(
     tm: &mut RunningTuringMachine<Spec>,
     max_steps: usize,

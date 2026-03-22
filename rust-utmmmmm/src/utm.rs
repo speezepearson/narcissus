@@ -416,8 +416,6 @@ const ALL_SYMBOLS: [Symbol; 16] = [
 pub trait UtmEncodingScheme {
     type State;
     type Symbol;
-    fn initial() -> Self::State;
-    fn blank() -> Self::Symbol;
     fn encode<Guest: TuringMachineSpec>(spec: &RunningTuringMachine<Guest>) -> Vec<Self::Symbol>;
     fn decode<'a, Guest: TuringMachineSpec>(
         guest: &'a Guest,
@@ -429,12 +427,6 @@ pub struct MyUtmEncodingScheme;
 impl UtmEncodingScheme for MyUtmEncodingScheme {
     type State = State;
     type Symbol = Symbol;
-    fn initial() -> Self::State {
-        State::Init
-    }
-    fn blank() -> Self::Symbol {
-        Symbol::Blank
-    }
 
     // ════════════════════════════════════════════════════════════════════
     // Encoding: encode an arbitrary TM + input into a UTM tape
@@ -1680,107 +1672,6 @@ pub static UTM_SPEC: LazyLock<SimpleTuringMachineSpec<State, Symbol>> = LazyLock
     //     symbol_names: SYMBOL_NAMES.to_vec(),
     // }
 });
-
-// ════════════════════════════════════════════════════════════════════
-// Infinite tape wrapper for running TMs
-// ════════════════════════════════════════════════════════════════════
-
-pub struct InfiniteTape {
-    pub left: Vec<Symbol>,
-    pub right: Vec<Symbol>,
-    pub blank: Symbol,
-}
-
-impl InfiniteTape {
-    pub fn new(initial: &[Symbol], blank: Symbol) -> Self {
-        Self {
-            left: Vec::new(),
-            right: initial.to_vec(),
-            blank,
-        }
-    }
-
-    pub fn get(&self, pos: i64) -> Symbol {
-        if pos >= 0 {
-            let idx = pos as usize;
-            if idx < self.right.len() {
-                self.right[idx]
-            } else {
-                self.blank
-            }
-        } else {
-            let idx = (-pos - 1) as usize;
-            if idx < self.left.len() {
-                self.left[idx]
-            } else {
-                self.blank
-            }
-        }
-    }
-
-    pub fn set(&mut self, pos: i64, val: Symbol) {
-        if pos >= 0 {
-            let idx = pos as usize;
-            while self.right.len() <= idx {
-                self.right.push(self.blank);
-            }
-            self.right[idx] = val;
-        } else {
-            let idx = (-pos - 1) as usize;
-            while self.left.len() <= idx {
-                self.left.push(self.blank);
-            }
-            self.left[idx] = val;
-        }
-    }
-
-    /// Extract a contiguous slice as Vec, from min_pos to max_pos inclusive.
-    pub fn extract(&self, min_pos: i64, max_pos: i64) -> Vec<Symbol> {
-        (min_pos..=max_pos).map(|p| self.get(p)).collect()
-    }
-}
-
-// // ════════════════════════════════════════════════════════════════════
-// // Optimization hints for the UTM hot loop
-// // ════════════════════════════════════════════════════════════════════
-
-// /// States that are "scan right" (read symbol, write same, move right).
-// pub fn scan_right_states(spec: &TuringMachineSpec) -> Vec<bool> {
-//     let mut result = vec![false; spec.n_states];
-//     for s in 0..spec.n_states {
-//         let mut has_any = false;
-//         for sym in 0..spec.n_symbols {
-//             if let Some((ns, nsym, dir)) = spec.get_transition(State(s as u8), Symbol(sym as u8)) {
-//                 if ns.0 as usize == s && nsym.0 as usize == sym && matches!(dir, Dir::Right) {
-//                     has_any = true;
-//                 }
-//             }
-//         }
-//         if has_any {
-//             result[s] = true;
-//         }
-//     }
-//     result
-// }
-
-// /// States that are "scan left" (read symbol, write same, move left).
-// pub fn scan_left_states(spec: &TuringMachineSpec) -> Vec<bool> {
-//     let mut result = vec![false; spec.n_states];
-//     for s in 0..spec.n_states {
-//         let mut has_any = false;
-//         for sym in 0..spec.n_symbols {
-//             if let Some((ns, nsym, dir)) = spec.get_transition(State(s as u8), Symbol(sym as u8)) {
-//                 if ns.0 as usize == s && nsym.0 as usize == sym && matches!(dir, Dir::Left) {
-//                     has_any = true;
-//                 }
-//             }
-//         }
-//         if has_any {
-//             result[s] = true;
-//         }
-//     }
-//     result
-// }
 
 // ════════════════════════════════════════════════════════════════════
 // Tape formatting for debugging

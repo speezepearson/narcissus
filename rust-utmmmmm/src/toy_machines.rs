@@ -10,29 +10,6 @@ use std::{
 use crate::tm::{Dir, SimpleTuringMachineSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum W1State {
-    Init,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum W1Symbol {
-    Blank,
-    One,
-}
-
-const WRITE_1S_FOREVER_SPEC: LazyLock<SimpleTuringMachineSpec<W1State, W1Symbol>> =
-    LazyLock::new(|| SimpleTuringMachineSpec {
-        initial: W1State::Init,
-        blank: W1Symbol::Blank,
-        accepting: HashSet::new(),
-        transitions: HashMap::from([(
-            (W1State::Init, W1Symbol::Blank),
-            (W1State::Init, W1Symbol::One, Dir::Right),
-        )]),
-        all_states: vec![W1State::Init],
-        all_symbols: vec![W1Symbol::Blank, W1Symbol::One],
-    });
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AccImmState {
     Init,
 }

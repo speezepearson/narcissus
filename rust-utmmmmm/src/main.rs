@@ -1,6 +1,8 @@
+#[allow(dead_code)]
 mod compiled;
 mod infinity;
 mod tm;
+#[allow(dead_code)]
 mod toy_machines;
 mod utm;
 
