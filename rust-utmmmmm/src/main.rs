@@ -162,20 +162,25 @@ fn main() {
     update_tower(utm, &mut tower, &mut prev_states, &mut inf_extender);
     eprint!("{}", format_tower(&tower, total_steps));
 
+    let print_interval = std::time::Duration::from_millis(100);
+    let mut last_print = std::time::Instant::now();
+    let start_time = std::time::Instant::now();
+    // Adaptive step budget: tune so each run_until_enters_state call
+    // takes roughly half the print interval.
+    let mut step_budget: usize = 100_000;
+
     loop {
-        match run_until_enters_state(&mut tm, init_cstate, usize::MAX, Some(&mut extender)) {
+        let t0 = std::time::Instant::now();
+        match run_until_enters_state(&mut tm, init_cstate, step_budget, Some(&mut extender)) {
             Ok(steps) => {
                 total_steps += steps as u64;
                 guest_steps += 1;
 
                 tower[0] = compiled.decompile(&tm);
                 update_tower(utm, &mut tower, &mut prev_states, &mut inf_extender);
-
-                eprintln!(
-                    "Guest step {} after {} UTM steps (total: {})",
-                    guest_steps, steps, total_steps
-                );
-                eprint!("{}", format_tower(&tower, total_steps));
+            }
+            Err(RunUntilResult::StepLimit) => {
+                total_steps += step_budget as u64;
             }
             Err(
                 RunUntilResult::Accepted { num_steps } | RunUntilResult::Rejected { num_steps },
@@ -193,12 +198,28 @@ fn main() {
                     "halted ({}) in state {:?} after {} UTM steps ({} guest steps)",
                     status, tower[0].state, total_steps, guest_steps
                 );
-                break;
+                return;
             }
-            Err(RunUntilResult::StepLimit) => {
-                eprintln!("step limit reached after {} UTM steps", total_steps);
-                break;
-            }
+        }
+
+        // Adapt step budget based on elapsed time (target ~50ms per call)
+        let elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0;
+        if elapsed_ms > 0.1 {
+            step_budget = (step_budget as f64 * 50.0 / elapsed_ms) as usize;
+            step_budget = step_budget.max(1_000);
+        }
+
+        // Print every 0.1s: decompile L0 for display, but don't re-decode deeper levels
+        if last_print.elapsed() >= print_interval {
+            tower[0] = compiled.decompile(&tm);
+            let wall_secs = start_time.elapsed().as_secs_f64().max(0.001);
+            eprint!(
+                "{}  ({} guest steps, {:.1}M steps/s)\n",
+                format_tower(&tower, total_steps),
+                guest_steps,
+                total_steps as f64 / wall_secs / 1_000_000.0
+            );
+            last_print = std::time::Instant::now();
         }
     }
 }
