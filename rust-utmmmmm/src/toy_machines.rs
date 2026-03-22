@@ -2,232 +2,277 @@
 // Toy machines for testing the UTM
 // ════════════════════════════════════════════════════════════════════
 
-use crate::utm::*;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
-/// Helper to build a TuringMachineSpec from a simple description.
-/// States and symbols are given as string slices; transitions as tuples.
-fn build_spec(
-    state_names: &[&'static str],
-    symbol_names: &[&'static str],
-    initial: &str,
-    blank: &str,
-    accepting: &[&str],
-    // Each transition: (state, sym, new_state, new_sym, dir)
-    transitions: &[(&str, &str, &str, &str, Dir)],
-) -> TuringMachineSpec {
-    let n_states = state_names.len();
-    let n_symbols = symbol_names.len();
+use crate::tm::{Dir, SimpleTuringMachineSpec, TuringMachineSpec};
 
-    let find_state = |name: &str| -> State {
-        State(
-            state_names
-                .iter()
-                .position(|&n| n == name)
-                .unwrap_or_else(|| panic!("unknown state: {}", name)) as u8,
-        )
-    };
-    let find_sym = |name: &str| -> Symbol {
-        Symbol(
-            symbol_names
-                .iter()
-                .position(|&n| n == name)
-                .unwrap_or_else(|| panic!("unknown symbol: {}", name)) as u8,
-        )
-    };
-
-    let initial_idx = find_state(initial);
-    let blank_idx = find_sym(blank);
-
-    let mut acc = vec![false; n_states];
-    for &a in accepting {
-        acc[find_state(a).0 as usize] = true;
-    }
-
-    let mut trans = vec![None; 65536];
-    let mut ordered = Vec::new();
-
-    for &(st, sy, ns, nsym, dir) in transitions {
-        let st_idx = find_state(st);
-        let sy_idx = find_sym(sy);
-        let ns_idx = find_state(ns);
-        let nsym_idx = find_sym(nsym);
-
-        let key = ((st_idx.0 as usize) << 8) | (sy_idx.0 as usize);
-        trans[key] = Some((ns_idx, nsym_idx, dir));
-        ordered.push((st_idx, sy_idx, ns_idx, nsym_idx, dir));
-    }
-
-    let accept_idx = accepting
-        .first()
-        .map(|&a| find_state(a))
-        .unwrap_or(State(255));
-
-    TuringMachineSpec {
-        n_states,
-        n_symbols,
-        initial: initial_idx,
-        accept: accept_idx,
-        blank: blank_idx,
-        accepting: acc,
-        transitions: trans,
-        state_names: state_names.to_vec(),
-        symbol_names: symbol_names.to_vec(),
-        ordered_rules: ordered,
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum W1State {
+    Init,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum W1Symbol {
+    Blank,
+    One,
 }
 
-pub fn write1s_forever_spec() -> TuringMachineSpec {
-    build_spec(
-        &["init"],
-        &["_", "1"],
-        "init",
-        "_",
-        &["init"],
-        &[
-            ("init", "_", "init", "1", Dir::Right),
-            ("init", "1", "init", "1", Dir::Right),
-        ],
-    )
+const WRITE_1S_FOREVER_SPEC: LazyLock<SimpleTuringMachineSpec<W1State, W1Symbol>> =
+    LazyLock::new(|| SimpleTuringMachineSpec {
+        initial: W1State::Init,
+        blank: W1Symbol::Blank,
+        accepting: HashSet::new(),
+        transitions: HashMap::from([(
+            (W1State::Init, W1Symbol::Blank),
+            (W1State::Init, W1Symbol::One, Dir::Right),
+        )]),
+        all_states: vec![W1State::Init],
+        all_symbols: vec![W1Symbol::Blank, W1Symbol::One],
+    });
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum AccImmState {
+    Init,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum AccImmSymbol {
+    Blank,
+    One,
+}
+pub static ACCEPT_IMMEDIATELY_SPEC: LazyLock<SimpleTuringMachineSpec<AccImmState, AccImmSymbol>> =
+    LazyLock::new(|| SimpleTuringMachineSpec {
+        initial: AccImmState::Init,
+        blank: AccImmSymbol::Blank,
+        accepting: HashSet::from([AccImmState::Init]),
+        transitions: HashMap::from([(
+            (AccImmState::Init, AccImmSymbol::Blank),
+            (AccImmState::Init, AccImmSymbol::One, Dir::Right),
+        )]),
+        all_states: vec![AccImmState::Init],
+        all_symbols: vec![AccImmSymbol::Blank, AccImmSymbol::One],
+    });
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RejImmState {
+    Init,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RejImmSymbol {
+    Blank,
+    One,
+}
+pub static REJECT_IMMEDIATELY_SPEC: LazyLock<SimpleTuringMachineSpec<RejImmState, RejImmSymbol>> =
+    LazyLock::new(|| SimpleTuringMachineSpec {
+        initial: RejImmState::Init,
+        blank: RejImmSymbol::Blank,
+        accepting: HashSet::new(),
+        transitions: HashMap::from([(
+            (RejImmState::Init, RejImmSymbol::Blank),
+            (RejImmState::Init, RejImmSymbol::One, Dir::Right),
+        )]),
+        all_states: vec![RejImmState::Init],
+        all_symbols: vec![RejImmSymbol::Blank, RejImmSymbol::One],
+    });
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CheckPalindromeState {
+    Start,
+    Accept,
+    SeekL,
+    SeekRA,
+    SeekRB,
+    SeekRC,
+    CheckA,
+    CheckB,
+    CheckC,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CheckPalindromeSymbol {
+    Blank,
+    A,
+    B,
+    C,
 }
 
-pub fn accept_immediately_spec() -> TuringMachineSpec {
-    build_spec(&["init"], &["_"], "init", "_", &["init"], &[])
-}
+pub static CHECK_PALINDROME_SPEC: LazyLock<
+    SimpleTuringMachineSpec<CheckPalindromeState, CheckPalindromeSymbol>,
+> = LazyLock::new(|| {
+    use CheckPalindromeState::*;
+    use CheckPalindromeSymbol::*;
 
-pub fn reject_immediately_spec() -> TuringMachineSpec {
-    build_spec(&["init"], &["_"], "init", "_", &[], &[])
-}
+    let letter_triplets = [
+        (A, CheckA, SeekRA),
+        (B, CheckB, SeekRB),
+        (C, CheckC, SeekRC),
+    ];
 
-pub fn flip_bits_spec() -> TuringMachineSpec {
-    build_spec(
-        &["init"],
-        &["_", "0", "1"],
-        "init",
-        "_",
-        &["init"],
-        &[
-            ("init", "0", "init", "1", Dir::Right),
-            ("init", "1", "init", "0", Dir::Right),
-        ],
-    )
-}
-
-pub fn check_palindrome_spec() -> TuringMachineSpec {
-    let letters = ["a", "b", "c"];
-
-    let mut state_names: Vec<&'static str> = vec!["start", "accept", "seekL"];
-    for l in &letters {
-        state_names.push(match *l {
-            "a" => "seekR_a",
-            "b" => "seekR_b",
-            "c" => "seekR_c",
-            _ => unreachable!(),
-        });
-    }
-    for l in &letters {
-        state_names.push(match *l {
-            "a" => "check_a",
-            "b" => "check_b",
-            "c" => "check_c",
-            _ => unreachable!(),
-        });
-    }
-
-    let symbol_names: Vec<&'static str> = vec!["_", "a", "b", "c"];
-
-    let mut transitions: Vec<(&str, &str, &str, &str, Dir)> = Vec::new();
+    let mut transitions: HashMap<
+        (CheckPalindromeState, CheckPalindromeSymbol),
+        (CheckPalindromeState, CheckPalindromeSymbol, Dir),
+    > = HashMap::new();
 
     // start rules
-    transitions.push(("start", "_", "accept", "_", Dir::Right));
-    for &l in &letters {
-        let seek = match l {
-            "a" => "seekR_a",
-            "b" => "seekR_b",
-            "c" => "seekR_c",
-            _ => unreachable!(),
-        };
-        transitions.push(("start", l, seek, "_", Dir::Right));
-    }
+    transitions.insert((Start, Blank), (Accept, Blank, Dir::Right));
+    transitions.insert((Start, A), (SeekRA, Blank, Dir::Right));
+    transitions.insert((Start, B), (SeekRB, Blank, Dir::Right));
+    transitions.insert((Start, C), (SeekRC, Blank, Dir::Right));
 
-    // seekR_x rules
-    for &l in &letters {
-        let seek = match l {
-            "a" => "seekR_a",
-            "b" => "seekR_b",
-            "c" => "seekR_c",
-            _ => unreachable!(),
-        };
-        let check = match l {
-            "a" => "check_a",
-            "b" => "check_b",
-            "c" => "check_c",
-            _ => unreachable!(),
-        };
-        transitions.push((seek, "_", check, "_", Dir::Left));
-        for &l2 in &letters {
-            transitions.push((seek, l2, seek, l2, Dir::Right));
+    for (letter, check, seek) in letter_triplets {
+        transitions.insert((seek, Blank), (check, Blank, Dir::Left));
+        for (l2, _, _) in letter_triplets {
+            transitions.insert((seek, l2), (seek, l2, Dir::Right));
         }
     }
 
     // check_x rules
-    for &l in &letters {
-        let check = match l {
-            "a" => "check_a",
-            "b" => "check_b",
-            "c" => "check_c",
-            _ => unreachable!(),
-        };
-        transitions.push((check, "_", "accept", "_", Dir::Right));
-        transitions.push((check, l, "seekL", "_", Dir::Left));
+    for (letter, check, seek) in letter_triplets {
+        transitions.insert((check, Blank), (Accept, Blank, Dir::Right));
+        transitions.insert((check, letter), (SeekL, Blank, Dir::Left));
     }
 
     // seekL rules
-    transitions.push(("seekL", "_", "start", "_", Dir::Right));
-    for &l in &letters {
-        transitions.push(("seekL", l, "seekL", l, Dir::Left));
+    transitions.insert((SeekL, Blank), (Start, Blank, Dir::Right));
+    for (letter, _, _) in letter_triplets {
+        transitions.insert((SeekL, letter), (SeekL, letter, Dir::Left));
     }
 
-    // Leak the vecs to get &'static str slices
-    let state_names_leaked: &'static [&'static str] = Box::leak(state_names.into_boxed_slice());
-    let symbol_names_leaked: &'static [&'static str] = Box::leak(symbol_names.into_boxed_slice());
+    SimpleTuringMachineSpec {
+        initial: CheckPalindromeState::Start,
+        accepting: HashSet::from([CheckPalindromeState::Accept]),
+        blank: CheckPalindromeSymbol::Blank,
+        transitions: HashMap::from(transitions),
+        all_states: vec![
+            CheckPalindromeState::Start,
+            CheckPalindromeState::Accept,
+            CheckPalindromeState::SeekL,
+            CheckPalindromeState::SeekRA,
+            CheckPalindromeState::SeekRB,
+            CheckPalindromeState::SeekRC,
+            CheckPalindromeState::CheckA,
+            CheckPalindromeState::CheckB,
+            CheckPalindromeState::CheckC,
+        ],
+        all_symbols: vec![
+            CheckPalindromeSymbol::Blank,
+            CheckPalindromeSymbol::A,
+            CheckPalindromeSymbol::B,
+            CheckPalindromeSymbol::C,
+        ],
+    }
+});
 
-    build_spec(
-        state_names_leaked,
-        symbol_names_leaked,
-        "start",
-        "_",
-        &["accept"],
-        &transitions,
-    )
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum DoubleXState {
+    Start,
+    FindX,
+    GoRight,
+    GoBack,
+    CleanL,
+    CleanR,
+    Done,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum DoubleXSymbol {
+    Blank,
+    Dollar,
+    X,
+    Y,
+    Z,
+}
+pub static DOUBLE_X_SPEC: LazyLock<SimpleTuringMachineSpec<DoubleXState, DoubleXSymbol>> =
+    LazyLock::new(|| {
+        use DoubleXState::*;
+        use DoubleXSymbol::*;
+        SimpleTuringMachineSpec {
+            initial: DoubleXState::Start,
+            accepting: HashSet::from([DoubleXState::Done]),
+            blank: DoubleXSymbol::Blank,
+            transitions: HashMap::from([
+                ((Start, Dollar), (FindX, Dollar, Dir::Right)),
+                ((FindX, X), (GoRight, Y, Dir::Right)),
+                ((FindX, Y), (FindX, Y, Dir::Right)),
+                ((FindX, Z), (CleanL, Z, Dir::Left)),
+                ((FindX, Blank), (Done, Blank, Dir::Left)),
+                ((GoRight, X), (GoRight, X, Dir::Right)),
+                ((GoRight, Z), (GoRight, Z, Dir::Right)),
+                ((GoRight, Blank), (GoBack, Z, Dir::Left)),
+                ((GoBack, X), (GoBack, X, Dir::Left)),
+                ((GoBack, Y), (GoBack, Y, Dir::Left)),
+                ((GoBack, Z), (GoBack, Z, Dir::Left)),
+                ((GoBack, Dollar), (FindX, Dollar, Dir::Right)),
+                ((CleanL, Y), (CleanL, X, Dir::Left)),
+                ((CleanL, Dollar), (CleanR, Dollar, Dir::Right)),
+                ((CleanR, X), (CleanR, X, Dir::Right)),
+                ((CleanR, Z), (CleanR, X, Dir::Right)),
+                ((CleanR, Blank), (Done, Blank, Dir::Left)),
+            ]),
+            all_states: vec![Start, FindX, GoRight, GoBack, CleanL, CleanR, Done],
+            all_symbols: vec![Blank, Dollar, X, Y, Z],
+        }
+    });
 
-pub fn double_x_spec() -> TuringMachineSpec {
-    build_spec(
-        &[
-            "start", "findX", "goRight", "goBack", "cleanL", "cleanR", "done",
-        ],
-        &["_", "$", "X", "Y", "Z"],
-        "start",
-        "_",
-        &["done"],
-        &[
-            ("start", "$", "findX", "$", Dir::Right),
-            ("findX", "X", "goRight", "Y", Dir::Right),
-            ("findX", "Y", "findX", "Y", Dir::Right),
-            ("findX", "Z", "cleanL", "Z", Dir::Left),
-            ("findX", "_", "done", "_", Dir::Left),
-            ("goRight", "X", "goRight", "X", Dir::Right),
-            ("goRight", "Z", "goRight", "Z", Dir::Right),
-            ("goRight", "_", "goBack", "Z", Dir::Left),
-            ("goBack", "X", "goBack", "X", Dir::Left),
-            ("goBack", "Y", "goBack", "Y", Dir::Left),
-            ("goBack", "Z", "goBack", "Z", Dir::Left),
-            ("goBack", "$", "findX", "$", Dir::Right),
-            ("cleanL", "Y", "cleanL", "X", Dir::Left),
-            ("cleanL", "$", "cleanR", "$", Dir::Right),
-            ("cleanR", "X", "cleanR", "X", Dir::Right),
-            ("cleanR", "Z", "cleanR", "X", Dir::Right),
-            ("cleanR", "_", "done", "_", Dir::Left),
-        ],
-    )
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tm::{run_tm, HaltReason, RunningTuringMachine};
+
+    #[test]
+    fn accept_immediately() {
+        use AccImmSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*ACCEPT_IMMEDIATELY_SPEC);
+        tm.tape = vec![Blank, One];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
+    }
+
+    #[test]
+    fn reject_immediately() {
+        use RejImmSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*REJECT_IMMEDIATELY_SPEC);
+        tm.tape = vec![Blank, One];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Rejected { .. })));
+    }
+
+    #[test]
+    fn double_x() {
+        use DoubleXSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*DOUBLE_X_SPEC);
+        tm.tape = vec![Dollar, X, X, X];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
+        while tm.tape.last() == Some(&Blank) {
+            tm.tape.pop();
+        }
+        assert_eq!(tm.tape, vec![Dollar, X, X, X, X, X, X]);
+    }
+
+    #[test]
+    fn check_palindrome_accepts_odd_length_palindrome() {
+        use CheckPalindromeSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
+        tm.tape = vec![A, B, C, B, A];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
+    }
+
+    #[test]
+    fn check_palindrome_accepts_even_length_palindrome() {
+        use CheckPalindromeSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
+        tm.tape = vec![A, B, B, A];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
+    }
+
+    #[test]
+    fn check_palindrome_rejects_non_palindrome() {
+        use CheckPalindromeSymbol::*;
+        let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
+        tm.tape = vec![A, B, C, A];
+        let result = run_tm(&mut tm, 1000, None);
+        assert!(matches!(result, Ok(HaltReason::Rejected { .. })));
+    }
 }

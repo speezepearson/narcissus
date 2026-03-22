@@ -1,7 +1,14 @@
+mod compiled;
+mod infinity;
+mod tm;
 mod toy_machines;
 mod utm;
 
+fn main() {}
+
 use utm::*;
+
+use crate::tm::RunningTuringMachine;
 
 const RADIUS: usize = 30;
 
@@ -47,31 +54,8 @@ fn tape_view(
     format!("{}\n{}", top, bot)
 }
 
-fn raw_tape_view(tape: &[Symbol], pos: usize, state: State) -> String {
-    let tape_as_usize: Vec<usize> = tape.iter().map(|s| s.0 as usize).collect();
-    let state_name = STATE_NAMES.get(state.0 as usize).unwrap_or(&"?");
-    tape_view(
-        &tape_as_usize,
-        pos,
-        state_name,
-        &SYMBOL_NAMES,
-        SYM_BLANK.0 as usize,
-    )
-}
-
-fn try_decode(tape: &[usize], guest: &TuringMachineSpec) -> Option<DecodedGuestState> {
-    let tape_sym: Vec<Symbol> = tape.iter().map(|&s| Symbol(s as u8)).collect();
-
-    let hash_count = tape_sym.iter().filter(|&&s| s == SYM_HASH).count();
-    if hash_count < 5 {
-        return None;
-    }
-
-    std::panic::catch_unwind(|| decode_tape(&tape_sym, guest)).ok()
-}
-
-fn print_tower(tape: &[Symbol], pos: usize, state: State, steps: u64) {
-    let utm = build_utm_spec();
+fn print_tower(utm: RunningTuringMachine<utm> tape: &[Symbol], pos: usize, state: State, steps: u64) {
+    let utm = &*UTM_SPEC;
 
     eprintln!(
         "═══ {} steps ═══════════════════════════════════════",
@@ -79,7 +63,7 @@ fn print_tower(tape: &[Symbol], pos: usize, state: State, steps: u64) {
     );
 
     eprintln!("Level 0 (outermost UTM):");
-    eprintln!("{}", raw_tape_view(tape, pos, state));
+    eprintln!("{}", format_tape(tape));
 
     let outer_tape: Vec<usize> = tape.iter().map(|s| s.0 as usize).collect();
     if let Some(level1) = try_decode(&outer_tape, &utm) {
@@ -169,7 +153,7 @@ fn main() {
                 Dir::Right => pos + 1,
             };
             steps += 1;
-            if steps % 1_000_000 == 0 {
+            if steps % 100_000_000 == 0 {
                 print_tower(&tape, pos, state, steps);
             }
         } else {
