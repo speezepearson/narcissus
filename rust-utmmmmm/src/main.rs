@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use tm::{RunningTuringMachine, TapeExtender, TuringMachineSpec};
 use utm::*;
 
-use crate::infinity::InfiniteTapeExtender;
+use crate::infinity::{header_len, InfiniteTapeExtender};
 
 const RADIUS: usize = 30;
 
@@ -51,6 +51,12 @@ where
     format!("{}\n{}", top, bot)
 }
 
+/// Must be larger than the UTM header to allow decode to find all 5 `#` delimiters.
+fn min_display_tape_len() -> usize {
+    // Header + some extra cells so decode has tape content to work with.
+    header_len() + 1_000
+}
+
 fn print_tower<Spec: TuringMachineSpec<Symbol = Symbol>>(
     tm: &RunningTuringMachine<Spec>,
     steps: u64,
@@ -58,6 +64,7 @@ fn print_tower<Spec: TuringMachineSpec<Symbol = Symbol>>(
     Spec::State: Debug,
 {
     let utm = &*UTM_SPEC;
+    let extender = InfiniteTapeExtender;
 
     eprintln!(
         "═══ {} steps ═══════════════════════════════════════",
@@ -65,19 +72,35 @@ fn print_tower<Spec: TuringMachineSpec<Symbol = Symbol>>(
     );
 
     eprintln!("Level 0 (outermost UTM):");
-    eprintln!("{}", &format_tape(&tm.tape)[..1000]);
+    let tape_str = format_tape(&tm.tape);
+    eprintln!("{}", &tape_str[..tape_str.len().min(1000)]);
 
     eprintln!("Level 0 tape view:");
     eprintln!("{}", tape_view(tm));
 
-    match MyUtmEncodingScheme::decode(utm, &tm.tape) {
-        Ok(level1) => {
-            eprintln!("Level 1 (simulated UTM):");
+    // Extend a copy of the tape so decode can see the full encoding
+    let mut full_tape = tm.tape.clone();
+    extender.extend(&mut full_tape, min_display_tape_len());
+
+    match MyUtmEncodingScheme::decode(utm, &full_tape) {
+        Ok(mut level1) => {
+            // Level 1's tape contains the guest symbols of the simulated UTM.
+            // To decode level 2, we need the full UTM encoding of level 1's machine,
+            // which we get by re-encoding level 1 and extending it.
+            extender.extend(&mut level1.tape, min_display_tape_len());
+            eprintln!("Level 1 (simulated UTM, {} symbols):", level1.tape.len());
             eprintln!("{}", tape_view(&level1));
 
-            match MyUtmEncodingScheme::decode(utm, &level1.tape) {
-                Ok(level2) => {
-                    eprintln!("Level 2 (simulated simulated UTM):");
+            let mut level1_encoded = MyUtmEncodingScheme::encode(&level1);
+            extender.extend(&mut level1_encoded, min_display_tape_len());
+
+            match MyUtmEncodingScheme::decode(utm, &level1_encoded) {
+                Ok(mut level2) => {
+                    extender.extend(&mut level2.tape, min_display_tape_len());
+                    eprintln!(
+                        "Level 2 (simulated simulated UTM, {} symbols):",
+                        level2.tape.len()
+                    );
                     eprintln!("{}", tape_view(&level2));
                 }
                 Err(e) => {

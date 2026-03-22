@@ -33,11 +33,11 @@ const WRITE_1S_FOREVER_SPEC: LazyLock<SimpleTuringMachineSpec<W1State, W1Symbol>
     });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum AccImmState {
+pub enum AccImmState {
     Init,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum AccImmSymbol {
+pub enum AccImmSymbol {
     Blank,
     One,
 }
@@ -55,11 +55,11 @@ pub static ACCEPT_IMMEDIATELY_SPEC: LazyLock<SimpleTuringMachineSpec<AccImmState
     });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum RejImmState {
+pub enum RejImmState {
     Init,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum RejImmSymbol {
+pub enum RejImmSymbol {
     Blank,
     One,
 }
@@ -164,7 +164,7 @@ pub static CHECK_PALINDROME_SPEC: LazyLock<
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum DoubleXState {
+pub enum DoubleXState {
     Start,
     FindX,
     GoRight,
@@ -174,7 +174,7 @@ enum DoubleXState {
     Done,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum DoubleXSymbol {
+pub enum DoubleXSymbol {
     Blank,
     Dollar,
     X,
@@ -210,6 +210,35 @@ pub static DOUBLE_X_SPEC: LazyLock<SimpleTuringMachineSpec<DoubleXState, DoubleX
             ]),
             all_states: vec![Start, FindX, GoRight, GoBack, CleanL, CleanR, Done],
             all_symbols: vec![Blank, Dollar, X, Y, Z],
+        }
+    });
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlipBitsState {
+    Flip,
+    Done,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlipBitsSymbol {
+    Blank,
+    Zero,
+    One,
+}
+pub static FLIP_BITS_SPEC: LazyLock<SimpleTuringMachineSpec<FlipBitsState, FlipBitsSymbol>> =
+    LazyLock::new(|| {
+        use FlipBitsState::*;
+        use FlipBitsSymbol::*;
+        SimpleTuringMachineSpec {
+            initial: Flip,
+            accepting: HashSet::from([Done]),
+            blank: Blank,
+            transitions: HashMap::from([
+                ((Flip, Zero), (Flip, One, Dir::Right)),
+                ((Flip, One), (Flip, Zero, Dir::Right)),
+                ((Flip, Blank), (Done, Blank, Dir::Left)),
+            ]),
+            all_states: vec![Flip, Done],
+            all_symbols: vec![Blank, Zero, One],
         }
     });
 

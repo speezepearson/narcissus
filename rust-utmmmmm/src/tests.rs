@@ -1,256 +1,499 @@
-// use crate::tm::run_tm;
-// use crate::tm::TuringMachineSpec;
-// use crate::toy_machines::*;
-// use crate::utm::*;
+use crate::tm::{run_tm, HaltReason, RunningTuringMachine, TuringMachineSpec};
+use crate::toy_machines::*;
+use crate::utm::*;
 
-// // ════════════════════════════════════════════════════════════════════
-// // Helpers
-// // ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// Helpers
+// ════════════════════════════════════════════════════════════════════
 
-// fn sym(v: u8) -> Symbol {
-//     Symbol(v)
-// }
+fn run_guest_direct<'a, Spec: TuringMachineSpec>(
+    spec: &'a Spec,
+    input: &[Spec::Symbol],
+    max_steps: usize,
+) -> (&'static str, RunningTuringMachine<'a, Spec>) {
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = input.to_vec();
+    if tm.tape.is_empty() {
+        tm.tape.push(spec.blank());
+    }
 
-// fn run_guest_direct<Spec: TuringMachineSpec>(
-//     spec: Spec,
-//     input: &[Spec::Symbol],
-//     max_steps: i64,
-// ) -> (State, &'static str, Vec<Symbol>, i64) {
-//     let blank = spec.blank;
-//     let mut tape = InfiniteTape::new(input, blank);
-//     let mut head: i64 = 0;
-//     let mut state = spec.initial;
+    let result = run_tm(&mut tm, max_steps, None);
+    let status = match result {
+        Ok(HaltReason::Accepted { .. }) => "accept",
+        Ok(HaltReason::Rejected { .. }) => "reject",
+        Err(_) => "limit",
+    };
 
-//     let result = run_tm(spec, &mut tape, &mut head, &mut state, max_steps);
-//     let status = match result {
-//         RunResult::Accepted(_) => "accept",
-//         RunResult::Rejected(_) => "reject",
-//         RunResult::StepLimit(_) => "limit",
-//     };
+    (status, tm)
+}
 
-//     let max_pos = tape.right.len() as i64;
-//     let contents = tape.extract(0, max_pos - 1);
-//     (state, status, contents, head)
-// }
+fn run_via_utm<'a, Guest: TuringMachineSpec>(
+    guest: &'a Guest,
+    input: &[Guest::Symbol],
+    max_utm_steps: usize,
+) -> (String, RunningTuringMachine<'a, Guest>) {
+    let utm = &*UTM_SPEC;
 
-// fn run_via_utm(
-//     guest: &TuringMachineSpec,
-//     input: &[Symbol],
-//     max_utm_steps: i64,
-// ) -> (String, Vec<usize>) {
-//     let utm = build_utm_spec();
-//     let encoded = encode_tape(guest, input, 0, None);
+    let mut guest_tm = RunningTuringMachine::new(guest);
+    guest_tm.tape = if input.is_empty() {
+        vec![guest.blank()]
+    } else {
+        input.to_vec()
+    };
 
-//     let mut tape = InfiniteTape::new(&encoded, SYM_BLANK);
-//     let mut head: i64 = 0;
-//     let mut state = utm.initial;
+    let encoded = MyUtmEncodingScheme::encode(&guest_tm);
+    let mut utm_tm = RunningTuringMachine::new(utm);
+    utm_tm.tape = encoded;
 
-//     let result = run_tm(&utm, &mut tape, &mut head, &mut state, max_utm_steps);
+    let result = run_tm(&mut utm_tm, max_utm_steps, None);
+    let status = match result {
+        Ok(HaltReason::Accepted { .. }) => "accept",
+        Ok(HaltReason::Rejected { .. }) => "reject",
+        Err(_) => "limit",
+    };
 
-//     let status = match result {
-//         RunResult::Accepted(_) => "accept",
-//         RunResult::Rejected(_) => "reject",
-//         RunResult::StepLimit(_) => "limit",
-//     };
+    let decoded = MyUtmEncodingScheme::decode(guest, &utm_tm.tape)
+        .expect("should be able to decode UTM tape");
 
-//     let min_pos = -(tape.left.len() as i64);
-//     let max_pos = tape.right.len() as i64 - 1;
-//     let flat: Vec<Symbol> = tape.extract(min_pos, max_pos);
+    (status.to_string(), decoded)
+}
 
-//     let offset = (-min_pos) as usize;
+/// Strip trailing blanks from a tape.
+fn strip_trailing_blanks<Spec: TuringMachineSpec>(tm: &mut RunningTuringMachine<Spec>) {
+    while tm.tape.last() == Some(&tm.spec.blank()) && tm.tape.len() > 1 {
+        tm.tape.pop();
+    }
+}
 
-//     if status == "accept" || status == "reject" {
-//         let decoded = decode_tape(&flat[offset..], guest);
-//         (status.to_string(), decoded.tape)
-//     } else {
-//         (status.to_string(), vec![])
-//     }
-// }
+/// Assert that the UTM faithfully simulates the given TM:
+/// - Run the guest directly and via UTM
+/// - Assert accept/reject status matches
+/// - Assert final tapes match (modulo trailing blanks)
+fn assert_faithful<Spec: TuringMachineSpec + std::fmt::Debug>(
+    mut guest_tm: RunningTuringMachine<Spec>,
+    max_direct_steps: usize,
+    max_utm_steps: usize,
+) where
+    Spec::State: std::fmt::Debug,
+    Spec::Symbol: std::fmt::Debug,
+{
+    // Run directly
+    let mut direct_tm = RunningTuringMachine {
+        spec: guest_tm.spec,
+        state: guest_tm.state,
+        pos: guest_tm.pos,
+        tape: guest_tm.tape.clone(),
+    };
+    let direct_result = run_tm(&mut direct_tm, max_direct_steps, None);
+    let direct_status = match &direct_result {
+        Ok(HaltReason::Accepted { .. }) => "accept",
+        Ok(HaltReason::Rejected { .. }) => "reject",
+        Err(_) => panic!("direct run hit step limit ({} steps)", max_direct_steps),
+    };
 
-// // ════════════════════════════════════════════════════════════════════
-// // Tests: Direct guest TM execution
-// // ════════════════════════════════════════════════════════════════════
+    // Run via UTM
+    let encoded = MyUtmEncodingScheme::encode(&guest_tm);
+    let utm = &*UTM_SPEC;
+    let mut utm_tm = RunningTuringMachine::new(utm);
+    utm_tm.tape = encoded;
 
-// #[test]
-// fn test_accept_immediately() {
-//     let spec = accept_immediately_spec();
-//     let (_, status, _, _) = run_guest_direct(&spec, &[], 100);
-//     assert_eq!(status, "accept");
-// }
+    let utm_result = run_tm(&mut utm_tm, max_utm_steps, None);
+    let utm_status = match &utm_result {
+        Ok(HaltReason::Accepted { .. }) => "accept",
+        Ok(HaltReason::Rejected { .. }) => "reject",
+        Err(_) => panic!("UTM run hit step limit ({} steps)", max_utm_steps),
+    };
 
-// #[test]
-// fn test_reject_immediately() {
-//     let spec = reject_immediately_spec();
-//     let (_, status, _, _) = run_guest_direct(&spec, &[], 100);
-//     assert_eq!(status, "reject");
-// }
+    assert_eq!(
+        direct_status, utm_status,
+        "status mismatch: direct={}, utm={}",
+        direct_status, utm_status
+    );
 
-// #[test]
-// fn test_flip_bits_direct() {
-//     let spec = flip_bits_spec();
-//     let input = vec![sym(1), sym(2)]; // "0", "1"
-//     let (_, status, tape, _) = run_guest_direct(&spec, &input, 100);
-//     assert_eq!(status, "accept");
-//     assert_eq!(tape[0], sym(2)); // "1"
-//     assert_eq!(tape[1], sym(1)); // "0"
-// }
+    let mut decoded = MyUtmEncodingScheme::decode(guest_tm.spec, &utm_tm.tape)
+        .expect("should decode UTM tape after halting");
 
-// #[test]
-// fn test_palindrome_direct() {
-//     let spec = check_palindrome_spec();
-//     let (_, status, _, _) = run_guest_direct(&spec, &[sym(1), sym(1)], 1000);
-//     assert_eq!(status, "accept");
+    strip_trailing_blanks(&mut direct_tm);
+    strip_trailing_blanks(&mut decoded);
 
-//     let (_, status, _, _) = run_guest_direct(&spec, &[sym(1), sym(2)], 1000);
-//     assert_eq!(status, "reject");
+    assert_eq!(
+        direct_tm.tape, decoded.tape,
+        "tape mismatch after {:?}",
+        direct_status
+    );
+}
 
-//     let (_, status, _, _) = run_guest_direct(&spec, &[sym(1), sym(2), sym(1)], 1000);
-//     assert_eq!(status, "accept");
+// ════════════════════════════════════════════════════════════════════
+// Tests: Direct guest TM execution
+// ════════════════════════════════════════════════════════════════════
 
-//     let (_, status, _, _) = run_guest_direct(&spec, &[], 1000);
-//     assert_eq!(status, "accept");
-// }
+#[test]
+fn test_accept_immediately() {
+    use AccImmSymbol::*;
+    // This spec accepts when it encounters a symbol with no transition.
+    // (Init, One) has no rule, so it halts in the accepting state Init.
+    let (status, _) = run_guest_direct(&*ACCEPT_IMMEDIATELY_SPEC, &[One], 100);
+    assert_eq!(status, "accept");
+}
 
-// #[test]
-// fn test_double_x_direct() {
-//     let spec = double_x_spec();
-//     let input = vec![sym(1), sym(2), sym(2)]; // $, X, X
-//     let (_, status, tape, _) = run_guest_direct(&spec, &input, 1000);
-//     assert_eq!(status, "accept");
-//     assert_eq!(tape[0], sym(1)); // $
-//     assert_eq!(tape[1], sym(2)); // X
-//     assert_eq!(tape[2], sym(2)); // X
-//     assert_eq!(tape[3], sym(2)); // X
-//     assert_eq!(tape[4], sym(2)); // X
-// }
+#[test]
+fn test_reject_immediately() {
+    use RejImmSymbol::*;
+    // Same structure but Init is not in the accepting set.
+    let (status, _) = run_guest_direct(&*REJECT_IMMEDIATELY_SPEC, &[One], 100);
+    assert_eq!(status, "reject");
+}
 
-// // ════════════════════════════════════════════════════════════════════
-// // Tests: UTM spec construction
-// // ════════════════════════════════════════════════════════════════════
+#[test]
+fn test_flip_bits_direct() {
+    use FlipBitsSymbol::*;
+    let (status, tm) = run_guest_direct(&*FLIP_BITS_SPEC, &[Zero, One], 100);
+    assert_eq!(status, "accept");
+    assert_eq!(tm.tape[0], One);
+    assert_eq!(tm.tape[1], Zero);
+}
 
-// #[test]
-// fn test_utm_spec_builds() {
-//     let utm = build_utm_spec();
-//     assert_eq!(utm.n_states, N_UTM_STATES);
-//     assert_eq!(utm.n_symbols, N_SYMBOLS);
-//     assert!(utm.ordered_rules.len() > 100, "UTM should have many rules");
-// }
+#[test]
+fn test_palindrome_direct() {
+    use CheckPalindromeSymbol::*;
+    let spec = &*CHECK_PALINDROME_SPEC;
 
-// // ════════════════════════════════════════════════════════════════════
-// // Tests: Encode/decode round-trip
-// // ════════════════════════════════════════════════════════════════════
+    let (status, _) = run_guest_direct(spec, &[A, A], 1000);
+    assert_eq!(status, "accept");
 
-// #[test]
-// fn test_encode_decode_roundtrip_flip_bits() {
-//     let guest = flip_bits_spec();
-//     let input = vec![sym(1), sym(2)]; // "0", "1"
-//     let encoded = encode_tape(&guest, &input, 0, None);
-//     let decoded = decode_tape(&encoded, &guest);
-//     assert_eq!(decoded.state, guest.initial.0 as usize);
-//     assert_eq!(decoded.head_pos, 0);
-//     assert_eq!(decoded.tape, vec![1, 2]);
-// }
+    let (status, _) = run_guest_direct(spec, &[A, B], 1000);
+    assert_eq!(status, "reject");
 
-// #[test]
-// fn test_encode_decode_roundtrip_empty() {
-//     let guest = accept_immediately_spec();
-//     let encoded = encode_tape(&guest, &[], 0, None);
-//     let decoded = decode_tape(&encoded, &guest);
-//     assert_eq!(decoded.state, guest.initial.0 as usize);
-//     assert_eq!(decoded.head_pos, 0);
-//     assert_eq!(decoded.tape, vec![0]); // blank
-// }
+    let (status, _) = run_guest_direct(spec, &[A, B, A], 1000);
+    assert_eq!(status, "accept");
 
-// #[test]
-// fn test_encode_decode_roundtrip_palindrome() {
-//     let guest = check_palindrome_spec();
-//     let input = vec![sym(1), sym(2), sym(1)]; // "a", "b", "a"
-//     let encoded = encode_tape(&guest, &input, 0, None);
-//     let decoded = decode_tape(&encoded, &guest);
-//     assert_eq!(decoded.state, 0); // "start" is index 0
-//     assert_eq!(decoded.head_pos, 0);
-//     assert_eq!(decoded.tape, vec![1, 2, 1]);
-// }
+    let (status, _) = run_guest_direct(spec, &[], 1000);
+    assert_eq!(status, "accept");
+}
 
-// // ════════════════════════════════════════════════════════════════════
-// // Tests: UTM simulation of guest TMs
-// // ════════════════════════════════════════════════════════════════════
+#[test]
+fn test_double_x_direct() {
+    use DoubleXSymbol::*;
+    let (status, tm) = run_guest_direct(&*DOUBLE_X_SPEC, &[Dollar, X, X], 1000);
+    assert_eq!(status, "accept");
+    assert_eq!(tm.tape[0], Dollar);
+    assert_eq!(tm.tape[1], X);
+    assert_eq!(tm.tape[2], X);
+    assert_eq!(tm.tape[3], X);
+    assert_eq!(tm.tape[4], X);
+}
 
-// #[test]
-// fn test_utm_accept_immediately() {
-//     let guest = accept_immediately_spec();
-//     let (status, _) = run_via_utm(&guest, &[], 10_000);
-//     assert_eq!(status, "accept");
-// }
+// ════════════════════════════════════════════════════════════════════
+// Tests: UTM spec construction
+// ════════════════════════════════════════════════════════════════════
 
-// #[test]
-// fn test_utm_reject_immediately() {
-//     let guest = reject_immediately_spec();
-//     let (status, _) = run_via_utm(&guest, &[], 10_000);
-//     assert_eq!(status, "reject");
-// }
+#[test]
+fn test_utm_spec_builds() {
+    let utm = &*UTM_SPEC;
+    let n_rules = utm.transitions.len();
+    assert!(n_rules > 100, "UTM should have many rules, got {}", n_rules);
+}
 
-// #[test]
-// fn test_utm_flip_bits() {
-//     let guest = flip_bits_spec();
-//     let input = vec![sym(1), sym(2)]; // "0", "1"
-//     let (status, tape) = run_via_utm(&guest, &input, 1_000_000);
-//     assert_eq!(status, "accept");
-//     assert_eq!(tape[0], 2);
-//     assert_eq!(tape[1], 1);
-// }
+// ════════════════════════════════════════════════════════════════════
+// Tests: Encode/decode round-trip
+// ════════════════════════════════════════════════════════════════════
 
-// #[test]
-// fn test_utm_flip_bits_5() {
-//     let guest = flip_bits_spec();
-//     let input = vec![sym(1), sym(2), sym(1), sym(2), sym(2)];
-//     let (status, tape) = run_via_utm(&guest, &input, 10_000_000);
-//     assert_eq!(status, "accept");
-//     assert_eq!(tape[0], 2);
-//     assert_eq!(tape[1], 1);
-//     assert_eq!(tape[2], 2);
-//     assert_eq!(tape[3], 1);
-//     assert_eq!(tape[4], 1);
-// }
+#[test]
+fn test_encode_decode_roundtrip_flip_bits() {
+    use FlipBitsSymbol::*;
+    let spec = &*FLIP_BITS_SPEC;
+    let mut guest_tm = RunningTuringMachine::new(spec);
+    guest_tm.tape = vec![Zero, One];
 
-// #[test]
-// fn test_utm_palindrome_accept() {
-//     let guest = check_palindrome_spec();
-//     let (status, _) = run_via_utm(&guest, &[sym(1), sym(1)], 10_000_000);
-//     assert_eq!(status, "accept");
-// }
+    let encoded = MyUtmEncodingScheme::encode(&guest_tm);
+    let decoded = MyUtmEncodingScheme::decode(spec, &encoded).unwrap();
+    assert_eq!(decoded.state, guest_tm.state);
+    assert_eq!(decoded.pos, 0);
+    assert_eq!(decoded.tape, vec![Zero, One]);
+}
 
-// #[test]
-// fn test_utm_palindrome_reject() {
-//     let guest = check_palindrome_spec();
-//     let (status, _) = run_via_utm(&guest, &[sym(1), sym(2)], 10_000_000);
-//     assert_eq!(status, "reject");
-// }
+#[test]
+fn test_encode_decode_roundtrip_empty() {
+    let spec = &*ACCEPT_IMMEDIATELY_SPEC;
+    let mut guest_tm = RunningTuringMachine::new(spec);
+    guest_tm.tape = vec![spec.blank()];
 
-// #[test]
-// fn test_utm_double_x() {
-//     let guest = double_x_spec();
-//     let input = vec![sym(1), sym(2), sym(2)]; // $, X, X
-//     let (status, tape) = run_via_utm(&guest, &input, 50_000_000);
-//     assert_eq!(status, "accept");
-//     assert_eq!(tape[0], 1); // $
-//     assert_eq!(tape[1], 2); // X
-//     assert_eq!(tape[2], 2); // X
-//     assert_eq!(tape[3], 2); // X
-//     assert_eq!(tape[4], 2); // X
-// }
+    let encoded = MyUtmEncodingScheme::encode(&guest_tm);
+    let decoded = MyUtmEncodingScheme::decode(spec, &encoded).unwrap();
+    assert_eq!(decoded.state, spec.initial());
+    assert_eq!(decoded.pos, 0);
+    assert_eq!(decoded.tape, vec![spec.blank()]);
+}
 
-// // ════════════════════════════════════════════════════════════════════
-// // Tests: Infinite UTM tape header
-// // ════════════════════════════════════════════════════════════════════
+#[test]
+fn test_encode_decode_roundtrip_palindrome() {
+    use CheckPalindromeSymbol::*;
+    let spec = &*CHECK_PALINDROME_SPEC;
+    let mut guest_tm = RunningTuringMachine::new(spec);
+    guest_tm.tape = vec![A, B, A];
 
-// #[test]
-// fn test_infinite_tape_header() {
-//     let header = infinite_utm_tape_header();
-//     assert_eq!(header[0], SYM_DOLLAR);
-//     assert!(
-//         header.len() > 100,
-//         "header should be substantial: got {}",
-//         header.len()
-//     );
-// }
+    let encoded = MyUtmEncodingScheme::encode(&guest_tm);
+    let decoded = MyUtmEncodingScheme::decode(spec, &encoded).unwrap();
+    assert_eq!(decoded.state, CheckPalindromeState::Start);
+    assert_eq!(decoded.pos, 0);
+    assert_eq!(decoded.tape, vec![A, B, A]);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Tests: UTM simulation of guest TMs
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_utm_accept_immediately() {
+    use AccImmSymbol::*;
+    let (status, _) = run_via_utm(&*ACCEPT_IMMEDIATELY_SPEC, &[One], 10_000);
+    assert_eq!(status, "accept");
+}
+
+#[test]
+fn test_utm_reject_immediately() {
+    use RejImmSymbol::*;
+    let (status, _) = run_via_utm(&*REJECT_IMMEDIATELY_SPEC, &[One], 10_000);
+    assert_eq!(status, "reject");
+}
+
+#[test]
+fn test_utm_flip_bits() {
+    use FlipBitsSymbol::*;
+    let (status, tm) = run_via_utm(&*FLIP_BITS_SPEC, &[Zero, One], 1_000_000);
+    assert_eq!(status, "accept");
+    assert_eq!(tm.tape[0], One);
+    assert_eq!(tm.tape[1], Zero);
+}
+
+#[test]
+fn test_utm_flip_bits_5() {
+    use FlipBitsSymbol::*;
+    let (status, tm) = run_via_utm(&*FLIP_BITS_SPEC, &[Zero, One, Zero, One, One], 10_000_000);
+    assert_eq!(status, "accept");
+    assert_eq!(tm.tape[0], One);
+    assert_eq!(tm.tape[1], Zero);
+    assert_eq!(tm.tape[2], One);
+    assert_eq!(tm.tape[3], Zero);
+    assert_eq!(tm.tape[4], Zero);
+}
+
+#[test]
+fn test_utm_palindrome_accept() {
+    use CheckPalindromeSymbol::*;
+    let (status, _) = run_via_utm(&*CHECK_PALINDROME_SPEC, &[A, A], 10_000_000);
+    assert_eq!(status, "accept");
+}
+
+#[test]
+fn test_utm_palindrome_reject() {
+    use CheckPalindromeSymbol::*;
+    let (status, _) = run_via_utm(&*CHECK_PALINDROME_SPEC, &[A, B], 10_000_000);
+    assert_eq!(status, "reject");
+}
+
+#[test]
+fn test_utm_double_x() {
+    use DoubleXSymbol::*;
+    let (status, tm) = run_via_utm(&*DOUBLE_X_SPEC, &[Dollar, X, X], 50_000_000);
+    assert_eq!(status, "accept");
+    assert_eq!(tm.tape[0], Dollar);
+    assert_eq!(tm.tape[1], X);
+    assert_eq!(tm.tape[2], X);
+    assert_eq!(tm.tape[3], X);
+    assert_eq!(tm.tape[4], X);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Tests: Infinite UTM tape
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_infinite_tape_initial() {
+    use crate::infinity::InfiniteTapeExtender;
+    use crate::tm::TapeExtender;
+
+    let mut tape: Vec<Symbol> = Vec::new();
+    InfiniteTapeExtender.extend(&mut tape, 100);
+    assert_eq!(tape[0], Symbol::Dollar);
+    assert!(
+        tape.len() >= 100,
+        "tape should be at least 100 symbols: got {}",
+        tape.len()
+    );
+}
+
+#[test]
+fn test_infinite_tape_self_similar() {
+    use crate::infinity::InfiniteTapeExtender;
+    use crate::tm::TapeExtender;
+
+    let mut outer_tape: Vec<Symbol> = Vec::new();
+    InfiniteTapeExtender.extend(&mut outer_tape, 100_000);
+
+    let utm = &*UTM_SPEC;
+    // Decode the outer tape to get the inner (guest) TM state.
+    // The guest is also a UTM, and its tape contains guest-level symbols.
+    let decoded =
+        MyUtmEncodingScheme::decode(utm, &outer_tape).expect("should decode the infinite UTM tape");
+
+    // Re-encode the decoded guest TM back into a UTM tape.
+    // This should reproduce the outer tape (since UTM simulates itself).
+    let mut re_encoded = MyUtmEncodingScheme::encode(&decoded);
+    InfiniteTapeExtender.extend(&mut re_encoded, 100_000);
+
+    assert_eq!(
+        re_encoded[..100_000],
+        outer_tape[..100_000],
+        "re-encoded inner tape should equal the outer tape"
+    );
+}
+
+#[test]
+fn test_decoded_tape_no_leading_blanks() {
+    use crate::infinity::InfiniteTapeExtender;
+    use crate::tm::TapeExtender;
+
+    let utm = &*UTM_SPEC;
+
+    // Build the infinite UTM tape and decode it
+    let mut outer_tape: Vec<Symbol> = Vec::new();
+    InfiniteTapeExtender.extend(&mut outer_tape, 100_000);
+
+    let decoded =
+        MyUtmEncodingScheme::decode(utm, &outer_tape).expect("should decode the infinite UTM tape");
+
+    // The decoded tape is the guest UTM's tape. Since the guest is a fresh UTM
+    // simulating itself, its tape should start with $, not blanks.
+    assert_eq!(
+        decoded.tape[0],
+        Symbol::Dollar,
+        "decoded tape should start with $, not {:?}",
+        decoded.tape[0]
+    );
+}
+
+/// Regression: MIN_DISPLAY_TAPE_LEN = 10_000 was too small to contain the full
+/// UTM header (which has 5 # delimiters). Decoding a tape of only 10k symbols
+/// failed with "expected at least 5 # delimiters, found 1".
+#[test]
+fn test_decode_needs_more_than_10k_symbols() {
+    use crate::infinity::{header_len, InfiniteTapeExtender};
+    use crate::tm::TapeExtender;
+
+    let utm = &*UTM_SPEC;
+
+    // 10k is NOT enough — the header alone is larger than that.
+    let mut small_tape: Vec<Symbol> = Vec::new();
+    InfiniteTapeExtender.extend(&mut small_tape, 10_000);
+    assert!(
+        MyUtmEncodingScheme::decode(utm, &small_tape).is_err(),
+        "10k symbols should NOT be enough to decode (header_len = {})",
+        header_len(),
+    );
+
+    // header_len + 1000 IS enough.
+    let min_len = header_len() + 1_000;
+    let mut big_tape: Vec<Symbol> = Vec::new();
+    InfiniteTapeExtender.extend(&mut big_tape, min_len);
+    MyUtmEncodingScheme::decode(utm, &big_tape)
+        .expect("should be able to decode a tape extended to header_len + 1000");
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Tests: UTM faithfulness
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_faithful_accept_immediately() {
+    use AccImmSymbol::*;
+    let spec = &*ACCEPT_IMMEDIATELY_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![One];
+    assert_faithful(tm, 100, 10_000);
+}
+
+#[test]
+fn test_faithful_reject_immediately() {
+    use RejImmSymbol::*;
+    let spec = &*REJECT_IMMEDIATELY_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![One];
+    assert_faithful(tm, 100, 10_000);
+}
+
+#[test]
+fn test_faithful_flip_bits_2() {
+    use FlipBitsSymbol::*;
+    let spec = &*FLIP_BITS_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![Zero, One];
+    assert_faithful(tm, 100, 1_000_000);
+}
+
+#[test]
+fn test_faithful_flip_bits_5() {
+    use FlipBitsSymbol::*;
+    let spec = &*FLIP_BITS_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![Zero, One, Zero, One, One];
+    assert_faithful(tm, 100, 10_000_000);
+}
+
+#[test]
+fn test_faithful_palindrome_accept() {
+    use CheckPalindromeSymbol::*;
+    let spec = &*CHECK_PALINDROME_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![A, B, A];
+    assert_faithful(tm, 1_000, 10_000_000);
+}
+
+#[test]
+fn test_faithful_palindrome_reject() {
+    use CheckPalindromeSymbol::*;
+    let spec = &*CHECK_PALINDROME_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![A, B, C];
+    assert_faithful(tm, 1_000, 10_000_000);
+}
+
+#[test]
+fn test_faithful_palindrome_empty() {
+    let spec = &*CHECK_PALINDROME_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![spec.blank()];
+    assert_faithful(tm, 1_000, 10_000_000);
+}
+
+#[test]
+fn test_faithful_double_x() {
+    use DoubleXSymbol::*;
+    let spec = &*DOUBLE_X_SPEC;
+    let mut tm = RunningTuringMachine::new(spec);
+    tm.tape = vec![Dollar, X, X];
+    assert_faithful(tm, 1_000, 50_000_000);
+}
+
+#[test]
+#[ignore] // ~38s in release mode; too slow for debug. Run with: cargo test --release -- --ignored
+fn test_faithful_utm_running_accept_immediately() {
+    // Smoke-test recursion: a UTM running AcceptImmediately,
+    // then assert_faithful runs *that* through the UTM.
+    use AccImmSymbol::*;
+    let acc_spec = &*ACCEPT_IMMEDIATELY_SPEC;
+    let mut inner_tm = RunningTuringMachine::new(acc_spec);
+    inner_tm.tape = vec![One];
+
+    // Encode the inner TM into a UTM tape
+    let encoded_inner = MyUtmEncodingScheme::encode(&inner_tm);
+
+    let utm = &*UTM_SPEC;
+    let mut utm_tm = RunningTuringMachine::new(utm);
+    utm_tm.tape = encoded_inner;
+
+    // Now assert_faithful runs this UTM-running-AcceptImmediately
+    // through the UTM again (two levels of simulation).
+    // Two levels of UTM overhead requires a very large step limit.
+    assert_faithful(utm_tm, 10_000, 10_000_000_000);
+}
