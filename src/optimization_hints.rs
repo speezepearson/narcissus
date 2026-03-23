@@ -1,4 +1,4 @@
-use super::{State, Symbol};
+use crate::utm::{State, Symbol};
 
 /// Optimization hints for UTM rule ordering.
 /// Rules listed here should be encoded last (most-used rules at the end)

@@ -1,20 +1,11 @@
-mod compiled;
-mod infinity;
-mod optimization_hints;
-mod tm;
-#[allow(dead_code)]
-mod toy_machines;
-mod utm;
 
 use std::cmp::max;
 use std::fmt::Write;
 use std::io::Write as IoWrite;
-use tm::{RunningTuringMachine, TapeExtender, TuringMachineSpec};
-use utm::*;
-
-use crate::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
-use crate::infinity::{header_len, InfiniteTapeExtender};
-use crate::tm::SimpleTuringMachineSpec;
+use utmmmmm::tm::{RunningTuringMachine, TapeExtender, TuringMachineSpec, SimpleTuringMachineSpec, Dir};
+use utmmmmm::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
+use utmmmmm::infinity::{header_len, InfiniteTapeExtender};
+use utmmmmm::utm::{State, Symbol, MyUtmEncodingScheme, UtmEncodingScheme, UTM_SPEC};
 
 type UtmTm<'a> = RunningTuringMachine<'a, SimpleTuringMachineSpec<State, Symbol>>;
 
@@ -259,8 +250,8 @@ fn main() {
             tm.state = ns;
             tm.tape[tm.pos] = nsym;
             tm.pos = match dir {
-                tm::Dir::Left => tm.pos.saturating_sub(1),
-                tm::Dir::Right => tm.pos + 1,
+                Dir::Left => tm.pos.saturating_sub(1),
+                Dir::Right => tm.pos + 1,
             };
             total_steps += 1;
         } else {
@@ -318,6 +309,3 @@ fn main() {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;
