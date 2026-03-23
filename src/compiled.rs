@@ -173,7 +173,11 @@ impl<Guest: TuringMachineSpec> CompiledTapeExtender<Guest> {
 
     pub fn extend(&mut self, tape: &mut Vec<CSymbol>, min_size: usize) {
         self.inner.extend(&mut self.shadow, min_size);
-        tape.extend(self.shadow[tape.len()..].iter().map(|s| self.sym_to_csym[s]));
+        tape.extend(
+            self.shadow[tape.len()..]
+                .iter()
+                .map(|s| self.sym_to_csym[s]),
+        );
     }
 
     /// Get the shadow tape in original guest symbols.

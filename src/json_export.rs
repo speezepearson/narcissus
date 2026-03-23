@@ -1,6 +1,5 @@
 /// Serializes Turing machine specs to JSON compatible with the TypeScript
 /// `TuringMachineSpec<State, Symbol>` interface in `ui/src/types.ts`.
-
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -56,10 +55,10 @@ where
             Dir::Left => "L".to_string(),
             Dir::Right => "R".to_string(),
         };
-        rules
-            .entry(state_name(st))
-            .or_default()
-            .insert(symbol_name(sym), (state_name(nst), symbol_name(nsym), dir_str));
+        rules.entry(state_name(st)).or_default().insert(
+            symbol_name(sym),
+            (state_name(nst), symbol_name(nsym), dir_str),
+        );
     }
 
     let symbol_chars: HashMap<String, String> = spec

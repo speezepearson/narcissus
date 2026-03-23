@@ -1,11 +1,12 @@
-
 use std::cmp::max;
 use std::fmt::Write;
 use std::io::Write as IoWrite;
-use utmmmmm::tm::{RunningTuringMachine, TapeExtender, TuringMachineSpec, SimpleTuringMachineSpec, Dir};
 use utmmmmm::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
 use utmmmmm::infinity::{header_len, InfiniteTapeExtender};
-use utmmmmm::utm::{State, Symbol, MyUtmEncodingScheme, UtmEncodingScheme, UTM_SPEC};
+use utmmmmm::tm::{
+    Dir, RunningTuringMachine, SimpleTuringMachineSpec, TapeExtender, TuringMachineSpec,
+};
+use utmmmmm::utm::{MyUtmEncodingScheme, State, Symbol, UtmEncodingScheme, UTM_SPEC};
 
 type UtmTm<'a> = RunningTuringMachine<'a, SimpleTuringMachineSpec<State, Symbol>>;
 
