@@ -1,9 +1,12 @@
 import "./App.css";
-import { SamplerPlatter } from "./SamplerPlatter";
+import { MachineExplorer } from "./MachineExplorer";
 
 function App() {
-  // return <UTMTower />;
-  return <SamplerPlatter />;
+  return (
+    <div>
+      <MachineExplorer />
+    </div>
+  );
 }
 
 export default App;

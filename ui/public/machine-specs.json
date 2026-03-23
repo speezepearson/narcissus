@@ -1,0 +1,5630 @@
+[
+  {
+    "name": "Accept Immediately",
+    "description": "Immediately accepts (initial state is accepting).",
+    "allStates": [
+      "Init"
+    ],
+    "allSymbols": [
+      "Blank",
+      "One"
+    ],
+    "initial": "Init",
+    "acceptingStates": [
+      "Init"
+    ],
+    "blank": "Blank",
+    "rules": {
+      "Init": {
+        "Blank": [
+          "Init",
+          "One",
+          "R"
+        ]
+      }
+    },
+    "symbolChars": {
+      "One": "1",
+      "Blank": "_"
+    }
+  },
+  {
+    "name": "Reject Immediately",
+    "description": "Immediately rejects (no transition, non-accepting).",
+    "allStates": [
+      "Init"
+    ],
+    "allSymbols": [
+      "Blank",
+      "One"
+    ],
+    "initial": "Init",
+    "acceptingStates": [],
+    "blank": "Blank",
+    "rules": {
+      "Init": {
+        "Blank": [
+          "Init",
+          "One",
+          "R"
+        ]
+      }
+    },
+    "symbolChars": {
+      "Blank": "_",
+      "One": "1"
+    }
+  },
+  {
+    "name": "Flip Bits",
+    "description": "Flips 0s to 1s and vice versa, then halts at blank.",
+    "allStates": [
+      "Flip",
+      "Done"
+    ],
+    "allSymbols": [
+      "Blank",
+      "Zero",
+      "One"
+    ],
+    "initial": "Flip",
+    "acceptingStates": [
+      "Done"
+    ],
+    "blank": "Blank",
+    "rules": {
+      "Flip": {
+        "One": [
+          "Flip",
+          "Zero",
+          "R"
+        ],
+        "Zero": [
+          "Flip",
+          "One",
+          "R"
+        ],
+        "Blank": [
+          "Done",
+          "Blank",
+          "L"
+        ]
+      }
+    },
+    "symbolChars": {
+      "Zero": "0",
+      "Blank": "_",
+      "One": "1"
+    }
+  },
+  {
+    "name": "Check Palindrome",
+    "description": "Checks if the input (over {A, B, C}) is a palindrome.",
+    "allStates": [
+      "Start",
+      "Accept",
+      "SeekL",
+      "SeekRA",
+      "SeekRB",
+      "SeekRC",
+      "CheckA",
+      "CheckB",
+      "CheckC"
+    ],
+    "allSymbols": [
+      "Blank",
+      "A",
+      "B",
+      "C"
+    ],
+    "initial": "Start",
+    "acceptingStates": [
+      "Accept"
+    ],
+    "blank": "Blank",
+    "rules": {
+      "SeekRA": {
+        "Blank": [
+          "CheckA",
+          "Blank",
+          "L"
+        ],
+        "A": [
+          "SeekRA",
+          "A",
+          "R"
+        ],
+        "C": [
+          "SeekRA",
+          "C",
+          "R"
+        ],
+        "B": [
+          "SeekRA",
+          "B",
+          "R"
+        ]
+      },
+      "Start": {
+        "C": [
+          "SeekRC",
+          "Blank",
+          "R"
+        ],
+        "B": [
+          "SeekRB",
+          "Blank",
+          "R"
+        ],
+        "A": [
+          "SeekRA",
+          "Blank",
+          "R"
+        ],
+        "Blank": [
+          "Accept",
+          "Blank",
+          "R"
+        ]
+      },
+      "CheckB": {
+        "B": [
+          "SeekL",
+          "Blank",
+          "L"
+        ],
+        "Blank": [
+          "Accept",
+          "Blank",
+          "R"
+        ]
+      },
+      "CheckC": {
+        "C": [
+          "SeekL",
+          "Blank",
+          "L"
+        ],
+        "Blank": [
+          "Accept",
+          "Blank",
+          "R"
+        ]
+      },
+      "CheckA": {
+        "A": [
+          "SeekL",
+          "Blank",
+          "L"
+        ],
+        "Blank": [
+          "Accept",
+          "Blank",
+          "R"
+        ]
+      },
+      "SeekL": {
+        "B": [
+          "SeekL",
+          "B",
+          "L"
+        ],
+        "Blank": [
+          "Start",
+          "Blank",
+          "R"
+        ],
+        "C": [
+          "SeekL",
+          "C",
+          "L"
+        ],
+        "A": [
+          "SeekL",
+          "A",
+          "L"
+        ]
+      },
+      "SeekRC": {
+        "Blank": [
+          "CheckC",
+          "Blank",
+          "L"
+        ],
+        "C": [
+          "SeekRC",
+          "C",
+          "R"
+        ],
+        "A": [
+          "SeekRC",
+          "A",
+          "R"
+        ],
+        "B": [
+          "SeekRC",
+          "B",
+          "R"
+        ]
+      },
+      "SeekRB": {
+        "Blank": [
+          "CheckB",
+          "Blank",
+          "L"
+        ],
+        "B": [
+          "SeekRB",
+          "B",
+          "R"
+        ],
+        "C": [
+          "SeekRB",
+          "C",
+          "R"
+        ],
+        "A": [
+          "SeekRB",
+          "A",
+          "R"
+        ]
+      }
+    },
+    "symbolChars": {
+      "C": "c",
+      "A": "a",
+      "B": "b",
+      "Blank": "_"
+    }
+  },
+  {
+    "name": "Double X",
+    "description": "Doubles a string of X's preceded by $. E.g. $XXX -> $XXXXXX.",
+    "allStates": [
+      "Start",
+      "FindX",
+      "GoRight",
+      "GoBack",
+      "CleanL",
+      "CleanR",
+      "Done"
+    ],
+    "allSymbols": [
+      "Blank",
+      "Dollar",
+      "X",
+      "Y",
+      "Z"
+    ],
+    "initial": "Start",
+    "acceptingStates": [
+      "Done"
+    ],
+    "blank": "Blank",
+    "rules": {
+      "GoBack": {
+        "Dollar": [
+          "FindX",
+          "Dollar",
+          "R"
+        ],
+        "Z": [
+          "GoBack",
+          "Z",
+          "L"
+        ],
+        "X": [
+          "GoBack",
+          "X",
+          "L"
+        ],
+        "Y": [
+          "GoBack",
+          "Y",
+          "L"
+        ]
+      },
+      "CleanR": {
+        "Blank": [
+          "Done",
+          "Blank",
+          "L"
+        ],
+        "X": [
+          "CleanR",
+          "X",
+          "R"
+        ],
+        "Z": [
+          "CleanR",
+          "X",
+          "R"
+        ]
+      },
+      "CleanL": {
+        "Y": [
+          "CleanL",
+          "X",
+          "L"
+        ],
+        "Dollar": [
+          "CleanR",
+          "Dollar",
+          "R"
+        ]
+      },
+      "Start": {
+        "Dollar": [
+          "FindX",
+          "Dollar",
+          "R"
+        ]
+      },
+      "GoRight": {
+        "X": [
+          "GoRight",
+          "X",
+          "R"
+        ],
+        "Z": [
+          "GoRight",
+          "Z",
+          "R"
+        ],
+        "Blank": [
+          "GoBack",
+          "Z",
+          "L"
+        ]
+      },
+      "FindX": {
+        "Y": [
+          "FindX",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "GoRight",
+          "Y",
+          "R"
+        ],
+        "Z": [
+          "CleanL",
+          "Z",
+          "L"
+        ],
+        "Blank": [
+          "Done",
+          "Blank",
+          "L"
+        ]
+      }
+    },
+    "symbolChars": {
+      "Y": "Y",
+      "Z": "Z",
+      "Blank": "_",
+      "Dollar": "$",
+      "X": "X"
+    }
+  },
+  {
+    "name": "Universal Turing Machine",
+    "description": "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
+    "allStates": [
+      "Accept",
+      "AcceptSeekHome",
+      "AccFinalHome",
+      "AccRestAcc",
+      "AccRestState",
+      "ApplyReadNst",
+      "ChkAccBack2acc",
+      "ChkAccC0",
+      "ChkAccC0Find",
+      "ChkAccC1",
+      "ChkAccC1Find",
+      "ChkAccDoRest",
+      "ChkAccDoRest2",
+      "ChkAccFailBit",
+      "ChkAccInit",
+      "ChkAccIntoAcc",
+      "ChkAccNextEntry",
+      "ChkAccOk",
+      "ChkAccOkAcc",
+      "ChkAccOkFind",
+      "ChkAccOkSkip",
+      "ChkAccRestState",
+      "CmpStC0",
+      "CmpStC0Find",
+      "CmpStC0Sk1",
+      "CmpStC1",
+      "CmpStC1Find",
+      "CmpStC1Sk1",
+      "CmpStFail",
+      "CmpStNextbit",
+      "CmpStOk",
+      "CmpStRead",
+      "CmpSymC0",
+      "CmpSymC0Fb",
+      "CmpSymC0Fh",
+      "CmpSymC0S1",
+      "CmpSymC0S2",
+      "CmpSymC0S3",
+      "CmpSymC1",
+      "CmpSymC1Fb",
+      "CmpSymC1Fh",
+      "CmpSymC1S1",
+      "CmpSymC1S2",
+      "CmpSymC1S3",
+      "CmpSymFail",
+      "CmpSymNb2",
+      "CmpSymNextbit",
+      "CmpSymOk",
+      "CmpSymRead",
+      "CpNstC0",
+      "CpNstC0S1",
+      "CpNstC0W",
+      "CpNstC1",
+      "CpNstC1S1",
+      "CpNstC1W",
+      "CpNstDone",
+      "CpNstNext",
+      "CpNstNext2",
+      "CpNstNext3",
+      "CpNstRestDo",
+      "CpNstRestNav",
+      "CpNstRestS1",
+      "CpNstRet",
+      "CpNsymC0",
+      "CpNsymC0Fb",
+      "CpNsymC0Fh",
+      "CpNsymC0S1",
+      "CpNsymC0S2",
+      "CpNsymC0S3",
+      "CpNsymC1",
+      "CpNsymC1Fb",
+      "CpNsymC1Fh",
+      "CpNsymC1S1",
+      "CpNsymC1S2",
+      "CpNsymC1S3",
+      "CpNsymDone",
+      "CpNsymFn2",
+      "CpNsymFn3",
+      "CpNsymFn4",
+      "CpNsymFnext",
+      "CpNsymNav",
+      "CpNsymNav2",
+      "CpNsymNav3",
+      "CpNsymRead",
+      "CpNsymRestNav",
+      "CpNsymRet",
+      "CpNsymRnDo",
+      "CpNsymRnFh",
+      "CpNsymRnS1",
+      "CpNsymRnS2",
+      "CpNsymRnS3",
+      "CpNsymSeek",
+      "DoneSeekHome",
+      "Init",
+      "InitSeekEnd",
+      "InitSkip",
+      "MarkRule",
+      "MarkRuleNoMatch",
+      "MlFindHead",
+      "MlMark",
+      "MlNav",
+      "MlRestore",
+      "MlS1",
+      "MlS2",
+      "MlS3",
+      "MoveLeft",
+      "MoveRight",
+      "MrExtBc0",
+      "MrExtBc1",
+      "MrExtBcNext",
+      "MrExtBcRet",
+      "MrExtendInit",
+      "MrExtH1",
+      "MrExtH2",
+      "MrExtH3",
+      "MrExtHome",
+      "MrExtReadBlank",
+      "MrExtRestBlank",
+      "MrExtToBlank",
+      "MrExtWriteHead",
+      "MrFindHead",
+      "MrNav",
+      "MrPlaceHead",
+      "MrS1",
+      "MrS2",
+      "MrS3",
+      "MrSkipCell",
+      "RdRead",
+      "RdSk2",
+      "RdSk3",
+      "RdSk4",
+      "RdSkipToDir",
+      "ReadDir",
+      "Reject",
+      "RejectSeekHome",
+      "RejFinalHome",
+      "RejRestAcc",
+      "RejRestState",
+      "SmcFh",
+      "SmcRestDone",
+      "SmcRestHead",
+      "SmcRestSym",
+      "SmcS1",
+      "SmcS2",
+      "SmcS3",
+      "SmcSkipSt",
+      "StfFindStar",
+      "StfGoPrev",
+      "StfRestoreRule",
+      "StfRestoreState",
+      "StfSkipRest",
+      "StMatchCleanup",
+      "StmBackToRule",
+      "StmGoLeft",
+      "StmGotoState",
+      "StmGsSk1",
+      "StmRestoreRule",
+      "StmRestoreState",
+      "SymfDeactivate",
+      "SymfRestHead",
+      "SymfRestSym",
+      "SymfSeekStar",
+      "SymfSkipRest",
+      "SymfSkipSt",
+      "SymMatchCleanup",
+      "SymSkipState"
+    ],
+    "allSymbols": [
+      "Blank",
+      "Zero",
+      "One",
+      "X",
+      "Y",
+      "Hash",
+      "Pipe",
+      "Semi",
+      "Comma",
+      "Caret",
+      "L",
+      "R",
+      "Dot",
+      "Star",
+      "Gt",
+      "Dollar"
+    ],
+    "initial": "Init",
+    "acceptingStates": [
+      "Accept"
+    ],
+    "blank": "Blank",
+    "rules": {
+      "ChkAccOkAcc": {
+        "Hash": [
+          "ChkAccOkFind",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "ChkAccOkAcc",
+          "Semi",
+          "L"
+        ],
+        "Y": [
+          "ChkAccOkAcc",
+          "Y",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccOkAcc",
+          "Zero",
+          "L"
+        ],
+        "One": [
+          "ChkAccOkAcc",
+          "One",
+          "L"
+        ],
+        "X": [
+          "ChkAccOkAcc",
+          "X",
+          "L"
+        ]
+      },
+      "SymfRestSym": {
+        "X": [
+          "SymfRestSym",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "SymfRestSym",
+          "One",
+          "R"
+        ],
+        "One": [
+          "SymfRestSym",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "SymfRestSym",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "SymfDeactivate",
+          "Pipe",
+          "L"
+        ]
+      },
+      "CmpSymC1S2": {
+        "Hash": [
+          "CmpSymC1S3",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CmpSymC1S2",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC1S2",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC1S2",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "CmpSymC1S2",
+          "One",
+          "R"
+        ]
+      },
+      "MlS3": {
+        "One": [
+          "MlS3",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "MlS3",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "MlFindHead",
+          "Hash",
+          "R"
+        ]
+      },
+      "ChkAccRestState": {
+        "X": [
+          "ChkAccRestState",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "ChkAccRestState",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "ChkAccBack2acc",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "ChkAccRestState",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccRestState",
+          "Zero",
+          "R"
+        ]
+      },
+      "ChkAccC0": {
+        "Semi": [
+          "ChkAccC0",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "ChkAccC0",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "ChkAccC0Find",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "ChkAccC0",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "ChkAccC0",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccC0",
+          "Zero",
+          "R"
+        ]
+      },
+      "MrExtBcRet": {
+        "One": [
+          "MrExtBcRet",
+          "One",
+          "L"
+        ],
+        "X": [
+          "MrExtBcNext",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "MrExtBcRet",
+          "Zero",
+          "L"
+        ],
+        "Caret": [
+          "MrExtBcRet",
+          "Caret",
+          "L"
+        ],
+        "Y": [
+          "MrExtBcNext",
+          "Y",
+          "R"
+        ],
+        "Hash": [
+          "MrExtBcRet",
+          "Hash",
+          "L"
+        ],
+        "Comma": [
+          "MrExtBcRet",
+          "Comma",
+          "L"
+        ]
+      },
+      "MlFindHead": {
+        "One": [
+          "MlFindHead",
+          "One",
+          "R"
+        ],
+        "Caret": [
+          "MlMark",
+          "Gt",
+          "L"
+        ],
+        "Comma": [
+          "MlFindHead",
+          "Comma",
+          "R"
+        ],
+        "Zero": [
+          "MlFindHead",
+          "Zero",
+          "R"
+        ]
+      },
+      "InitSkip": {
+        "Hash": [
+          "InitSeekEnd",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNsymC0S2": {
+        "One": [
+          "CpNsymC0S2",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC0S2",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC0S2",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC0S3",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CpNsymC0S2",
+          "X",
+          "R"
+        ]
+      },
+      "AcceptSeekHome": {
+        "Hash": [
+          "AccRestAcc",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "AcceptSeekHome",
+          "Y",
+          "L"
+        ],
+        "X": [
+          "AcceptSeekHome",
+          "X",
+          "L"
+        ],
+        "One": [
+          "AcceptSeekHome",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "AcceptSeekHome",
+          "Zero",
+          "L"
+        ],
+        "Semi": [
+          "AcceptSeekHome",
+          "Semi",
+          "L"
+        ]
+      },
+      "CmpSymC1Fb": {
+        "X": [
+          "CmpSymC1Fb",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymOk",
+          "Y",
+          "L"
+        ],
+        "Y": [
+          "CmpSymC1Fb",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymFail",
+          "X",
+          "L"
+        ]
+      },
+      "ChkAccDoRest2": {
+        "Hash": [
+          "RejectSeekHome",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "ChkAccDoRest2",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "ChkAccDoRest2",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccDoRest2",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "ChkAccDoRest2",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "ChkAccNextEntry",
+          "Semi",
+          "R"
+        ]
+      },
+      "SmcFh": {
+        "Y": [
+          "SmcFh",
+          "Y",
+          "R"
+        ],
+        "Comma": [
+          "SmcFh",
+          "Comma",
+          "R"
+        ],
+        "X": [
+          "SmcFh",
+          "X",
+          "R"
+        ],
+        "Caret": [
+          "SmcRestHead",
+          "Caret",
+          "R"
+        ],
+        "One": [
+          "SmcFh",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "SmcFh",
+          "Zero",
+          "R"
+        ]
+      },
+      "CpNsymFn4": {
+        "X": [
+          "CpNsymFn4",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CpNsymC1",
+          "Y",
+          "R"
+        ],
+        "Y": [
+          "CpNsymFn4",
+          "Y",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymDone",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "CpNsymC0",
+          "X",
+          "R"
+        ]
+      },
+      "CpNstC1S1": {
+        "Hash": [
+          "CpNstC1W",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "CpNstC1S1",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "CpNstC1S1",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNstC1S1",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CpNstC1S1",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "CpNstC1S1",
+          "Zero",
+          "R"
+        ]
+      },
+      "AccRestState": {
+        "Zero": [
+          "AccRestState",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "AccRestState",
+          "One",
+          "R"
+        ],
+        "X": [
+          "AccRestState",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "AccFinalHome",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "AccRestState",
+          "One",
+          "R"
+        ]
+      },
+      "CpNstC1W": {
+        "X": [
+          "CpNstC1W",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CpNstC1W",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNstRet",
+          "Y",
+          "L"
+        ],
+        "One": [
+          "CpNstRet",
+          "Y",
+          "L"
+        ]
+      },
+      "SmcSkipSt": {
+        "One": [
+          "SmcSkipSt",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "SmcRestSym",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "SmcSkipSt",
+          "Zero",
+          "R"
+        ]
+      },
+      "CpNsymFn2": {
+        "Pipe": [
+          "CpNsymFn3",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNsymFn2",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymFn2",
+          "Zero",
+          "R"
+        ]
+      },
+      "MlS2": {
+        "Zero": [
+          "MlS2",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "MlS3",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "MlS2",
+          "One",
+          "R"
+        ]
+      },
+      "CmpStC1": {
+        "R": [
+          "CmpStC1",
+          "R",
+          "R"
+        ],
+        "Zero": [
+          "CmpStC1",
+          "Zero",
+          "R"
+        ],
+        "L": [
+          "CmpStC1",
+          "L",
+          "R"
+        ],
+        "Hash": [
+          "CmpStC1Sk1",
+          "Hash",
+          "R"
+        ],
+        "Pipe": [
+          "CmpStC1",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CmpStC1",
+          "One",
+          "R"
+        ],
+        "Semi": [
+          "CmpStC1",
+          "Semi",
+          "R"
+        ],
+        "Dot": [
+          "CmpStC1",
+          "Dot",
+          "R"
+        ],
+        "Y": [
+          "CmpStC1",
+          "Y",
+          "R"
+        ],
+        "Star": [
+          "CmpStC1",
+          "Star",
+          "R"
+        ],
+        "X": [
+          "CmpStC1",
+          "X",
+          "R"
+        ]
+      },
+      "CmpSymC1S1": {
+        "Y": [
+          "CmpSymC1S1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC1S1",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "CmpSymC1S1",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC1S2",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CmpSymC1S1",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymC1S1",
+          "One",
+          "R"
+        ]
+      },
+      "MlNav": {
+        "Hash": [
+          "MlS1",
+          "Hash",
+          "R"
+        ],
+        "Dot": [
+          "MlNav",
+          "Dot",
+          "R"
+        ],
+        "R": [
+          "MlNav",
+          "R",
+          "R"
+        ],
+        "Y": [
+          "MlNav",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "MlNav",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "MlNav",
+          "Zero",
+          "R"
+        ],
+        "L": [
+          "MlNav",
+          "L",
+          "R"
+        ],
+        "Pipe": [
+          "MlNav",
+          "Pipe",
+          "R"
+        ],
+        "Semi": [
+          "MlNav",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "MlNav",
+          "One",
+          "R"
+        ]
+      },
+      "SymfSkipSt": {
+        "Zero": [
+          "SymfSkipSt",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "SymfRestSym",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "SymfSkipSt",
+          "One",
+          "R"
+        ]
+      },
+      "ReadDir": {
+        "X": [
+          "ReadDir",
+          "X",
+          "L"
+        ],
+        "Caret": [
+          "ReadDir",
+          "Caret",
+          "L"
+        ],
+        "R": [
+          "ReadDir",
+          "R",
+          "L"
+        ],
+        "L": [
+          "ReadDir",
+          "L",
+          "L"
+        ],
+        "Hash": [
+          "ReadDir",
+          "Hash",
+          "L"
+        ],
+        "Star": [
+          "RdSkipToDir",
+          "Star",
+          "R"
+        ],
+        "Dot": [
+          "ReadDir",
+          "Dot",
+          "L"
+        ],
+        "Pipe": [
+          "ReadDir",
+          "Pipe",
+          "L"
+        ],
+        "Semi": [
+          "ReadDir",
+          "Semi",
+          "L"
+        ],
+        "Y": [
+          "ReadDir",
+          "Y",
+          "L"
+        ],
+        "One": [
+          "ReadDir",
+          "One",
+          "L"
+        ],
+        "Comma": [
+          "ReadDir",
+          "Comma",
+          "L"
+        ],
+        "Zero": [
+          "ReadDir",
+          "Zero",
+          "L"
+        ]
+      },
+      "MrS3": {
+        "One": [
+          "MrS3",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "MrFindHead",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "MrS3",
+          "Zero",
+          "R"
+        ]
+      },
+      "SmcRestSym": {
+        "Y": [
+          "SmcRestSym",
+          "One",
+          "R"
+        ],
+        "X": [
+          "SmcRestSym",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "ApplyReadNst",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "SmcRestSym",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "SmcRestSym",
+          "One",
+          "R"
+        ]
+      },
+      "ChkAccBack2acc": {
+        "Zero": [
+          "ChkAccBack2acc",
+          "Zero",
+          "L"
+        ],
+        "Hash": [
+          "ChkAccIntoAcc",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "ChkAccBack2acc",
+          "One",
+          "L"
+        ]
+      },
+      "MrS2": {
+        "Zero": [
+          "MrS2",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "MrS2",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "MrS3",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNsymRnFh": {
+        "One": [
+          "CpNsymRnFh",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRnFh",
+          "Zero",
+          "R"
+        ],
+        "Comma": [
+          "CpNsymRnFh",
+          "Comma",
+          "R"
+        ],
+        "Caret": [
+          "CpNsymRnDo",
+          "Caret",
+          "R"
+        ]
+      },
+      "CpNsymRnDo": {
+        "Blank": [
+          "ReadDir",
+          "Blank",
+          "L"
+        ],
+        "Y": [
+          "CpNsymRnDo",
+          "One",
+          "R"
+        ],
+        "Comma": [
+          "ReadDir",
+          "Comma",
+          "L"
+        ],
+        "Zero": [
+          "CpNsymRnDo",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNsymRnDo",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CpNsymRnDo",
+          "Zero",
+          "R"
+        ]
+      },
+      "CmpSymC0Fh": {
+        "Comma": [
+          "CmpSymC0Fh",
+          "Comma",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC0Fh",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CmpSymC0Fh",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymC0Fh",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC0Fh",
+          "Zero",
+          "R"
+        ],
+        "Caret": [
+          "CmpSymC0Fb",
+          "Caret",
+          "R"
+        ]
+      },
+      "CmpSymNextbit": {
+        "Pipe": [
+          "CmpSymNb2",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymNextbit",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CmpSymNextbit",
+          "One",
+          "R"
+        ]
+      },
+      "CpNsymRestNav": {
+        "Zero": [
+          "CpNsymRestNav",
+          "Zero",
+          "R"
+        ],
+        "R": [
+          "CpNsymRestNav",
+          "R",
+          "R"
+        ],
+        "Dot": [
+          "CpNsymRestNav",
+          "Dot",
+          "R"
+        ],
+        "L": [
+          "CpNsymRestNav",
+          "L",
+          "R"
+        ],
+        "Y": [
+          "CpNsymRestNav",
+          "Y",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymRestNav",
+          "Pipe",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymRestNav",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "CpNsymRestNav",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CpNsymRestNav",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymRnS1",
+          "Hash",
+          "R"
+        ]
+      },
+      "ChkAccOk": {
+        "X": [
+          "ChkAccOk",
+          "X",
+          "L"
+        ],
+        "One": [
+          "ChkAccOk",
+          "One",
+          "L"
+        ],
+        "Hash": [
+          "ChkAccOkAcc",
+          "Hash",
+          "L"
+        ],
+        "Y": [
+          "ChkAccOk",
+          "Y",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccOk",
+          "Zero",
+          "L"
+        ]
+      },
+      "CpNsymRnS1": {
+        "Hash": [
+          "CpNsymRnS2",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymRnS1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRnS1",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNsymRnS1",
+          "One",
+          "R"
+        ]
+      },
+      "CmpSymNb2": {
+        "X": [
+          "CmpSymNb2",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymC1",
+          "Y",
+          "R"
+        ],
+        "Y": [
+          "CmpSymNb2",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC0",
+          "X",
+          "R"
+        ],
+        "Pipe": [
+          "SymMatchCleanup",
+          "Pipe",
+          "R"
+        ]
+      },
+      "CmpSymC0Fb": {
+        "Zero": [
+          "CmpSymOk",
+          "X",
+          "L"
+        ],
+        "Y": [
+          "CmpSymC0Fb",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CmpSymC0Fb",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymFail",
+          "Y",
+          "L"
+        ]
+      },
+      "CpNstC0": {
+        "Dot": [
+          "CpNstC0",
+          "Dot",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstC0",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNstC0",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNstC0",
+          "Y",
+          "R"
+        ],
+        "Star": [
+          "CpNstC0",
+          "Star",
+          "R"
+        ],
+        "R": [
+          "CpNstC0",
+          "R",
+          "R"
+        ],
+        "X": [
+          "CpNstC0",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "CpNstC0S1",
+          "Hash",
+          "R"
+        ],
+        "L": [
+          "CpNstC0",
+          "L",
+          "R"
+        ],
+        "Semi": [
+          "CpNstC0",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "CpNstC0",
+          "Zero",
+          "R"
+        ]
+      },
+      "ChkAccOkFind": {
+        "Y": [
+          "ChkAccOkSkip",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "ChkAccOkSkip",
+          "X",
+          "R"
+        ],
+        "One": [
+          "ChkAccOkFind",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "AcceptSeekHome",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccOkFind",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "ChkAccOkFind",
+          "Semi",
+          "R"
+        ]
+      },
+      "CpNstC0W": {
+        "X": [
+          "CpNstC0W",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CpNstC0W",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "CpNstRet",
+          "X",
+          "L"
+        ],
+        "Zero": [
+          "CpNstRet",
+          "X",
+          "L"
+        ]
+      },
+      "SmcS2": {
+        "Y": [
+          "SmcS2",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "SmcS2",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "SmcS2",
+          "One",
+          "R"
+        ],
+        "X": [
+          "SmcS2",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "SmcS3",
+          "Hash",
+          "R"
+        ]
+      },
+      "SymfSeekStar": {
+        "Hash": [
+          "SymfSeekStar",
+          "Hash",
+          "L"
+        ],
+        "Pipe": [
+          "SymfSeekStar",
+          "Pipe",
+          "L"
+        ],
+        "Y": [
+          "SymfSeekStar",
+          "Y",
+          "L"
+        ],
+        "Caret": [
+          "SymfSeekStar",
+          "Caret",
+          "L"
+        ],
+        "Zero": [
+          "SymfSeekStar",
+          "Zero",
+          "L"
+        ],
+        "Semi": [
+          "SymfSeekStar",
+          "Semi",
+          "L"
+        ],
+        "Star": [
+          "SymfSkipSt",
+          "Star",
+          "R"
+        ],
+        "Dot": [
+          "SymfSeekStar",
+          "Dot",
+          "L"
+        ],
+        "L": [
+          "SymfSeekStar",
+          "L",
+          "L"
+        ],
+        "R": [
+          "SymfSeekStar",
+          "R",
+          "L"
+        ],
+        "Comma": [
+          "SymfSeekStar",
+          "Comma",
+          "L"
+        ],
+        "One": [
+          "SymfSeekStar",
+          "One",
+          "L"
+        ],
+        "X": [
+          "SymfSeekStar",
+          "X",
+          "L"
+        ]
+      },
+      "CpNsymC1": {
+        "One": [
+          "CpNsymC1",
+          "One",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymC1",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "CpNsymC1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC1",
+          "Y",
+          "R"
+        ],
+        "Star": [
+          "CpNsymC1",
+          "Star",
+          "R"
+        ],
+        "Dot": [
+          "CpNsymC1",
+          "Dot",
+          "R"
+        ],
+        "L": [
+          "CpNsymC1",
+          "L",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC1S1",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC1",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymC1",
+          "Pipe",
+          "R"
+        ],
+        "R": [
+          "CpNsymC1",
+          "R",
+          "R"
+        ]
+      },
+      "CmpStFail": {
+        "Zero": [
+          "CmpStFail",
+          "Zero",
+          "L"
+        ],
+        "Hash": [
+          "StfRestoreState",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CmpStFail",
+          "X",
+          "L"
+        ],
+        "Y": [
+          "CmpStFail",
+          "Y",
+          "L"
+        ],
+        "One": [
+          "CmpStFail",
+          "One",
+          "L"
+        ]
+      },
+      "MlS1": {
+        "Semi": [
+          "MlS1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "MlS1",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "MlS1",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "MlS2",
+          "Hash",
+          "R"
+        ]
+      },
+      "CmpStRead": {
+        "Pipe": [
+          "StMatchCleanup",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CmpStC1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpStC0",
+          "X",
+          "R"
+        ]
+      },
+      "MrSkipCell": {
+        "One": [
+          "MrSkipCell",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "MrSkipCell",
+          "Zero",
+          "R"
+        ],
+        "Blank": [
+          "MrExtendInit",
+          "Blank",
+          "L"
+        ],
+        "Comma": [
+          "MrPlaceHead",
+          "Caret",
+          "L"
+        ]
+      },
+      "CpNsymC1Fb": {
+        "Y": [
+          "CpNsymC1Fb",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "CpNsymRet",
+          "Y",
+          "L"
+        ],
+        "X": [
+          "CpNsymC1Fb",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRet",
+          "Y",
+          "L"
+        ]
+      },
+      "ChkAccNextEntry": {
+        "One": [
+          "ChkAccC1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccC0",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "RejectSeekHome",
+          "Hash",
+          "L"
+        ]
+      },
+      "CpNstRet": {
+        "Hash": [
+          "CpNstRet",
+          "Hash",
+          "L"
+        ],
+        "Comma": [
+          "CpNstRet",
+          "Comma",
+          "L"
+        ],
+        "Pipe": [
+          "CpNstRet",
+          "Pipe",
+          "L"
+        ],
+        "Caret": [
+          "CpNstRet",
+          "Caret",
+          "L"
+        ],
+        "X": [
+          "CpNstRet",
+          "X",
+          "L"
+        ],
+        "R": [
+          "CpNstRet",
+          "R",
+          "L"
+        ],
+        "Semi": [
+          "CpNstRet",
+          "Semi",
+          "L"
+        ],
+        "Dot": [
+          "CpNstRet",
+          "Dot",
+          "L"
+        ],
+        "Zero": [
+          "CpNstRet",
+          "Zero",
+          "L"
+        ],
+        "Star": [
+          "CpNstNext",
+          "Star",
+          "R"
+        ],
+        "One": [
+          "CpNstRet",
+          "One",
+          "L"
+        ],
+        "Y": [
+          "CpNstRet",
+          "Y",
+          "L"
+        ],
+        "L": [
+          "CpNstRet",
+          "L",
+          "L"
+        ]
+      },
+      "MrExtendInit": {
+        "One": [
+          "MrExtendInit",
+          "One",
+          "L"
+        ],
+        "Gt": [
+          "MrExtToBlank",
+          "Comma",
+          "R"
+        ],
+        "Zero": [
+          "MrExtendInit",
+          "Zero",
+          "L"
+        ]
+      },
+      "MarkRuleNoMatch": {
+        "Pipe": [
+          "MarkRuleNoMatch",
+          "Pipe",
+          "R"
+        ],
+        "Hash": [
+          "ChkAccInit",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "MarkRuleNoMatch",
+          "Y",
+          "R"
+        ],
+        "R": [
+          "MarkRuleNoMatch",
+          "R",
+          "R"
+        ],
+        "Semi": [
+          "MarkRuleNoMatch",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "MarkRuleNoMatch",
+          "One",
+          "R"
+        ],
+        "Dot": [
+          "MarkRuleNoMatch",
+          "Dot",
+          "R"
+        ],
+        "X": [
+          "MarkRuleNoMatch",
+          "X",
+          "R"
+        ],
+        "L": [
+          "MarkRuleNoMatch",
+          "L",
+          "R"
+        ],
+        "Zero": [
+          "MarkRuleNoMatch",
+          "Zero",
+          "R"
+        ]
+      },
+      "StfRestoreState": {
+        "One": [
+          "StfRestoreState",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "StfFindStar",
+          "Hash",
+          "L"
+        ],
+        "X": [
+          "StfRestoreState",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "StfRestoreState",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "StfRestoreState",
+          "Zero",
+          "R"
+        ]
+      },
+      "CmpSymC1Fh": {
+        "One": [
+          "CmpSymC1Fh",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CmpSymC1Fh",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC1Fh",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC1Fh",
+          "Zero",
+          "R"
+        ],
+        "Caret": [
+          "CmpSymC1Fb",
+          "Caret",
+          "R"
+        ],
+        "Comma": [
+          "CmpSymC1Fh",
+          "Comma",
+          "R"
+        ]
+      },
+      "CpNstRestS1": {
+        "Hash": [
+          "CpNstRestDo",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "CpNstRestS1",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNstRestS1",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "CpNstRestS1",
+          "Semi",
+          "R"
+        ]
+      },
+      "CmpSymC0S3": {
+        "Zero": [
+          "CmpSymC0S3",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CmpSymC0S3",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC0Fh",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNsymNav2": {
+        "Pipe": [
+          "CpNsymNav3",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNsymNav2",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymNav2",
+          "Zero",
+          "R"
+        ]
+      },
+      "CpNsymRnS3": {
+        "Hash": [
+          "CpNsymRnFh",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRnS3",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNsymRnS3",
+          "One",
+          "R"
+        ]
+      },
+      "CpNsymSeek": {
+        "Star": [
+          "CpNsymNav",
+          "Star",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymSeek",
+          "Semi",
+          "L"
+        ],
+        "Comma": [
+          "CpNsymSeek",
+          "Comma",
+          "L"
+        ],
+        "One": [
+          "CpNsymSeek",
+          "One",
+          "L"
+        ],
+        "Y": [
+          "CpNsymSeek",
+          "Y",
+          "L"
+        ],
+        "L": [
+          "CpNsymSeek",
+          "L",
+          "L"
+        ],
+        "Dot": [
+          "CpNsymSeek",
+          "Dot",
+          "L"
+        ],
+        "X": [
+          "CpNsymSeek",
+          "X",
+          "L"
+        ],
+        "Zero": [
+          "CpNsymSeek",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "CpNsymSeek",
+          "Pipe",
+          "L"
+        ],
+        "Hash": [
+          "CpNsymSeek",
+          "Hash",
+          "L"
+        ],
+        "Caret": [
+          "CpNsymSeek",
+          "Caret",
+          "L"
+        ],
+        "R": [
+          "CpNsymSeek",
+          "R",
+          "L"
+        ]
+      },
+      "StmRestoreState": {
+        "Y": [
+          "StmRestoreState",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "StmBackToRule",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "StmRestoreState",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "StmRestoreState",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "StmRestoreState",
+          "One",
+          "R"
+        ]
+      },
+      "CpNsymC1Fh": {
+        "Comma": [
+          "CpNsymC1Fh",
+          "Comma",
+          "R"
+        ],
+        "One": [
+          "CpNsymC1Fh",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC1Fh",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC1Fh",
+          "Zero",
+          "R"
+        ],
+        "Caret": [
+          "CpNsymC1Fb",
+          "Caret",
+          "R"
+        ],
+        "X": [
+          "CpNsymC1Fh",
+          "X",
+          "R"
+        ]
+      },
+      "CpNsymRead": {
+        "Zero": [
+          "CpNsymC0",
+          "X",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymDone",
+          "Pipe",
+          "L"
+        ],
+        "One": [
+          "CpNsymC1",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNsymC1S1": {
+        "Y": [
+          "CpNsymC1S1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC1S1",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC1S2",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "CpNsymC1S1",
+          "One",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymC1S1",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "CpNsymC1S1",
+          "X",
+          "R"
+        ]
+      },
+      "CpNsymNav": {
+        "Zero": [
+          "CpNsymNav",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymNav2",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNsymNav",
+          "One",
+          "R"
+        ]
+      },
+      "SymMatchCleanup": {
+        "Hash": [
+          "SmcS1",
+          "Hash",
+          "R"
+        ],
+        "L": [
+          "SymMatchCleanup",
+          "L",
+          "R"
+        ],
+        "One": [
+          "SymMatchCleanup",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "SymMatchCleanup",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "SymMatchCleanup",
+          "Pipe",
+          "R"
+        ],
+        "Semi": [
+          "SymMatchCleanup",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "SymMatchCleanup",
+          "X",
+          "R"
+        ],
+        "R": [
+          "SymMatchCleanup",
+          "R",
+          "R"
+        ],
+        "Y": [
+          "SymMatchCleanup",
+          "Y",
+          "R"
+        ],
+        "Dot": [
+          "SymMatchCleanup",
+          "Dot",
+          "R"
+        ]
+      },
+      "DoneSeekHome": {
+        "One": [
+          "DoneSeekHome",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "DoneSeekHome",
+          "Zero",
+          "L"
+        ],
+        "R": [
+          "DoneSeekHome",
+          "R",
+          "L"
+        ],
+        "Semi": [
+          "DoneSeekHome",
+          "Semi",
+          "L"
+        ],
+        "Pipe": [
+          "DoneSeekHome",
+          "Pipe",
+          "L"
+        ],
+        "Gt": [
+          "DoneSeekHome",
+          "Gt",
+          "L"
+        ],
+        "Star": [
+          "DoneSeekHome",
+          "Star",
+          "L"
+        ],
+        "X": [
+          "DoneSeekHome",
+          "X",
+          "L"
+        ],
+        "Comma": [
+          "DoneSeekHome",
+          "Comma",
+          "L"
+        ],
+        "Dollar": [
+          "Init",
+          "Dollar",
+          "R"
+        ],
+        "Caret": [
+          "DoneSeekHome",
+          "Caret",
+          "L"
+        ],
+        "L": [
+          "DoneSeekHome",
+          "L",
+          "L"
+        ],
+        "Hash": [
+          "DoneSeekHome",
+          "Hash",
+          "L"
+        ],
+        "Dot": [
+          "DoneSeekHome",
+          "Dot",
+          "L"
+        ],
+        "Y": [
+          "DoneSeekHome",
+          "Y",
+          "L"
+        ]
+      },
+      "MrExtRestBlank": {
+        "Zero": [
+          "MrExtRestBlank",
+          "Zero",
+          "L"
+        ],
+        "Y": [
+          "MrExtRestBlank",
+          "One",
+          "L"
+        ],
+        "X": [
+          "MrExtRestBlank",
+          "Zero",
+          "L"
+        ],
+        "Hash": [
+          "DoneSeekHome",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "MrExtRestBlank",
+          "One",
+          "L"
+        ]
+      },
+      "SymfDeactivate": {
+        "Pipe": [
+          "SymfDeactivate",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "SymfDeactivate",
+          "Zero",
+          "L"
+        ],
+        "One": [
+          "SymfDeactivate",
+          "One",
+          "L"
+        ],
+        "Star": [
+          "MarkRule",
+          "Dot",
+          "L"
+        ]
+      },
+      "RdSk4": {
+        "Pipe": [
+          "RdRead",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "RdSk4",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "RdSk4",
+          "One",
+          "R"
+        ]
+      },
+      "AccRestAcc": {
+        "Semi": [
+          "AccRestAcc",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "AccRestState",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "AccRestAcc",
+          "One",
+          "R"
+        ],
+        "One": [
+          "AccRestAcc",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "AccRestAcc",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "AccRestAcc",
+          "Zero",
+          "R"
+        ]
+      },
+      "CpNstRestDo": {
+        "Hash": [
+          "CpNsymSeek",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "CpNstRestDo",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNstRestDo",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNstRestDo",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CpNstRestDo",
+          "Zero",
+          "R"
+        ]
+      },
+      "InitSeekEnd": {
+        "Pipe": [
+          "InitSeekEnd",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "InitSeekEnd",
+          "Zero",
+          "R"
+        ],
+        "L": [
+          "InitSeekEnd",
+          "L",
+          "R"
+        ],
+        "Dot": [
+          "InitSeekEnd",
+          "Dot",
+          "R"
+        ],
+        "R": [
+          "InitSeekEnd",
+          "R",
+          "R"
+        ],
+        "Y": [
+          "InitSeekEnd",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "InitSeekEnd",
+          "One",
+          "R"
+        ],
+        "X": [
+          "InitSeekEnd",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "MarkRule",
+          "Hash",
+          "L"
+        ],
+        "Semi": [
+          "InitSeekEnd",
+          "Semi",
+          "R"
+        ]
+      },
+      "RejRestAcc": {
+        "Y": [
+          "RejRestAcc",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "RejRestState",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "RejRestAcc",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "RejRestAcc",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "RejRestAcc",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "RejRestAcc",
+          "Zero",
+          "R"
+        ]
+      },
+      "CmpStC0Sk1": {
+        "Semi": [
+          "CmpStC0Sk1",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "CmpStC0Find",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CmpStC0Sk1",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CmpStC0Sk1",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CmpStC0Sk1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CmpStC0Sk1",
+          "Y",
+          "R"
+        ]
+      },
+      "RejectSeekHome": {
+        "Y": [
+          "RejectSeekHome",
+          "Y",
+          "L"
+        ],
+        "Hash": [
+          "RejRestAcc",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "RejectSeekHome",
+          "Semi",
+          "L"
+        ],
+        "One": [
+          "RejectSeekHome",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "RejectSeekHome",
+          "Zero",
+          "L"
+        ],
+        "X": [
+          "RejectSeekHome",
+          "X",
+          "L"
+        ]
+      },
+      "CpNsymFnext": {
+        "Pipe": [
+          "CpNsymFn2",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNsymFnext",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymFnext",
+          "Zero",
+          "R"
+        ]
+      },
+      "StmGoLeft": {
+        "One": [
+          "StmGoLeft",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "StmGoLeft",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "StmRestoreRule",
+          "Pipe",
+          "L"
+        ]
+      },
+      "CmpStC1Sk1": {
+        "Zero": [
+          "CmpStC1Sk1",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CmpStC1Find",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "CmpStC1Sk1",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "CmpStC1Sk1",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CmpStC1Sk1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CmpStC1Sk1",
+          "Y",
+          "R"
+        ]
+      },
+      "CmpStC0Find": {
+        "One": [
+          "CmpStFail",
+          "Y",
+          "L"
+        ],
+        "Zero": [
+          "CmpStOk",
+          "X",
+          "L"
+        ],
+        "Y": [
+          "CmpStC0Find",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CmpStC0Find",
+          "X",
+          "R"
+        ]
+      },
+      "StmBackToRule": {
+        "Dot": [
+          "StmBackToRule",
+          "Dot",
+          "L"
+        ],
+        "Hash": [
+          "StmBackToRule",
+          "Hash",
+          "L"
+        ],
+        "Semi": [
+          "StmBackToRule",
+          "Semi",
+          "L"
+        ],
+        "L": [
+          "StmBackToRule",
+          "L",
+          "L"
+        ],
+        "R": [
+          "StmBackToRule",
+          "R",
+          "L"
+        ],
+        "Comma": [
+          "StmBackToRule",
+          "Comma",
+          "L"
+        ],
+        "Star": [
+          "SymSkipState",
+          "Star",
+          "R"
+        ],
+        "X": [
+          "StmBackToRule",
+          "X",
+          "L"
+        ],
+        "One": [
+          "StmBackToRule",
+          "One",
+          "L"
+        ],
+        "Caret": [
+          "StmBackToRule",
+          "Caret",
+          "L"
+        ],
+        "Zero": [
+          "StmBackToRule",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "StmBackToRule",
+          "Pipe",
+          "L"
+        ],
+        "Y": [
+          "StmBackToRule",
+          "Y",
+          "L"
+        ]
+      },
+      "ChkAccC1Find": {
+        "One": [
+          "ChkAccOk",
+          "Y",
+          "L"
+        ],
+        "Y": [
+          "ChkAccC1Find",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccFailBit",
+          "X",
+          "L"
+        ],
+        "X": [
+          "ChkAccC1Find",
+          "X",
+          "R"
+        ]
+      },
+      "StfFindStar": {
+        "Semi": [
+          "StfFindStar",
+          "Semi",
+          "L"
+        ],
+        "Star": [
+          "StfRestoreRule",
+          "Dot",
+          "R"
+        ],
+        "One": [
+          "StfFindStar",
+          "One",
+          "L"
+        ],
+        "L": [
+          "StfFindStar",
+          "L",
+          "L"
+        ],
+        "X": [
+          "StfFindStar",
+          "X",
+          "L"
+        ],
+        "R": [
+          "StfFindStar",
+          "R",
+          "L"
+        ],
+        "Hash": [
+          "StfFindStar",
+          "Hash",
+          "L"
+        ],
+        "Y": [
+          "StfFindStar",
+          "Y",
+          "L"
+        ],
+        "Pipe": [
+          "StfFindStar",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "StfFindStar",
+          "Zero",
+          "L"
+        ],
+        "Dot": [
+          "StfFindStar",
+          "Dot",
+          "L"
+        ]
+      },
+      "ChkAccOkSkip": {
+        "Y": [
+          "ChkAccOkSkip",
+          "Y",
+          "R"
+        ],
+        "Semi": [
+          "AcceptSeekHome",
+          "Semi",
+          "L"
+        ],
+        "X": [
+          "ChkAccOkSkip",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "AcceptSeekHome",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccC0",
+          "X",
+          "R"
+        ],
+        "One": [
+          "ChkAccC1",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNstC1": {
+        "X": [
+          "CpNstC1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CpNstC1",
+          "Y",
+          "R"
+        ],
+        "Dot": [
+          "CpNstC1",
+          "Dot",
+          "R"
+        ],
+        "R": [
+          "CpNstC1",
+          "R",
+          "R"
+        ],
+        "L": [
+          "CpNstC1",
+          "L",
+          "R"
+        ],
+        "Star": [
+          "CpNstC1",
+          "Star",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstC1",
+          "Pipe",
+          "R"
+        ],
+        "Semi": [
+          "CpNstC1",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "CpNstC1",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "CpNstC1S1",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CpNstC1",
+          "Zero",
+          "R"
+        ]
+      },
+      "MrFindHead": {
+        "Caret": [
+          "MrSkipCell",
+          "Gt",
+          "R"
+        ],
+        "Comma": [
+          "MrFindHead",
+          "Comma",
+          "R"
+        ],
+        "One": [
+          "MrFindHead",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "MrFindHead",
+          "Zero",
+          "R"
+        ]
+      },
+      "MrExtToBlank": {
+        "One": [
+          "MrExtToBlank",
+          "One",
+          "R"
+        ],
+        "Blank": [
+          "MrExtWriteHead",
+          "Caret",
+          "L"
+        ],
+        "Zero": [
+          "MrExtToBlank",
+          "Zero",
+          "R"
+        ]
+      },
+      "ApplyReadNst": {
+        "One": [
+          "CpNstC1",
+          "Y",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstDone",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "CpNstC0",
+          "X",
+          "R"
+        ]
+      },
+      "MrExtReadBlank": {
+        "One": [
+          "MrExtBc1",
+          "Y",
+          "R"
+        ],
+        "Hash": [
+          "MrExtRestBlank",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "MrExtBc0",
+          "X",
+          "R"
+        ]
+      },
+      "CmpSymC0S1": {
+        "Hash": [
+          "CmpSymC0S2",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CmpSymC0S1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC0S1",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "CmpSymC0S1",
+          "One",
+          "R"
+        ],
+        "Semi": [
+          "CmpSymC0S1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC0S1",
+          "Zero",
+          "R"
+        ]
+      },
+      "StmGsSk1": {
+        "Semi": [
+          "StmGsSk1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "StmGsSk1",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "StmGsSk1",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "StmGsSk1",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "StmGsSk1",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "StmRestoreState",
+          "Hash",
+          "R"
+        ]
+      },
+      "RdRead": {
+        "L": [
+          "MoveLeft",
+          "L",
+          "L"
+        ],
+        "R": [
+          "MoveRight",
+          "R",
+          "L"
+        ]
+      },
+      "ChkAccInit": {
+        "One": [
+          "ChkAccC1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccC0",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "RejFinalHome",
+          "Hash",
+          "L"
+        ]
+      },
+      "CpNstRestNav": {
+        "R": [
+          "CpNstRestNav",
+          "R",
+          "R"
+        ],
+        "One": [
+          "CpNstRestNav",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNstRestNav",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNstRestNav",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "CpNstRestNav",
+          "X",
+          "R"
+        ],
+        "Dot": [
+          "CpNstRestNav",
+          "Dot",
+          "R"
+        ],
+        "Hash": [
+          "CpNstRestS1",
+          "Hash",
+          "R"
+        ],
+        "L": [
+          "CpNstRestNav",
+          "L",
+          "R"
+        ],
+        "Semi": [
+          "CpNstRestNav",
+          "Semi",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstRestNav",
+          "Pipe",
+          "R"
+        ]
+      },
+      "MrExtBc0": {
+        "Zero": [
+          "MrExtBc0",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "MrExtBc0",
+          "One",
+          "R"
+        ],
+        "Comma": [
+          "MrExtBc0",
+          "Comma",
+          "R"
+        ],
+        "Hash": [
+          "MrExtBc0",
+          "Hash",
+          "R"
+        ],
+        "Caret": [
+          "MrExtBc0",
+          "Caret",
+          "R"
+        ],
+        "Blank": [
+          "MrExtBcRet",
+          "Zero",
+          "L"
+        ]
+      },
+      "CpNsymRet": {
+        "Semi": [
+          "CpNsymRet",
+          "Semi",
+          "L"
+        ],
+        "R": [
+          "CpNsymRet",
+          "R",
+          "L"
+        ],
+        "Dot": [
+          "CpNsymRet",
+          "Dot",
+          "L"
+        ],
+        "Comma": [
+          "CpNsymRet",
+          "Comma",
+          "L"
+        ],
+        "L": [
+          "CpNsymRet",
+          "L",
+          "L"
+        ],
+        "X": [
+          "CpNsymRet",
+          "X",
+          "L"
+        ],
+        "Caret": [
+          "CpNsymRet",
+          "Caret",
+          "L"
+        ],
+        "Y": [
+          "CpNsymRet",
+          "Y",
+          "L"
+        ],
+        "Star": [
+          "CpNsymFnext",
+          "Star",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRet",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "CpNsymRet",
+          "Pipe",
+          "L"
+        ],
+        "One": [
+          "CpNsymRet",
+          "One",
+          "L"
+        ],
+        "Hash": [
+          "CpNsymRet",
+          "Hash",
+          "L"
+        ]
+      },
+      "ChkAccDoRest": {
+        "Semi": [
+          "ChkAccNextEntry",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccDoRest",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "ChkAccDoRest2",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "ChkAccDoRest2",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "RejectSeekHome",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "ChkAccDoRest",
+          "One",
+          "R"
+        ]
+      },
+      "CpNsymRnS2": {
+        "Zero": [
+          "CpNsymRnS2",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymRnS3",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "CpNsymRnS2",
+          "One",
+          "R"
+        ]
+      },
+      "ChkAccFailBit": {
+        "One": [
+          "ChkAccFailBit",
+          "One",
+          "L"
+        ],
+        "X": [
+          "ChkAccFailBit",
+          "X",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccFailBit",
+          "Zero",
+          "L"
+        ],
+        "Y": [
+          "ChkAccFailBit",
+          "Y",
+          "L"
+        ],
+        "Hash": [
+          "ChkAccRestState",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNsymC0S3": {
+        "Zero": [
+          "CpNsymC0S3",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC0Fh",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "CpNsymC0S3",
+          "One",
+          "R"
+        ]
+      },
+      "MrExtH1": {
+        "One": [
+          "MrExtH1",
+          "One",
+          "R"
+        ],
+        "X": [
+          "MrExtH1",
+          "X",
+          "R"
+        ],
+        "Semi": [
+          "MrExtH1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "MrExtH1",
+          "Zero",
+          "R"
+        ],
+        "L": [
+          "MrExtH1",
+          "L",
+          "R"
+        ],
+        "Y": [
+          "MrExtH1",
+          "Y",
+          "R"
+        ],
+        "Pipe": [
+          "MrExtH1",
+          "Pipe",
+          "R"
+        ],
+        "Hash": [
+          "MrExtH2",
+          "Hash",
+          "R"
+        ],
+        "Dot": [
+          "MrExtH1",
+          "Dot",
+          "R"
+        ],
+        "R": [
+          "MrExtH1",
+          "R",
+          "R"
+        ]
+      },
+      "CpNstDone": {
+        "Pipe": [
+          "CpNstRestNav",
+          "Pipe",
+          "R"
+        ],
+        "Y": [
+          "CpNstDone",
+          "One",
+          "L"
+        ],
+        "X": [
+          "CpNstDone",
+          "Zero",
+          "L"
+        ]
+      },
+      "CpNstNext3": {
+        "Zero": [
+          "CpNstC0",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CpNstC1",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CpNstNext3",
+          "X",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstDone",
+          "Pipe",
+          "L"
+        ],
+        "Y": [
+          "CpNstNext3",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNsymFn3": {
+        "Zero": [
+          "CpNsymFn3",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNsymFn3",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymFn4",
+          "Pipe",
+          "R"
+        ]
+      },
+      "CpNsymC0": {
+        "Star": [
+          "CpNsymC0",
+          "Star",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymC0",
+          "Pipe",
+          "R"
+        ],
+        "L": [
+          "CpNsymC0",
+          "L",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC0",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymC0",
+          "Semi",
+          "R"
+        ],
+        "R": [
+          "CpNsymC0",
+          "R",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC0",
+          "Y",
+          "R"
+        ],
+        "Dot": [
+          "CpNsymC0",
+          "Dot",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC0S1",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "CpNsymC0",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CpNsymC0",
+          "X",
+          "R"
+        ]
+      },
+      "CpNstNext2": {
+        "Zero": [
+          "CpNstNext2",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstNext3",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CpNstNext2",
+          "One",
+          "R"
+        ]
+      },
+      "MrPlaceHead": {
+        "One": [
+          "MrPlaceHead",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "MrPlaceHead",
+          "Zero",
+          "L"
+        ],
+        "Gt": [
+          "DoneSeekHome",
+          "Comma",
+          "L"
+        ]
+      },
+      "RejFinalHome": {
+        "Caret": [
+          "RejFinalHome",
+          "Caret",
+          "L"
+        ],
+        "Pipe": [
+          "RejFinalHome",
+          "Pipe",
+          "L"
+        ],
+        "One": [
+          "RejFinalHome",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "RejFinalHome",
+          "Zero",
+          "L"
+        ],
+        "Star": [
+          "RejFinalHome",
+          "Star",
+          "L"
+        ],
+        "Hash": [
+          "RejFinalHome",
+          "Hash",
+          "L"
+        ],
+        "L": [
+          "RejFinalHome",
+          "L",
+          "L"
+        ],
+        "Dot": [
+          "RejFinalHome",
+          "Dot",
+          "L"
+        ],
+        "Y": [
+          "RejFinalHome",
+          "Y",
+          "L"
+        ],
+        "Gt": [
+          "RejFinalHome",
+          "Gt",
+          "L"
+        ],
+        "X": [
+          "RejFinalHome",
+          "X",
+          "L"
+        ],
+        "R": [
+          "RejFinalHome",
+          "R",
+          "L"
+        ],
+        "Dollar": [
+          "Reject",
+          "Dollar",
+          "R"
+        ],
+        "Comma": [
+          "RejFinalHome",
+          "Comma",
+          "L"
+        ],
+        "Semi": [
+          "RejFinalHome",
+          "Semi",
+          "L"
+        ]
+      },
+      "ChkAccC1": {
+        "One": [
+          "ChkAccC1",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccC1",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "ChkAccC1",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "ChkAccC1",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "ChkAccC1Find",
+          "Hash",
+          "R"
+        ],
+        "Semi": [
+          "ChkAccC1",
+          "Semi",
+          "R"
+        ]
+      },
+      "CmpStC0": {
+        "Semi": [
+          "CmpStC0",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "CmpStC0Sk1",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CmpStC0",
+          "Zero",
+          "R"
+        ],
+        "X": [
+          "CmpStC0",
+          "X",
+          "R"
+        ],
+        "R": [
+          "CmpStC0",
+          "R",
+          "R"
+        ],
+        "Dot": [
+          "CmpStC0",
+          "Dot",
+          "R"
+        ],
+        "Pipe": [
+          "CmpStC0",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "CmpStC0",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CmpStC0",
+          "Y",
+          "R"
+        ],
+        "Star": [
+          "CmpStC0",
+          "Star",
+          "R"
+        ],
+        "L": [
+          "CmpStC0",
+          "L",
+          "R"
+        ]
+      },
+      "SmcS3": {
+        "Zero": [
+          "SmcS3",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "SmcFh",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "SmcS3",
+          "One",
+          "R"
+        ]
+      },
+      "AccFinalHome": {
+        "R": [
+          "AccFinalHome",
+          "R",
+          "L"
+        ],
+        "L": [
+          "AccFinalHome",
+          "L",
+          "L"
+        ],
+        "One": [
+          "AccFinalHome",
+          "One",
+          "L"
+        ],
+        "Y": [
+          "AccFinalHome",
+          "Y",
+          "L"
+        ],
+        "Semi": [
+          "AccFinalHome",
+          "Semi",
+          "L"
+        ],
+        "Dollar": [
+          "Accept",
+          "Dollar",
+          "R"
+        ],
+        "Pipe": [
+          "AccFinalHome",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "AccFinalHome",
+          "Zero",
+          "L"
+        ],
+        "Caret": [
+          "AccFinalHome",
+          "Caret",
+          "L"
+        ],
+        "X": [
+          "AccFinalHome",
+          "X",
+          "L"
+        ],
+        "Star": [
+          "AccFinalHome",
+          "Star",
+          "L"
+        ],
+        "Dot": [
+          "AccFinalHome",
+          "Dot",
+          "L"
+        ],
+        "Hash": [
+          "AccFinalHome",
+          "Hash",
+          "L"
+        ],
+        "Gt": [
+          "AccFinalHome",
+          "Gt",
+          "L"
+        ],
+        "Comma": [
+          "AccFinalHome",
+          "Comma",
+          "L"
+        ]
+      },
+      "StMatchCleanup": {
+        "One": [
+          "StmGoLeft",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "StmGoLeft",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "StmGoLeft",
+          "Pipe",
+          "L"
+        ]
+      },
+      "ChkAccC0Find": {
+        "X": [
+          "ChkAccC0Find",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "ChkAccOk",
+          "X",
+          "L"
+        ],
+        "One": [
+          "ChkAccFailBit",
+          "Y",
+          "L"
+        ],
+        "Y": [
+          "ChkAccC0Find",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNstNext": {
+        "One": [
+          "CpNstNext",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "CpNstNext2",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "CpNstNext",
+          "Zero",
+          "R"
+        ]
+      },
+      "MrNav": {
+        "R": [
+          "MrNav",
+          "R",
+          "R"
+        ],
+        "Semi": [
+          "MrNav",
+          "Semi",
+          "R"
+        ],
+        "Y": [
+          "MrNav",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "MrNav",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "MrNav",
+          "Pipe",
+          "R"
+        ],
+        "Dot": [
+          "MrNav",
+          "Dot",
+          "R"
+        ],
+        "X": [
+          "MrNav",
+          "X",
+          "R"
+        ],
+        "L": [
+          "MrNav",
+          "L",
+          "R"
+        ],
+        "One": [
+          "MrNav",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "MrS1",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNstC0S1": {
+        "Semi": [
+          "CpNstC0S1",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "CpNstC0W",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "CpNstC0S1",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CpNstC0S1",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNstC0S1",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CpNstC0S1",
+          "X",
+          "R"
+        ]
+      },
+      "CmpSymRead": {
+        "Zero": [
+          "CmpSymC0",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymC1",
+          "Y",
+          "R"
+        ],
+        "Pipe": [
+          "SymMatchCleanup",
+          "Pipe",
+          "R"
+        ]
+      },
+      "MoveLeft": {
+        "Star": [
+          "MlNav",
+          "Dot",
+          "R"
+        ],
+        "L": [
+          "MoveLeft",
+          "L",
+          "L"
+        ],
+        "One": [
+          "MoveLeft",
+          "One",
+          "L"
+        ],
+        "Pipe": [
+          "MoveLeft",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "MoveLeft",
+          "Zero",
+          "L"
+        ],
+        "R": [
+          "MoveLeft",
+          "R",
+          "L"
+        ]
+      },
+      "CmpSymC0": {
+        "R": [
+          "CmpSymC0",
+          "R",
+          "R"
+        ],
+        "Pipe": [
+          "CmpSymC0",
+          "Pipe",
+          "R"
+        ],
+        "Dot": [
+          "CmpSymC0",
+          "Dot",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC0S1",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC0",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "CmpSymC0",
+          "Semi",
+          "R"
+        ],
+        "L": [
+          "CmpSymC0",
+          "L",
+          "R"
+        ],
+        "Star": [
+          "CmpSymC0",
+          "Star",
+          "R"
+        ],
+        "X": [
+          "CmpSymC0",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpSymC0",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC0",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNsymC1S2": {
+        "Y": [
+          "CpNsymC1S2",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CpNsymC1S2",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CpNsymC1S2",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC1S2",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC1S3",
+          "Hash",
+          "R"
+        ]
+      },
+      "CmpSymOk": {
+        "One": [
+          "CmpSymOk",
+          "One",
+          "L"
+        ],
+        "Comma": [
+          "CmpSymOk",
+          "Comma",
+          "L"
+        ],
+        "Star": [
+          "CmpSymNextbit",
+          "Star",
+          "R"
+        ],
+        "Y": [
+          "CmpSymOk",
+          "Y",
+          "L"
+        ],
+        "Semi": [
+          "CmpSymOk",
+          "Semi",
+          "L"
+        ],
+        "Caret": [
+          "CmpSymOk",
+          "Caret",
+          "L"
+        ],
+        "L": [
+          "CmpSymOk",
+          "L",
+          "L"
+        ],
+        "R": [
+          "CmpSymOk",
+          "R",
+          "L"
+        ],
+        "Dot": [
+          "CmpSymOk",
+          "Dot",
+          "L"
+        ],
+        "X": [
+          "CmpSymOk",
+          "X",
+          "L"
+        ],
+        "Zero": [
+          "CmpSymOk",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "CmpSymOk",
+          "Pipe",
+          "L"
+        ],
+        "Hash": [
+          "CmpSymOk",
+          "Hash",
+          "L"
+        ]
+      },
+      "StfGoPrev": {
+        "Zero": [
+          "StfGoPrev",
+          "Zero",
+          "L"
+        ],
+        "One": [
+          "StfGoPrev",
+          "One",
+          "L"
+        ],
+        "Dot": [
+          "MarkRule",
+          "Dot",
+          "L"
+        ]
+      },
+      "SymSkipState": {
+        "Pipe": [
+          "CmpSymRead",
+          "Pipe",
+          "R"
+        ],
+        "One": [
+          "SymSkipState",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "SymSkipState",
+          "Zero",
+          "R"
+        ]
+      },
+      "CmpSymC1": {
+        "X": [
+          "CmpSymC1",
+          "X",
+          "R"
+        ],
+        "Dot": [
+          "CmpSymC1",
+          "Dot",
+          "R"
+        ],
+        "Pipe": [
+          "CmpSymC1",
+          "Pipe",
+          "R"
+        ],
+        "R": [
+          "CmpSymC1",
+          "R",
+          "R"
+        ],
+        "One": [
+          "CmpSymC1",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC1",
+          "Y",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC1S1",
+          "Hash",
+          "R"
+        ],
+        "L": [
+          "CmpSymC1",
+          "L",
+          "R"
+        ],
+        "Semi": [
+          "CmpSymC1",
+          "Semi",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC1",
+          "Zero",
+          "R"
+        ],
+        "Star": [
+          "CmpSymC1",
+          "Star",
+          "R"
+        ]
+      },
+      "CmpStNextbit": {
+        "Pipe": [
+          "StMatchCleanup",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "CmpStC0",
+          "X",
+          "R"
+        ],
+        "Y": [
+          "CmpStNextbit",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "CmpStNextbit",
+          "X",
+          "R"
+        ],
+        "One": [
+          "CmpStC1",
+          "Y",
+          "R"
+        ]
+      },
+      "CpNsymDone": {
+        "Y": [
+          "CpNsymDone",
+          "One",
+          "L"
+        ],
+        "Pipe": [
+          "CpNsymRestNav",
+          "Pipe",
+          "R"
+        ],
+        "X": [
+          "CpNsymDone",
+          "Zero",
+          "L"
+        ]
+      },
+      "SymfRestHead": {
+        "Comma": [
+          "SymfSeekStar",
+          "Comma",
+          "L"
+        ],
+        "X": [
+          "SymfRestHead",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "SymfRestHead",
+          "One",
+          "R"
+        ],
+        "Blank": [
+          "SymfSeekStar",
+          "Blank",
+          "L"
+        ],
+        "Y": [
+          "SymfRestHead",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "SymfRestHead",
+          "Zero",
+          "R"
+        ]
+      },
+      "CmpStC1Find": {
+        "One": [
+          "CmpStOk",
+          "Y",
+          "L"
+        ],
+        "Y": [
+          "CmpStC1Find",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "CmpStFail",
+          "X",
+          "L"
+        ],
+        "X": [
+          "CmpStC1Find",
+          "X",
+          "R"
+        ]
+      },
+      "CpNsymNav3": {
+        "One": [
+          "CpNsymNav3",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "CpNsymRead",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymNav3",
+          "Zero",
+          "R"
+        ]
+      },
+      "MrExtWriteHead": {
+        "One": [
+          "MrExtWriteHead",
+          "One",
+          "L"
+        ],
+        "Star": [
+          "MrExtWriteHead",
+          "Star",
+          "L"
+        ],
+        "Dot": [
+          "MrExtWriteHead",
+          "Dot",
+          "L"
+        ],
+        "Caret": [
+          "MrExtWriteHead",
+          "Caret",
+          "L"
+        ],
+        "Semi": [
+          "MrExtWriteHead",
+          "Semi",
+          "L"
+        ],
+        "Y": [
+          "MrExtWriteHead",
+          "Y",
+          "L"
+        ],
+        "Pipe": [
+          "MrExtWriteHead",
+          "Pipe",
+          "L"
+        ],
+        "Comma": [
+          "MrExtWriteHead",
+          "Comma",
+          "L"
+        ],
+        "Hash": [
+          "MrExtWriteHead",
+          "Hash",
+          "L"
+        ],
+        "L": [
+          "MrExtWriteHead",
+          "L",
+          "L"
+        ],
+        "Zero": [
+          "MrExtWriteHead",
+          "Zero",
+          "L"
+        ],
+        "Gt": [
+          "MrExtWriteHead",
+          "Gt",
+          "L"
+        ],
+        "Dollar": [
+          "MrExtHome",
+          "Dollar",
+          "R"
+        ],
+        "X": [
+          "MrExtWriteHead",
+          "X",
+          "L"
+        ],
+        "R": [
+          "MrExtWriteHead",
+          "R",
+          "L"
+        ]
+      },
+      "CmpSymFail": {
+        "Zero": [
+          "CmpSymFail",
+          "Zero",
+          "L"
+        ],
+        "Y": [
+          "CmpSymFail",
+          "Y",
+          "L"
+        ],
+        "Caret": [
+          "SymfRestHead",
+          "Caret",
+          "R"
+        ],
+        "X": [
+          "CmpSymFail",
+          "X",
+          "L"
+        ],
+        "One": [
+          "CmpSymFail",
+          "One",
+          "L"
+        ]
+      },
+      "CpNsymC0S1": {
+        "X": [
+          "CpNsymC0S1",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC0S1",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "CpNsymC0S1",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "CpNsymC0S1",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC0S1",
+          "Y",
+          "R"
+        ],
+        "Hash": [
+          "CpNsymC0S2",
+          "Hash",
+          "R"
+        ]
+      },
+      "RejRestState": {
+        "Hash": [
+          "RejFinalHome",
+          "Hash",
+          "L"
+        ],
+        "Zero": [
+          "RejRestState",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "RejRestState",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "RejRestState",
+          "One",
+          "R"
+        ],
+        "X": [
+          "RejRestState",
+          "Zero",
+          "R"
+        ]
+      },
+      "MlRestore": {
+        "Gt": [
+          "DoneSeekHome",
+          "Comma",
+          "L"
+        ],
+        "Zero": [
+          "MlRestore",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "MlRestore",
+          "One",
+          "R"
+        ]
+      },
+      "RdSk3": {
+        "Pipe": [
+          "RdSk4",
+          "Pipe",
+          "R"
+        ],
+        "Zero": [
+          "RdSk3",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "RdSk3",
+          "One",
+          "R"
+        ]
+      },
+      "RdSkipToDir": {
+        "One": [
+          "RdSkipToDir",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "RdSkipToDir",
+          "Zero",
+          "R"
+        ],
+        "Pipe": [
+          "RdSk2",
+          "Pipe",
+          "R"
+        ]
+      },
+      "Init": {
+        "Dollar": [
+          "InitSkip",
+          "Dollar",
+          "R"
+        ],
+        "Hash": [
+          "InitSeekEnd",
+          "Hash",
+          "R"
+        ]
+      },
+      "CpNsymC0Fb": {
+        "X": [
+          "CpNsymC0Fb",
+          "X",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymRet",
+          "X",
+          "L"
+        ],
+        "One": [
+          "CpNsymRet",
+          "X",
+          "L"
+        ],
+        "Y": [
+          "CpNsymC0Fb",
+          "Y",
+          "R"
+        ]
+      },
+      "StmRestoreRule": {
+        "Star": [
+          "StmGotoState",
+          "Star",
+          "R"
+        ],
+        "X": [
+          "StmRestoreRule",
+          "Zero",
+          "L"
+        ],
+        "Y": [
+          "StmRestoreRule",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "StmRestoreRule",
+          "Zero",
+          "L"
+        ],
+        "One": [
+          "StmRestoreRule",
+          "One",
+          "L"
+        ]
+      },
+      "CpNsymC0Fh": {
+        "Comma": [
+          "CpNsymC0Fh",
+          "Comma",
+          "R"
+        ],
+        "One": [
+          "CpNsymC0Fh",
+          "One",
+          "R"
+        ],
+        "X": [
+          "CpNsymC0Fh",
+          "X",
+          "R"
+        ],
+        "Caret": [
+          "CpNsymC0Fb",
+          "Caret",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC0Fh",
+          "Zero",
+          "R"
+        ],
+        "Y": [
+          "CpNsymC0Fh",
+          "Y",
+          "R"
+        ]
+      },
+      "SmcS1": {
+        "Y": [
+          "SmcS1",
+          "Y",
+          "R"
+        ],
+        "One": [
+          "SmcS1",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "SmcS2",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "SmcS1",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "SmcS1",
+          "Semi",
+          "R"
+        ],
+        "X": [
+          "SmcS1",
+          "X",
+          "R"
+        ]
+      },
+      "SmcRestDone": {
+        "X": [
+          "SmcRestDone",
+          "X",
+          "L"
+        ],
+        "Zero": [
+          "SmcRestDone",
+          "Zero",
+          "L"
+        ],
+        "Comma": [
+          "SmcRestDone",
+          "Comma",
+          "L"
+        ],
+        "Dot": [
+          "SmcRestDone",
+          "Dot",
+          "L"
+        ],
+        "Semi": [
+          "SmcRestDone",
+          "Semi",
+          "L"
+        ],
+        "Pipe": [
+          "SmcRestDone",
+          "Pipe",
+          "L"
+        ],
+        "Caret": [
+          "SmcRestDone",
+          "Caret",
+          "L"
+        ],
+        "Hash": [
+          "SmcRestDone",
+          "Hash",
+          "L"
+        ],
+        "One": [
+          "SmcRestDone",
+          "One",
+          "L"
+        ],
+        "Star": [
+          "SmcSkipSt",
+          "Star",
+          "R"
+        ],
+        "Y": [
+          "SmcRestDone",
+          "Y",
+          "L"
+        ],
+        "L": [
+          "SmcRestDone",
+          "L",
+          "L"
+        ],
+        "R": [
+          "SmcRestDone",
+          "R",
+          "L"
+        ]
+      },
+      "CmpSymC0S2": {
+        "Zero": [
+          "CmpSymC0S2",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CmpSymC0S2",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "CmpSymC0S2",
+          "Y",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC0S3",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "CmpSymC0S2",
+          "X",
+          "R"
+        ]
+      },
+      "StmGotoState": {
+        "Dot": [
+          "StmGotoState",
+          "Dot",
+          "R"
+        ],
+        "Pipe": [
+          "StmGotoState",
+          "Pipe",
+          "R"
+        ],
+        "Y": [
+          "StmGotoState",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "StmGotoState",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "StmGsSk1",
+          "Hash",
+          "R"
+        ],
+        "X": [
+          "StmGotoState",
+          "X",
+          "R"
+        ],
+        "One": [
+          "StmGotoState",
+          "One",
+          "R"
+        ],
+        "L": [
+          "StmGotoState",
+          "L",
+          "R"
+        ],
+        "R": [
+          "StmGotoState",
+          "R",
+          "R"
+        ],
+        "Semi": [
+          "StmGotoState",
+          "Semi",
+          "R"
+        ]
+      },
+      "StfRestoreRule": {
+        "Y": [
+          "StfRestoreRule",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "StfGoPrev",
+          "Pipe",
+          "L"
+        ],
+        "Zero": [
+          "StfRestoreRule",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "StfRestoreRule",
+          "One",
+          "R"
+        ],
+        "X": [
+          "StfRestoreRule",
+          "Zero",
+          "R"
+        ]
+      },
+      "ChkAccIntoAcc": {
+        "One": [
+          "ChkAccIntoAcc",
+          "One",
+          "L"
+        ],
+        "Zero": [
+          "ChkAccIntoAcc",
+          "Zero",
+          "L"
+        ],
+        "X": [
+          "ChkAccIntoAcc",
+          "X",
+          "L"
+        ],
+        "Hash": [
+          "ChkAccDoRest",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "ChkAccIntoAcc",
+          "Y",
+          "L"
+        ],
+        "Semi": [
+          "ChkAccIntoAcc",
+          "Semi",
+          "L"
+        ]
+      },
+      "CpNsymC1S3": {
+        "Hash": [
+          "CpNsymC1Fh",
+          "Hash",
+          "R"
+        ],
+        "Zero": [
+          "CpNsymC1S3",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "CpNsymC1S3",
+          "One",
+          "R"
+        ]
+      },
+      "SmcRestHead": {
+        "X": [
+          "SmcRestHead",
+          "Zero",
+          "R"
+        ],
+        "Zero": [
+          "SmcRestHead",
+          "Zero",
+          "R"
+        ],
+        "Comma": [
+          "SmcRestDone",
+          "Comma",
+          "L"
+        ],
+        "One": [
+          "SmcRestHead",
+          "One",
+          "R"
+        ],
+        "Y": [
+          "SmcRestHead",
+          "One",
+          "R"
+        ],
+        "Blank": [
+          "SmcRestDone",
+          "Blank",
+          "L"
+        ]
+      },
+      "CmpSymC1S3": {
+        "One": [
+          "CmpSymC1S3",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "CmpSymC1S3",
+          "Zero",
+          "R"
+        ],
+        "Hash": [
+          "CmpSymC1Fh",
+          "Hash",
+          "R"
+        ]
+      },
+      "RdSk2": {
+        "Zero": [
+          "RdSk2",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "RdSk2",
+          "One",
+          "R"
+        ],
+        "Pipe": [
+          "RdSk3",
+          "Pipe",
+          "R"
+        ]
+      },
+      "MrExtH3": {
+        "Hash": [
+          "MrExtReadBlank",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "MrExtH3",
+          "One",
+          "R"
+        ],
+        "Zero": [
+          "MrExtH3",
+          "Zero",
+          "R"
+        ]
+      },
+      "MarkRule": {
+        "Pipe": [
+          "MarkRule",
+          "Pipe",
+          "L"
+        ],
+        "Semi": [
+          "MarkRule",
+          "Semi",
+          "L"
+        ],
+        "Zero": [
+          "MarkRule",
+          "Zero",
+          "L"
+        ],
+        "L": [
+          "MarkRule",
+          "L",
+          "L"
+        ],
+        "Dot": [
+          "CmpStRead",
+          "Star",
+          "R"
+        ],
+        "Hash": [
+          "MarkRuleNoMatch",
+          "Hash",
+          "R"
+        ],
+        "Y": [
+          "MarkRule",
+          "Y",
+          "L"
+        ],
+        "X": [
+          "MarkRule",
+          "X",
+          "L"
+        ],
+        "One": [
+          "MarkRule",
+          "One",
+          "L"
+        ],
+        "R": [
+          "MarkRule",
+          "R",
+          "L"
+        ]
+      },
+      "MlMark": {
+        "Zero": [
+          "MlMark",
+          "Zero",
+          "L"
+        ],
+        "One": [
+          "MlMark",
+          "One",
+          "L"
+        ],
+        "Comma": [
+          "MlRestore",
+          "Caret",
+          "R"
+        ]
+      },
+      "MoveRight": {
+        "Zero": [
+          "MoveRight",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "MoveRight",
+          "Pipe",
+          "L"
+        ],
+        "R": [
+          "MoveRight",
+          "R",
+          "L"
+        ],
+        "Star": [
+          "MrNav",
+          "Dot",
+          "R"
+        ],
+        "One": [
+          "MoveRight",
+          "One",
+          "L"
+        ],
+        "L": [
+          "MoveRight",
+          "L",
+          "L"
+        ]
+      },
+      "MrExtBcNext": {
+        "Y": [
+          "MrExtBcNext",
+          "Y",
+          "R"
+        ],
+        "Zero": [
+          "MrExtBc0",
+          "X",
+          "R"
+        ],
+        "One": [
+          "MrExtBc1",
+          "Y",
+          "R"
+        ],
+        "X": [
+          "MrExtBcNext",
+          "X",
+          "R"
+        ],
+        "Hash": [
+          "MrExtRestBlank",
+          "Hash",
+          "L"
+        ]
+      },
+      "CmpStOk": {
+        "L": [
+          "CmpStOk",
+          "L",
+          "L"
+        ],
+        "One": [
+          "CmpStOk",
+          "One",
+          "L"
+        ],
+        "Dot": [
+          "CmpStOk",
+          "Dot",
+          "L"
+        ],
+        "Star": [
+          "CmpStNextbit",
+          "Star",
+          "R"
+        ],
+        "X": [
+          "CmpStOk",
+          "X",
+          "L"
+        ],
+        "Hash": [
+          "CmpStOk",
+          "Hash",
+          "L"
+        ],
+        "Y": [
+          "CmpStOk",
+          "Y",
+          "L"
+        ],
+        "Zero": [
+          "CmpStOk",
+          "Zero",
+          "L"
+        ],
+        "Pipe": [
+          "CmpStOk",
+          "Pipe",
+          "L"
+        ],
+        "Semi": [
+          "CmpStOk",
+          "Semi",
+          "L"
+        ],
+        "Caret": [
+          "CmpStOk",
+          "Caret",
+          "L"
+        ],
+        "R": [
+          "CmpStOk",
+          "R",
+          "L"
+        ],
+        "Comma": [
+          "CmpStOk",
+          "Comma",
+          "L"
+        ]
+      },
+      "MrExtHome": {
+        "Hash": [
+          "MrExtH1",
+          "Hash",
+          "R"
+        ]
+      },
+      "MrExtBc1": {
+        "Zero": [
+          "MrExtBc1",
+          "Zero",
+          "R"
+        ],
+        "One": [
+          "MrExtBc1",
+          "One",
+          "R"
+        ],
+        "Comma": [
+          "MrExtBc1",
+          "Comma",
+          "R"
+        ],
+        "Hash": [
+          "MrExtBc1",
+          "Hash",
+          "R"
+        ],
+        "Caret": [
+          "MrExtBc1",
+          "Caret",
+          "R"
+        ],
+        "Blank": [
+          "MrExtBcRet",
+          "One",
+          "L"
+        ]
+      },
+      "MrExtH2": {
+        "Zero": [
+          "MrExtH2",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "MrExtH2",
+          "Semi",
+          "R"
+        ],
+        "One": [
+          "MrExtH2",
+          "One",
+          "R"
+        ],
+        "Hash": [
+          "MrExtH3",
+          "Hash",
+          "R"
+        ]
+      },
+      "MrS1": {
+        "Zero": [
+          "MrS1",
+          "Zero",
+          "R"
+        ],
+        "Semi": [
+          "MrS1",
+          "Semi",
+          "R"
+        ],
+        "Hash": [
+          "MrS2",
+          "Hash",
+          "R"
+        ],
+        "One": [
+          "MrS1",
+          "One",
+          "R"
+        ]
+      }
+    },
+    "symbolChars": {
+      "Star": "*",
+      "Gt": ">",
+      "Zero": "0",
+      "Comma": ",",
+      "Caret": "^",
+      "Dollar": "$",
+      "Hash": "#",
+      "Pipe": "|",
+      "One": "1",
+      "Dot": ".",
+      "Semi": ";",
+      "L": "L",
+      "R": "R",
+      "X": "X",
+      "Y": "Y",
+      "Blank": "_"
+    }
+  }
+]

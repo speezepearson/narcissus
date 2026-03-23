@@ -1,5 +1,6 @@
 pub mod compiled;
 pub mod infinity;
+pub mod json_export;
 pub mod optimization_hints;
 pub mod tm;
 #[allow(dead_code)]
