@@ -21,6 +21,5 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 
 COPY .disposables/claude.json /home/dev/.claude.json
 
-WORKDIR /tmp/preinstalls
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/home/dev/.cargo/bin:$PATH"
