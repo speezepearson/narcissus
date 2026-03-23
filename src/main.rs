@@ -18,7 +18,7 @@ use crate::tm::SimpleTuringMachineSpec;
 
 type UtmTm<'a> = RunningTuringMachine<'a, SimpleTuringMachineSpec<State, Symbol>>;
 
-const RADIUS: usize = 30;
+const RADIUS: usize = 50;
 
 /// Format a tape view: 30 symbols on each side of the head, with ^ below.
 fn tape_view(tm: &UtmTm) -> String {
