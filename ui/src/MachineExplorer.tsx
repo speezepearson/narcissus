@@ -87,28 +87,33 @@ export function MachineExplorer() {
     return new Set(parsed.spec.allSymbols);
   }, [parsed]);
 
-  const snapshot = useMemo(() => {
-    if (!parsed) return null;
-    const { spec } = parsed;
-
-    // Each char in the input that is a valid display-char symbol gets added to the tape
-    const tapeSymbols: string[] = [];
+  const invalidChars = useMemo(() => {
+    const invalid: string[] = [];
     for (const ch of tapeInput) {
-      if (validSymbols.has(ch)) {
-        tapeSymbols.push(ch);
+      if (!validSymbols.has(ch) && !invalid.includes(ch)) {
+        invalid.push(ch);
       }
     }
+    return invalid;
+  }, [tapeInput, validSymbols]);
 
-    const overlay = makeSimpleTapeOverlay<string>(
-      (i) => (i >= 0 && i < tapeSymbols.length ? tapeSymbols[i] : undefined),
+  const snapshot = useMemo(() => {
+    if (!parsed || invalidChars.length > 0) return null;
+    const { spec } = parsed;
+
+    const tapeSymbols = [...tapeInput];
+
+    const overlay = makeSimpleTapeOverlay<string>((i) =>
+      i >= 0 && i < tapeSymbols.length ? tapeSymbols[i] : undefined,
     );
 
     return makeInitSnapshot(spec, overlay);
-  }, [parsed, tapeInput, validSymbols]);
+  }, [parsed, tapeInput, invalidChars]);
 
-  if (error) return <div style={{ color: "red" }}>Error loading specs: {error}</div>;
+  if (error)
+    return <div style={{ color: "red" }}>Error loading specs: {error}</div>;
   if (!specs) return <div>Loading machine specs...</div>;
-  if (!selected || !parsed || !snapshot) return null;
+  if (!selected || !parsed) return null;
 
   return (
     <div style={{ padding: "24px" }}>
@@ -160,7 +165,28 @@ export function MachineExplorer() {
         />
       </label>
 
-      <TuringMachineViewer key={`${selectedIdx}-${tapeInput}`} init={snapshot} />
+      {invalidChars.length > 0 && (
+        <p style={{ color: "red", margin: "8px 0" }}>
+          Invalid character{invalidChars.length > 1 ? "s" : ""}:{" "}
+          {invalidChars.map((ch) => (
+            <code key={ch} style={{ marginRight: "4px" }}>
+              {ch}
+            </code>
+          ))}
+          — allowed:{" "}
+          {parsed.spec.allSymbols.map((s) => (
+            <code key={s} style={{ marginRight: "4px" }}>
+              {s}
+            </code>
+          ))}
+        </p>
+      )}
+      {snapshot && (
+        <TuringMachineViewer
+          key={`${selectedIdx}-${tapeInput}`}
+          init={snapshot}
+        />
+      )}
     </div>
   );
 }
