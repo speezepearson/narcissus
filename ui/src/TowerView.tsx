@@ -1,14 +1,38 @@
 import { useEffect, useState } from "react";
 
-/** Convert ANSI color codes to HTML spans. */
-function ansiToHtml(text: string): string {
+const GREEN_SYMS = new Set(["*", "X", "Y", "^", ">"]);
+
+/** Colorize plain tower text into HTML.
+ *  - Head cell (parsed from pos=N) gets red background
+ *  - Special symbols (*, X, Y, ^, >) get green background
+ */
+function colorize(text: string): string {
   return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\x1b\[101m(.*?)\x1b\[0m/g, '<span style="background:#f87171">$1</span>')
-    .replace(/\x1b\[102m(.*?)\x1b\[0m/g, '<span style="background:#4ade80">$1</span>')
-    .replace(/\x1b\[\d+m/g, "");
+    .split("\n")
+    .map((line) => {
+      const headCol = parseHeadCol(line);
+      let out = "";
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        const escaped =
+          ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : ch;
+        if (i === headCol) {
+          out += `<span style="background:#f87171">${escaped}</span>`;
+        } else if (GREEN_SYMS.has(ch)) {
+          out += `<span style="background:#4ade80">${escaped}</span>`;
+        } else {
+          out += escaped;
+        }
+      }
+      return out;
+    })
+    .join("\n");
+}
+
+function parseHeadCol(line: string): number | null {
+  const match = line.match(/pos=(\d+)\)$/);
+  if (!match) return null;
+  return 4 + parseInt(match[1], 10);
 }
 
 export function TowerView() {
@@ -22,7 +46,7 @@ export function TowerView() {
           const res = await fetch("/api/tower");
           if (res.ok) {
             const text = await res.text();
-            setHtml(ansiToHtml(text));
+            setHtml(colorize(text));
           }
         } catch {
           // SWALLOW_EXCEPTION: server may not be ready yet; we'll retry

@@ -42,9 +42,7 @@ impl<'a> TowerLevel<'a> {
     }
 }
 
-/// Format a tape slice with the head cell highlighted in light red
-/// and special symbols (*, X, Y, ^, >) in light green.
-/// Shows tape[0..end].
+/// Format a tape slice as plain text. Shows tape[0..end].
 pub fn tape_view_range(tm: &UtmTm, end: usize) -> String {
     let mut out = String::from("    ");
     let blank = tm.spec.blank();
@@ -55,17 +53,7 @@ pub fn tape_view_range(tm: &UtmTm, end: usize) -> String {
         } else {
             blank
         };
-        let green = matches!(
-            sym,
-            Symbol::Star | Symbol::X | Symbol::Y | Symbol::Caret | Symbol::Gt
-        );
-        if i == tm.pos {
-            write!(out, "\x1b[101m{}\x1b[0m", sym).unwrap();
-        } else if green {
-            write!(out, "\x1b[102m{}\x1b[0m", sym).unwrap();
-        } else {
-            write!(out, "{}", sym).unwrap();
-        }
+        write!(out, "{}", sym).unwrap();
     }
 
     if end < tm.tape.len() {
@@ -73,6 +61,39 @@ pub fn tape_view_range(tm: &UtmTm, end: usize) -> String {
     }
     write!(out, " (state={:?}, pos={})", tm.state, tm.pos).unwrap();
     out
+}
+
+/// Add ANSI color codes to tower output.
+/// Light red background on head cells, light green on *, X, Y, ^, >.
+pub fn colorize_ansi(plain: &str) -> String {
+    let mut out = String::with_capacity(plain.len() * 2);
+    for line in plain.lines() {
+        // Parse head position from "(state=..., pos=N)" suffix
+        let head_col = parse_head_col(line);
+        for (i, ch) in line.char_indices() {
+            if Some(i) == head_col {
+                write!(out, "\x1b[101m{}\x1b[0m", ch).unwrap();
+            } else if matches!(ch, '*' | 'X' | 'Y' | '^' | '>') {
+                write!(out, "\x1b[102m{}\x1b[0m", ch).unwrap();
+            } else {
+                out.push(ch);
+            }
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// Find the character column of the head cell in a tape_view_range line.
+/// Lines start with "    " (4 spaces), then tape symbols, so head is at column 4 + pos.
+fn parse_head_col(line: &str) -> Option<usize> {
+    let marker = "pos=";
+    let pos_start = line.rfind(marker)?;
+    let after = &line[pos_start + marker.len()..];
+    let end = after.find(')')?;
+    let pos: usize = after[..end].parse().ok()?;
+    // The tape starts at column 4 (the "    " prefix)
+    Some(4 + pos)
 }
 
 /// Decode the next level from a parent machine, extending the tape as needed.
