@@ -1,16 +1,57 @@
+use std::io::Write as IoWrite;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use tiny_http::{Header, Response, Server};
-use utmmmmm::compiled::{CState, CompiledTapeExtender, CompiledTuringMachineSpec};
+use utmmmmm::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
 use utmmmmm::infinity::InfiniteTapeExtender;
-use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
+use utmmmmm::tm::{Dir, RunningTuringMachine, SimpleTuringMachineSpec, TuringMachineSpec};
 use utmmmmm::tower::{format_tower, update_tower, TowerLevel};
-use utmmmmm::utm::{State, UTM_SPEC};
+use utmmmmm::utm::{State, Symbol, UTM_SPEC};
 
-fn tower_thread(snapshot: Arc<Mutex<String>>) {
+fn save_savepoint(
+    path: &str,
+    total_steps: u64,
+    guest_steps: u64,
+    tm: &RunningTuringMachine<CompiledTuringMachineSpec<SimpleTuringMachineSpec<State, Symbol>>>,
+) {
+    let tmp = format!("{}.tmp", path);
+    let mut f = std::io::BufWriter::new(std::fs::File::create(&tmp).expect("create savepoint"));
+    f.write_all(&total_steps.to_le_bytes()).unwrap();
+    f.write_all(&guest_steps.to_le_bytes()).unwrap();
+    f.write_all(&[tm.state.0]).unwrap();
+    f.write_all(&(tm.pos as u64).to_le_bytes()).unwrap();
+    f.write_all(&(tm.tape.len() as u64).to_le_bytes()).unwrap();
+    let tape_bytes: Vec<u8> = tm.tape.iter().map(|s| s.0).collect();
+    f.write_all(&tape_bytes).unwrap();
+    drop(f);
+    std::fs::rename(&tmp, path).expect("rename savepoint");
+    eprintln!("Saved savepoint at step {} to {}", total_steps, path);
+}
+
+fn load_savepoint(path: &str) -> Option<(u64, u64, CState, usize, Vec<CSymbol>)> {
+    let data = std::fs::read(path).ok()?;
+    if data.len() < 25 {
+        return None;
+    }
+    let total_steps = u64::from_le_bytes(data[0..8].try_into().unwrap());
+    let guest_steps = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let state = CState(data[16]);
+    let pos = u64::from_le_bytes(data[17..25].try_into().unwrap()) as usize;
+    let tape_len = u64::from_le_bytes(data[25..33].try_into().unwrap()) as usize;
+    if data.len() < 33 + tape_len {
+        return None;
+    }
+    let tape: Vec<CSymbol> = data[33..33 + tape_len]
+        .iter()
+        .map(|&b| CSymbol(b))
+        .collect();
+    Some((total_steps, guest_steps, state, pos, tape))
+}
+
+fn tower_thread(snapshot: Arc<Mutex<String>>, savepoint_path: Option<String>) {
     let utm = &*UTM_SPEC;
     let compiled = CompiledTuringMachineSpec::compile(utm).expect("UTM should compile");
 
@@ -27,8 +68,26 @@ fn tower_thread(snapshot: Arc<Mutex<String>>) {
 
     let mut total_steps: u64 = 0;
     let mut guest_steps: u64 = 0;
+
+    if let Some(ref sp_path) = savepoint_path {
+        if let Some((sp_steps, sp_guest, sp_state, sp_pos, sp_tape)) = load_savepoint(sp_path) {
+            total_steps = sp_steps;
+            guest_steps = sp_guest;
+            tm.state = sp_state;
+            tm.pos = sp_pos;
+            tm.tape = sp_tape;
+            let tape_len = tm.tape.len();
+            extender.extend(&mut tm.tape, tape_len);
+            eprintln!(
+                "Loaded savepoint from {}: step {}, {} guest steps, tape len {}",
+                sp_path, total_steps, guest_steps, tm.tape.len()
+            );
+        }
+    }
+
     let mut base_max_pos: usize = tm.pos;
     let mut inf_extender = InfiniteTapeExtender;
+    let mut last_savepoint_step = total_steps;
 
     let mut tower: Vec<TowerLevel> = vec![TowerLevel::new(compiled.decompile(&tm))];
     if tm.state == init_cstate {
@@ -79,6 +138,9 @@ fn tower_thread(snapshot: Arc<Mutex<String>>) {
                 rendered, guest_steps
             );
             *snapshot.lock().unwrap() = text;
+            if let Some(ref sp_path) = savepoint_path {
+                save_savepoint(sp_path, total_steps, guest_steps, &tm);
+            }
             return;
         }
 
@@ -90,6 +152,15 @@ fn tower_thread(snapshot: Arc<Mutex<String>>) {
                 update_tower(utm, &mut tower, &mut inf_extender);
             }
             prev_cstate = tm.state;
+        }
+
+        if total_steps % 100_000 == 0 {
+            if let Some(ref sp_path) = savepoint_path {
+                if total_steps - last_savepoint_step >= 1_000_000_000 {
+                    save_savepoint(sp_path, total_steps, guest_steps, &tm);
+                    last_savepoint_step = total_steps;
+                }
+            }
         }
 
         if total_steps % 100_000 == 0 && last_snapshot.elapsed() >= snapshot_interval {
@@ -129,9 +200,16 @@ fn content_type_for(path: &str) -> &'static str {
     }
 }
 
+fn get_flag(args: &[String], flag: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == flag)
+        .map(|i| args[i + 1].clone())
+}
+
 fn main() {
-    let port = std::env::args()
-        .nth(1)
+    let args: Vec<String> = std::env::args().collect();
+    let savepoint_path = get_flag(&args, "--savepoint");
+    let port = get_flag(&args, "--port")
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(8080);
 
@@ -139,7 +217,7 @@ fn main() {
 
     // Start tower background thread
     let snap_clone = Arc::clone(&snapshot);
-    thread::spawn(move || tower_thread(snap_clone));
+    thread::spawn(move || tower_thread(snap_clone, savepoint_path));
 
     let addr = format!("0.0.0.0:{}", port);
     let server = Server::http(&addr).expect("Failed to start HTTP server");
