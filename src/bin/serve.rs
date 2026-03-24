@@ -8,7 +8,7 @@ use tiny_http::{Header, Response, Server};
 use utmmmmm::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
 use utmmmmm::infinity::InfiniteTapeExtender;
 use utmmmmm::tm::{Dir, RunningTuringMachine, SimpleTuringMachineSpec, TuringMachineSpec};
-use utmmmmm::tower::{format_tower, update_tower, TowerLevel};
+use utmmmmm::tower::{tower_to_json, update_tower, TowerLevel};
 use utmmmmm::utm::{State, Symbol, UTM_SPEC};
 
 fn save_savepoint(
@@ -102,12 +102,8 @@ fn tower_thread(snapshot: Arc<Mutex<String>>, savepoint_path: Option<String>) {
 
     // Initial snapshot
     {
-        let rendered = format_tower(&mut tower, total_steps, utm, &mut inf_extender);
-        let text = format!(
-            "{}  ({} guest steps, 0.0M steps/s)\n",
-            rendered, guest_steps
-        );
-        *snapshot.lock().unwrap() = text;
+        let json = tower_to_json(&mut tower, total_steps, guest_steps, 0.0, utm, &mut inf_extender);
+        *snapshot.lock().unwrap() = serde_json::to_string(&json).unwrap();
     }
 
     loop {
@@ -132,12 +128,8 @@ fn tower_thread(snapshot: Arc<Mutex<String>>, savepoint_path: Option<String>) {
             tower[0].update_machine(compiled.decompile(&tm));
             tower[0].max_head_pos = base_max_pos;
             update_tower(utm, &mut tower, &mut inf_extender);
-            let rendered = format_tower(&mut tower, total_steps, utm, &mut inf_extender);
-            let text = format!(
-                "{}  ({} guest steps)\nHalted.\n",
-                rendered, guest_steps
-            );
-            *snapshot.lock().unwrap() = text;
+            let json = tower_to_json(&mut tower, total_steps, guest_steps, 0.0, utm, &mut inf_extender);
+            *snapshot.lock().unwrap() = serde_json::to_string(&json).unwrap();
             if let Some(ref sp_path) = savepoint_path {
                 save_savepoint(sp_path, total_steps, guest_steps, &tm);
             }
@@ -167,14 +159,9 @@ fn tower_thread(snapshot: Arc<Mutex<String>>, savepoint_path: Option<String>) {
             tower[0].update_machine(compiled.decompile(&tm));
             tower[0].max_head_pos = base_max_pos;
             let wall_secs = start_time.elapsed().as_secs_f64().max(0.001);
-            let rendered = format_tower(&mut tower, total_steps, utm, &mut inf_extender);
-            let text = format!(
-                "{}  ({} guest steps, {:.1}M steps/s)\n",
-                rendered,
-                guest_steps,
-                total_steps as f64 / wall_secs / 1_000_000.0
-            );
-            *snapshot.lock().unwrap() = text;
+            let steps_per_sec = total_steps as f64 / wall_secs / 1_000_000.0;
+            let json = tower_to_json(&mut tower, total_steps, guest_steps, steps_per_sec, utm, &mut inf_extender);
+            *snapshot.lock().unwrap() = serde_json::to_string(&json).unwrap();
             last_snapshot = Instant::now();
         }
     }
@@ -240,7 +227,7 @@ fn main() {
             let text = snapshot.lock().unwrap().clone();
             let response = Response::from_string(text)
                 .with_header(
-                    Header::from_bytes("Content-Type", "text/plain; charset=utf-8").unwrap(),
+                    Header::from_bytes("Content-Type", "application/json").unwrap(),
                 )
                 .with_header(
                     Header::from_bytes("Cache-Control", "no-cache").unwrap(),

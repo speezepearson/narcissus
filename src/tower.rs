@@ -1,6 +1,8 @@
 use std::cmp::max;
 use std::fmt::Write;
 
+use serde::Serialize;
+
 use crate::infinity::{header_len, InfiniteTapeExtender};
 use crate::tm::{RunningTuringMachine, SimpleTuringMachineSpec, TapeExtender, TuringMachineSpec};
 use crate::utm::{MyUtmEncodingScheme, State, Symbol, UtmEncodingScheme};
@@ -39,6 +41,71 @@ impl<'a> TowerLevel<'a> {
             Some(prev) => self.machine.state == State::Init && prev != State::Init,
             None => false,
         }
+    }
+}
+
+#[derive(Serialize)]
+pub struct TowerLevelJson {
+    pub tape: String,
+    pub head_pos: usize,
+    pub state: String,
+    pub tape_len: usize,
+}
+
+#[derive(Serialize)]
+pub struct TowerJson {
+    pub steps: u64,
+    pub guest_steps: u64,
+    pub steps_per_sec: f64,
+    pub tower: Vec<TowerLevelJson>,
+}
+
+fn tape_string(tm: &UtmTm, end: usize) -> String {
+    let mut out = String::new();
+    let blank = tm.spec.blank();
+    for i in 0..end {
+        let sym = if i < tm.tape.len() { tm.tape[i] } else { blank };
+        write!(out, "{}", sym).unwrap();
+    }
+    if end < tm.tape.len() {
+        out.push_str(" ...");
+    }
+    out
+}
+
+fn level_to_json(tm: &UtmTm, end: usize) -> TowerLevelJson {
+    TowerLevelJson {
+        tape: tape_string(tm, end),
+        head_pos: tm.pos,
+        state: format!("{:?}", tm.state),
+        tape_len: tm.tape.len(),
+    }
+}
+
+pub fn tower_to_json<'a>(
+    tower: &mut [TowerLevel<'a>],
+    total_steps: u64,
+    guest_steps: u64,
+    steps_per_sec: f64,
+    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
+    extender: &mut InfiniteTapeExtender,
+) -> TowerJson {
+    let mut levels: Vec<TowerLevelJson> = tower
+        .iter()
+        .map(|tl| level_to_json(&tl.machine, tl.max_head_pos + 10))
+        .collect();
+
+    // Decode and include one more level beyond the tower.
+    let last = tower.last_mut().unwrap();
+    if let Some(extra) = decode_next_level(utm, &mut last.machine, extender) {
+        levels.push(level_to_json(&extra, extra.pos + 10));
+    }
+
+    TowerJson {
+        steps: total_steps,
+        guest_steps,
+        steps_per_sec,
+        tower: levels,
     }
 }
 
