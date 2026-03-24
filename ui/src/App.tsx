@@ -1,11 +1,9 @@
 import "./App.css";
-import { MachineExplorer } from "./MachineExplorer";
+import { TowerView } from "./TowerView";
 
 function App() {
   return (
-    <div>
-      <MachineExplorer />
-    </div>
+      <TowerView />
   );
 }
 
