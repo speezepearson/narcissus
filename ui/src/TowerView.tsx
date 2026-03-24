@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-
-const GREEN_SYMS = new Set(["*", "X", "Y", "^", ">"]);
+import { useEffect, useRef, useState, useMemo } from "react";
 
 interface TowerViewState {
   steps: number;
@@ -15,21 +13,160 @@ interface TowerViewState {
   }>;
 }
 
-function colorizeTape(tape: string, headPos: number): string {
-  let out = "";
+// ── Semantic tape structure ──
+
+interface TapeSections {
+  prefix: string; // "$"
+  rules: string[]; // individual rules (starting with "." or "*")
+  accepting: string;
+  state: string;
+  blank: string;
+  tapeCells: string[]; // individual cells
+  unparsed?: string; // fallback if format doesn't match
+}
+
+function parseTape(tape: string): TapeSections | null {
+  // Tape format: $#.rule1;.rule2;*activeRule#accepting#state#blank#^cell,cell,...
+  // Find all # positions
+  const hashPositions: number[] = [];
   for (let i = 0; i < tape.length; i++) {
-    const ch = tape[i];
-    const escaped =
-      ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : ch;
-    if (i === headPos) {
-      out += `<span style="background:#f87171">${escaped}</span>`;
-    } else if (GREEN_SYMS.has(ch)) {
-      out += `<span style="background:#4ade80">${escaped}</span>`;
+    if (tape[i] === "#") hashPositions.push(i);
+  }
+  if (hashPositions.length < 5) return null;
+
+  const prefix = tape.slice(0, hashPositions[0]); // "$"
+  const rulesStr = tape.slice(hashPositions[0] + 1, hashPositions[1]);
+  const accepting = tape.slice(hashPositions[1] + 1, hashPositions[2]);
+  const state = tape.slice(hashPositions[2] + 1, hashPositions[3]);
+  const blank = tape.slice(hashPositions[3] + 1, hashPositions[4]);
+  const tapeStr = tape.slice(hashPositions[4] + 1);
+
+  // Parse rules: split by ";" keeping each rule's leading "." or "*"
+  const rules = rulesStr.length > 0 ? rulesStr.split(";") : [];
+
+  // Parse tape cells: split by ","
+  const tapeCells = tapeStr.length > 0 ? tapeStr.split(",") : [];
+
+  return { prefix, rules, accepting, state, blank, tapeCells };
+}
+
+function HeadChar({ ch, isHead }: { ch: string; isHead: boolean }) {
+  if (isHead) {
+    return <span className="st-head">{ch}</span>;
+  }
+  return <>{ch}</>;
+}
+
+function CharSpan({ text, headPos, startIdx }: { text: string; headPos: number; startIdx: number }) {
+  // Render a string of characters, highlighting the one at headPos
+  const parts: React.ReactNode[] = [];
+  let run = "";
+  let runStart = startIdx;
+  for (let i = 0; i < text.length; i++) {
+    const globalIdx = startIdx + i;
+    if (globalIdx === headPos) {
+      if (run) parts.push(<span key={runStart}>{run}</span>);
+      parts.push(<HeadChar key={globalIdx} ch={text[i]} isHead={true} />);
+      run = "";
+      runStart = globalIdx + 1;
     } else {
-      out += escaped;
+      run += text[i];
     }
   }
-  return out;
+  if (run) parts.push(<span key={runStart}>{run}</span>);
+  return <>{parts}</>;
+}
+
+function SemanticTape({ tape, headPos }: { tape: string; headPos: number }) {
+  const parsed = useMemo(() => parseTape(tape), [tape]);
+
+  if (!parsed) {
+    // Fallback: render raw tape with head highlight
+    return <CharSpan text={tape} headPos={headPos} startIdx={0} />;
+  }
+
+  // Build position tracking: we need to know where each section starts
+  // in the original string to correctly place the head highlight
+  let pos = parsed.prefix.length; // after "$"
+  const rulesStart = pos + 1; // after first "#"
+
+  // Calculate positions for each rule
+  const rulePositions: number[] = [];
+  let rp = rulesStart;
+  for (let i = 0; i < parsed.rules.length; i++) {
+    rulePositions.push(rp);
+    rp += parsed.rules[i].length;
+    if (i < parsed.rules.length - 1) rp += 1; // ";"
+  }
+  const afterRules = rp + 1; // skip second "#"
+
+  const acceptingStart = afterRules;
+  const afterAccepting = acceptingStart + parsed.accepting.length + 1; // skip "#"
+
+  const stateStart = afterAccepting;
+  const afterState = stateStart + parsed.state.length + 1; // skip "#"
+
+  const blankStart = afterState;
+  const afterBlank = blankStart + parsed.blank.length + 1; // skip "#"
+
+  // Tape cell positions
+  const cellPositions: number[] = [];
+  let cp = afterBlank;
+  for (let i = 0; i < parsed.tapeCells.length; i++) {
+    cellPositions.push(cp);
+    cp += parsed.tapeCells[i].length;
+    if (i < parsed.tapeCells.length - 1) cp += 1; // ","
+  }
+
+  return (
+    <span className="st-tape">
+      <CharSpan text={parsed.prefix + "#"} headPos={headPos} startIdx={0} />
+      <span className="st-section st-rules">
+        <span className="st-label">rules</span>
+        {parsed.rules.map((rule, i) => {
+          const isActive = rule.startsWith("*");
+          return (
+            <span key={i}>
+              {i > 0 && <span className="st-delim">;</span>}
+              <span className={`st-rule${isActive ? " st-rule-active" : ""}`}>
+                <CharSpan text={rule} headPos={headPos} startIdx={rulePositions[i]} />
+              </span>
+            </span>
+          );
+        })}
+      </span>
+      <CharSpan text="#" headPos={headPos} startIdx={afterRules - 1} />
+      <span className="st-section st-accepting">
+        <span className="st-label">accept</span>
+        <CharSpan text={parsed.accepting} headPos={headPos} startIdx={acceptingStart} />
+      </span>
+      <CharSpan text="#" headPos={headPos} startIdx={afterAccepting - 1} />
+      <span className="st-section st-state">
+        <span className="st-label">state</span>
+        <CharSpan text={parsed.state} headPos={headPos} startIdx={stateStart} />
+      </span>
+      <CharSpan text="#" headPos={headPos} startIdx={afterState - 1} />
+      <span className="st-section st-blank">
+        <span className="st-label">blank</span>
+        <CharSpan text={parsed.blank} headPos={headPos} startIdx={blankStart} />
+      </span>
+      <CharSpan text="#" headPos={headPos} startIdx={afterBlank - 1} />
+      <span className="st-section st-tape-cells">
+        <span className="st-label">tape</span>
+        {parsed.tapeCells.map((cell, i) => {
+          const isActive = cell.startsWith("^") || cell.startsWith(">");
+          return (
+            <span key={i}>
+              {i > 0 && <span className="st-delim">,</span>}
+              <span className={`st-cell${isActive ? " st-cell-active" : ""}`}>
+                <CharSpan text={cell} headPos={headPos} startIdx={cellPositions[i]} />
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    </span>
+  );
 }
 
 export function TowerView() {
@@ -174,13 +311,12 @@ export function TowerView() {
                 style={{
                   fontFamily: "var(--mono)",
                   fontSize: "12px",
-                  lineHeight: "1.3",
+                  lineHeight: "1.6",
                   overflowWrap: "break-word",
                 }}
-                dangerouslySetInnerHTML={{
-                  __html: colorizeTape(tape, level.headPos),
-                }}
-              />
+              >
+                <SemanticTape tape={tape} headPos={level.headPos} />
+              </div>
             </div>
           );
         })}
