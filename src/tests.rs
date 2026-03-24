@@ -387,6 +387,84 @@ fn test_decode_needs_more_than_10k_symbols() {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// Tests: tower rendering
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_tower_l0_rendered_tape_contains_head_marker() {
+    use crate::compiled::{CompiledTapeExtender, CompiledTuringMachineSpec};
+    use crate::infinity::InfiniteTapeExtender;
+    use crate::tm::Dir;
+    use crate::tower::{tape_view_range, TowerLevel};
+
+    let utm = &*UTM_SPEC;
+    let compiled = CompiledTuringMachineSpec::compile(utm).expect("UTM should compile");
+
+    let mut tm = RunningTuringMachine::new(&compiled);
+    let mut extender = CompiledTapeExtender::new(&compiled, Box::new(InfiniteTapeExtender));
+    extender.extend(&mut tm.tape, 1);
+
+    // Run for 100k steps
+    for _ in 0..100_000 {
+        if tm.pos >= tm.tape.len() {
+            extender.extend(&mut tm.tape, tm.pos + 1);
+        }
+        let sym = tm.tape[tm.pos];
+        if let Some((ns, nsym, dir)) = compiled.get_transition(tm.state, sym) {
+            tm.state = ns;
+            tm.tape[tm.pos] = nsym;
+            tm.pos = match dir {
+                Dir::Left => tm.pos.saturating_sub(1),
+                Dir::Right => tm.pos + 1,
+            };
+        } else {
+            panic!("UTM halted unexpectedly after fewer than 100k steps");
+        }
+    }
+
+    // Track max head position across all steps
+    let mut max_head_pos = tm.pos;
+
+    // Keep running until the head has been past the ^ position.
+    // The ^ is at header_len() (29041); the head must reach it
+    // during the first guest step's symbol-read phase.
+    let header = crate::infinity::header_len();
+    let target = header + 100; // well past the ^
+    while max_head_pos < target {
+        if tm.pos >= tm.tape.len() {
+            extender.extend(&mut tm.tape, tm.pos + 1);
+        }
+        let sym = tm.tape[tm.pos];
+        if let Some((ns, nsym, dir)) = compiled.get_transition(tm.state, sym) {
+            tm.state = ns;
+            tm.tape[tm.pos] = nsym;
+            tm.pos = match dir {
+                Dir::Left => tm.pos.saturating_sub(1),
+                Dir::Right => tm.pos + 1,
+            };
+            if tm.pos > max_head_pos {
+                max_head_pos = tm.pos;
+            }
+        } else {
+            panic!("UTM halted before head reached tape section");
+        }
+    }
+
+    let decompiled = compiled.decompile(&tm);
+    let mut level = TowerLevel::new(decompiled);
+    // The decompiled machine's pos is a snapshot; the compiled TM's
+    // max_head_pos (tracked across all steps) is what we display.
+    level.max_head_pos = max_head_pos;
+    let rendered = tape_view_range(&level.machine, level.max_head_pos + 10);
+
+    assert!(
+        rendered.contains('^') || rendered.contains('>'),
+        "L0 tape rendered up to max_head_pos+10 should contain ^ or >, but got:\n...{}",
+        &rendered[rendered.len().saturating_sub(200)..],
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════
 // Tests: UTM faithfulness
 // ════════════════════════════════════════════════════════════════════
 

@@ -1,159 +1,9 @@
-use std::cmp::max;
-use std::fmt::Write;
 use std::io::Write as IoWrite;
 use utmmmmm::compiled::{CState, CSymbol, CompiledTapeExtender, CompiledTuringMachineSpec};
-use utmmmmm::infinity::{header_len, InfiniteTapeExtender};
-use utmmmmm::tm::{
-    Dir, RunningTuringMachine, SimpleTuringMachineSpec, TapeExtender, TuringMachineSpec,
-};
-use utmmmmm::utm::{MyUtmEncodingScheme, State, Symbol, UtmEncodingScheme, UTM_SPEC};
-
-type UtmTm<'a> = RunningTuringMachine<'a, SimpleTuringMachineSpec<State, Symbol>>;
-
-struct TowerLevel<'a> {
-    machine: UtmTm<'a>,
-    max_head_pos: usize,
-    prev_state: Option<State>,
-}
-
-impl<'a> TowerLevel<'a> {
-    fn new(machine: UtmTm<'a>) -> Self {
-        let max_head_pos = machine.pos;
-        Self {
-            machine,
-            max_head_pos,
-            prev_state: None,
-        }
-    }
-
-    fn update_machine(&mut self, machine: UtmTm<'a>) {
-        self.machine = machine;
-        if self.machine.pos > self.max_head_pos {
-            self.max_head_pos = self.machine.pos;
-        }
-    }
-
-    fn snapshot_state(&mut self) {
-        self.prev_state = Some(self.machine.state);
-    }
-
-    fn entered_init(&self) -> bool {
-        match self.prev_state {
-            Some(prev) => self.machine.state == State::Init && prev != State::Init,
-            None => false,
-        }
-    }
-}
-
-/// Format a tape slice with the head cell highlighted in light red.
-/// Shows tape[0..end].
-fn tape_view_range(tm: &UtmTm, end: usize) -> String {
-    let mut out = String::from("    ");
-    let blank = tm.spec.blank();
-
-    for i in 0..end {
-        let sym = if i < tm.tape.len() {
-            tm.tape[i]
-        } else {
-            blank
-        };
-        let green = matches!(sym, Symbol::Star | Symbol::X | Symbol::Y | Symbol::Caret | Symbol::Gt);
-        if i == tm.pos {
-            write!(out, "\x1b[101m{}\x1b[0m", sym).unwrap();
-        } else if green {
-            write!(out, "\x1b[102m{}\x1b[0m", sym).unwrap();
-        } else {
-            write!(out, "{}", sym).unwrap();
-        }
-    }
-
-    if end < tm.tape.len() {
-        out.push_str(" ...");
-    }
-    write!(out, " (state={:?}, pos={})", tm.state, tm.pos).unwrap();
-    out
-}
-
-
-/// Decode the next level from a parent machine, extending the tape as needed.
-/// Returns None if decoding fails (tape too short, etc.)
-fn decode_next_level<'a>(
-    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
-    parent: &mut UtmTm<'a>,
-    extender: &mut InfiniteTapeExtender,
-) -> Option<UtmTm<'a>> {
-    let min_len = max(header_len(), parent.pos + 100);
-    extender.extend(&mut parent.tape, min_len);
-    MyUtmEncodingScheme::decode(utm, &parent.tape).ok()
-}
-
-/// Build the tower by decoding each level from the previous.
-/// tower[0] = decompiled L0, tower[1] = decode(tower[0]), etc.
-/// Re-decodes level i+1 when level i entered Init.
-/// Grows the tower by at most one new level per call.
-fn update_tower<'a>(
-    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
-    tower: &mut Vec<TowerLevel<'a>>,
-    extender: &mut InfiniteTapeExtender,
-) {
-    let mut level = 0;
-    loop {
-        if level > 0 && !tower[level].entered_init() {
-            break;
-        }
-
-        if let Some(next) = decode_next_level(utm, &mut tower[level].machine, extender) {
-            if level + 1 < tower.len() {
-                tower[level + 1].update_machine(next);
-            } else {
-                tower.push(TowerLevel::new(next));
-                break;
-            }
-            level += 1;
-        } else {
-            break;
-        }
-    }
-
-    for tl in tower.iter_mut() {
-        tl.snapshot_state();
-    }
-}
-
-fn format_tower<'a>(
-    tower: &mut [TowerLevel<'a>],
-    total_steps: u64,
-    utm: &'a SimpleTuringMachineSpec<State, Symbol>,
-    extender: &mut InfiniteTapeExtender,
-) -> String {
-    let mut buf = String::new();
-    writeln!(
-        buf,
-        "═══ {} steps ═══════════════════════════════════════",
-        total_steps
-    )
-    .unwrap();
-
-    for (i, tl) in tower.iter().enumerate() {
-        writeln!(buf, "Level {} ({} symbols):", i, tl.machine.tape.len()).unwrap();
-        writeln!(buf, "{}", tape_view_range(&tl.machine, tl.max_head_pos + 10)).unwrap();
-    }
-
-    // Decode and print one more level beyond the tower.
-    let last = tower.last_mut().unwrap();
-    if let Some(extra) = decode_next_level(utm, &mut last.machine, extender) {
-        let i = tower.len();
-        writeln!(buf, "Level {} ({} symbols):", i, extra.tape.len()).unwrap();
-        writeln!(buf, "{}", tape_view_range(&extra, extra.pos + 10)).unwrap();
-        assert!(
-            extra.pos == 0,
-            "Extra tower level should have head at pos 0, but has pos {}",
-            extra.pos
-        );
-    }
-
-    buf
-}
+use utmmmmm::infinity::InfiniteTapeExtender;
+use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
+use utmmmmm::tower::{format_tower, update_tower, TowerLevel};
+use utmmmmm::utm::{State, Symbol, UTM_SPEC};
 
 // ════════════════════════════════════════════════════════════════════
 // Savepoint: binary format for compiled TM state
@@ -164,7 +14,7 @@ fn save_savepoint(
     path: &str,
     total_steps: u64,
     guest_steps: u64,
-    tm: &RunningTuringMachine<CompiledTuringMachineSpec<SimpleTuringMachineSpec<State, Symbol>>>,
+    tm: &RunningTuringMachine<CompiledTuringMachineSpec<utmmmmm::tm::SimpleTuringMachineSpec<State, Symbol>>>,
 ) {
     let tmp = format!("{}.tmp", path);
     let mut f = std::io::BufWriter::new(std::fs::File::create(&tmp).expect("create savepoint"));
@@ -252,12 +102,14 @@ fn main() {
     }
 
     let mut inf_extender = InfiniteTapeExtender;
+    let mut base_max_pos: usize = tm.pos;
 
     // Initialize tower
     let mut tower: Vec<TowerLevel> = vec![TowerLevel::new(compiled.decompile(&tm))];
     if tm.state == init_cstate {
         update_tower(utm, &mut tower, &mut inf_extender);
     }
+    tower[0].max_head_pos = base_max_pos;
     eprint!("{}", format_tower(&mut tower, total_steps, utm, &mut inf_extender));
 
     let print_interval = std::time::Duration::from_millis(100);
@@ -282,9 +134,13 @@ fn main() {
                 Dir::Right => tm.pos + 1,
             };
             total_steps += 1;
+            if tm.pos > base_max_pos {
+                base_max_pos = tm.pos;
+            }
         } else {
             // Halted
             tower[0].update_machine(compiled.decompile(&tm));
+            tower[0].max_head_pos = base_max_pos;
             update_tower(utm, &mut tower, &mut inf_extender);
             eprint!("{}", format_tower(&mut tower, total_steps, utm, &mut inf_extender));
             let status = if compiled.is_accepting(tm.state) {
@@ -307,6 +163,7 @@ fn main() {
             if tm.state == init_cstate {
                 guest_steps += 1;
                 tower[0].update_machine(compiled.decompile(&tm));
+                tower[0].max_head_pos = base_max_pos;
                 update_tower(utm, &mut tower, &mut inf_extender);
             }
             prev_cstate = tm.state;
@@ -325,6 +182,7 @@ fn main() {
             // Print every 0.1s
             if last_print.elapsed() >= print_interval {
                 tower[0].update_machine(compiled.decompile(&tm));
+                tower[0].max_head_pos = base_max_pos;
                 let wall_secs = start_time.elapsed().as_secs_f64().max(0.001);
                 eprint!(
                     "{}  ({} guest steps, {:.1}M steps/s)\n",
