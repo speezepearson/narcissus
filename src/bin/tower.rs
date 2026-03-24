@@ -57,8 +57,11 @@ fn tape_view_range(tm: &UtmTm, end: usize) -> String {
         } else {
             blank
         };
+        let green = matches!(sym, Symbol::Star | Symbol::X | Symbol::Y | Symbol::Caret | Symbol::Gt);
         if i == tm.pos {
             write!(out, "\x1b[101m{}\x1b[0m", sym).unwrap();
+        } else if green {
+            write!(out, "\x1b[102m{}\x1b[0m", sym).unwrap();
         } else {
             write!(out, "{}", sym).unwrap();
         }
