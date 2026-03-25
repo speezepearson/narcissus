@@ -66,12 +66,20 @@ const DeltaEvent = z.object({
 type DeltaEvent = z.infer<typeof DeltaEvent>;
 const SseEvent = z.union([TotalEvent, DeltaEvent]);
 
-function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
+function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null, emptyLevel: TowerLevel } {
   const unblemishedRef = useRef<string>("");
   const [meta, setMeta] = useState<UtmMeta | null>(null);
 
   const towerRef = useRef<TowerLevel[] | null>(null);
   const [tower, setTower] = useState<TowerLevel[] | null>(null);
+
+  const [emptyLevel, setEmptyLevel] = useState<TowerLevel>({
+    headPos: 0,
+    state: 'Init',
+    steps: 0,
+    tape: '',
+    maxHeadPos: 0,
+  });
 
   useEffect(() => {
     const es = new EventSource("/api/tower");
@@ -104,6 +112,7 @@ function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
             ).join(""),
           }));
           setTower(towerRef.current);
+          setEmptyLevel(l => ({...l, tape: unblemishedRef.current.slice(0, 200)}))
           break;
         }
         case "delta": {
@@ -138,13 +147,47 @@ function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
   return {
     meta,
     tower,
+    emptyLevel,
   };
+}
+
+function TowerLevelView({ level, name }: { level: TowerLevel, name: string }) {
+  return <div
+  style={{
+    background: "var(--code-bg)",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    transition: "height 0.3s ease, min-height 0.3s ease",
+    overflow: "hidden",
+  }}
+>
+  <div
+    style={{
+      fontSize: "11px",
+      color: "#888",
+      marginBottom: "4px",
+    }}
+  >
+    {name} &middot; <span style={{fontFamily: 'monospace'}}>{level.steps}</span> steps &middot; <span style={{fontFamily: 'monospace'}}>{level.state}</span>
+  </div>
+  <div
+    style={{
+      fontFamily: "var(--mono)",
+      fontSize: "12px",
+      lineHeight: "1.3",
+      overflowWrap: "break-word",
+    }}
+    dangerouslySetInnerHTML={{
+      __html: colorizeTape(level.tape.slice(0, level.maxHeadPos+100) + ' and so on', level.headPos),
+    }}
+  />
+</div>
 }
 
 // ── Main component ──
 
 export function TowerView() {
-  const { meta, tower } = useSseTower();
+  const { meta, tower, emptyLevel } = useSseTower();
 
   if (!meta || !tower) {
     return <div style={{ padding: "16px" }}>Loading...</div>;
@@ -153,41 +196,28 @@ export function TowerView() {
   return (
     <div style={{ textAlign: "left", padding: "16px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {tower.map((level, i) => {
-          return (
-            <div
-              key={i}
-              style={{
-                background: "var(--code-bg)",
-                padding: "8px 12px",
-                borderRadius: "6px",
-                transition: "height 0.3s ease, min-height 0.3s ease",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "#888",
-                  marginBottom: "4px",
-                }}
-              >
-                L{i} &middot; {level.state}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "12px",
-                  lineHeight: "1.3",
-                  overflowWrap: "break-word",
-                }}
-                dangerouslySetInnerHTML={{
-                  __html: colorizeTape(level.tape.slice(0, level.maxHeadPos+1), level.headPos),
-                }}
-              />
-            </div>
-          );
-        })}
+        {[...tower].map((level, i) => <TowerLevelView key={i} level={level} name={`L${i}`} />)}
+        {Array.from({length: 5}).map((_, i) => <TowerLevelView key={i} level={emptyLevel} name={`L${i+tower.length}`} />)}
+        <div
+          style={{
+            background: "var(--code-bg)",
+            padding: "8px 12px",
+            borderRadius: "6px",
+            transition: "height 0.3s ease, min-height 0.3s ease",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: "12px",
+              lineHeight: "1.3",
+              overflowWrap: "break-word",
+            }}
+          >
+            and so on
+          </div>
+        </div>
       </div>
     </div>
   );

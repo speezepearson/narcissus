@@ -93,16 +93,9 @@ fn decode_into_level<'a>(tm: &UtmTm<'a>, dst: &mut UtmTowerLevel<'a>) -> bool {
         .expect("it should always be okay to decode a utm that just entered Init");
     let old_state = dst.tm.state;
     let new_state = decoded.state;
-    let new_total_steps = dst.total_steps + 1;
-    let new_max_head_pos = max(dst.max_head_pos, decoded.pos);
-    let new_head_pos = decoded.pos;
+    dst.total_steps += 1;
+    dst.max_head_pos = max(dst.max_head_pos, decoded.pos);
     dst.tm = decoded;
-    dst.max_head_pos = new_max_head_pos;
 
-    if new_state != old_state && new_state == State::Init {
-        dst.total_steps = new_total_steps;
-        return true;
-    }
-
-    return false;
+    return new_state != old_state && new_state == State::Init ;
 }
