@@ -3,12 +3,9 @@ use std::io::Write as IoWrite;
 
 use serde::{Deserialize, Serialize};
 
-use crate::compiled::CompiledTuringMachineSpec;
-use crate::compiled::{CState, CSymbol};
 use crate::delta::current_overwrites;
 use crate::infinity::InfiniteTapeExtender;
 use crate::tm::{RunningTuringMachine, TapeExtender as _};
-use crate::tm::SimpleTuringMachineSpec;
 use crate::tower::{CompiledUtmSpec, Tower, TowerLevel};
 use crate::utm::{State, Symbol, UTM_SPEC};
 
@@ -20,6 +17,7 @@ pub struct Snapshot {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TowerLevelJson {
     pub steps: u64,
+    pub max_head_pos: usize,
     pub head_pos: usize,
     pub state: State,
     pub overwrites: HashMap<usize, Symbol>,
@@ -34,6 +32,7 @@ pub fn build_snapshot<'a>(
     inf_extender.extend(reference, decompiled.tape.len());
     let it = std::iter::once(TowerLevel {
         total_steps: tower.base.total_steps,
+        max_head_pos: tower.base.max_head_pos,
         tm: tower.base.tm.spec.decompile(&tower.base.tm),
     })
     .chain(tower.decoded.iter().map(|l| l.clone()));
@@ -41,6 +40,7 @@ pub fn build_snapshot<'a>(
         levels: it
             .map(|l| TowerLevelJson {
                 steps: l.total_steps,
+                max_head_pos: l.max_head_pos,
                 head_pos: l.tm.pos,
                 state: l.tm.state,
                 overwrites: current_overwrites(&l.tm.tape, &reference)
@@ -80,30 +80,43 @@ pub fn load_savepoint<'a>(path: &str, spec: &'a CompiledUtmSpec<'a>) -> Option<T
 
     let mut tower = Tower::new(RunningTuringMachine::new(spec));
 
-    tower.base.total_steps = snap_base.steps;
-    tower.base.tm.state = spec.compile_state(snap_base.state);
-    let mut tape = Vec::new();
-    for (pos, sym) in snap_base.overwrites.iter() {
-        InfiniteTapeExtender.extend(&mut tape, pos + 1);
-        tape[*pos] = *sym;
-    }
-    tower.base.tm.tape = tape.iter().map(|&s| spec.compile_symbol(s)).collect();
-
-    tower.decoded = snap_decoded.iter().map(|l| {
-        let mut tape = Vec::new();
-        for (pos, sym) in l.overwrites.iter() {
-            InfiniteTapeExtender.extend(&mut tape, pos + 1);
-            tape[*pos] = *sym;
-        }
+    tower.base = TowerLevel {
+        total_steps: snap_base.steps,
+        max_head_pos: snap_base.max_head_pos,
+        tm: RunningTuringMachine {
+            state: spec.compile_state(snap_base.state),
+            tape: {
+                let mut tape = Vec::new();
+                for (pos, sym) in snap_base.overwrites.iter() {
+                    InfiniteTapeExtender.extend(&mut tape, pos + 1);
+                    tape[*pos] = *sym;
+                }
+                tape.iter().map(|&s| spec.compile_symbol(s)).collect()
+            },
+            pos: snap_base.head_pos,
+            spec: spec,
+        },
+    };
+    tower.decoded = snap_decoded.iter().map(|level| {
         TowerLevel {
-            total_steps: l.steps,
+            total_steps: level.steps,
+            max_head_pos: level.max_head_pos,
             tm: RunningTuringMachine {
-                spec: &*UTM_SPEC,
-                pos: l.head_pos,
-                state: l.state,
-                tape,
+                spec: spec.guest,
+                state: level.state,
+                tape: {
+                    let mut tape = Vec::new();
+                    for (pos, sym) in level.overwrites.iter() {
+                        InfiniteTapeExtender.extend(&mut tape, pos + 1);
+                        tape[*pos] = *sym;
+                    }
+                    tape
+                },
+                pos: level.head_pos,
             },
         }
+
     }).collect();
+
     Some(tower)
 }

@@ -29,6 +29,7 @@ function colorizeTape(tape: string, headPos: number): string {
 
 interface TowerLevel {
   steps: number;
+  maxHeadPos: number;
   state: string;
   headPos: number;
   tape: string;
@@ -42,6 +43,7 @@ const TotalEvent = z.object({
   levels: z.array(
     z.object({
       steps: z.number(),
+      max_head_pos: z.number(),
       state: z.string(),
       head_pos: z.number(),
       overwrites: z.record(z.number(), z.string()),
@@ -54,6 +56,7 @@ const DeltaEvent = z.object({
   levels: z.array(
     z.object({
       steps: z.number(),
+      max_head_pos: z.number(),
       state: z.string(),
       head_pos: z.number(),
       overwrites: z.record(z.number(), z.string()),
@@ -82,14 +85,14 @@ function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
             utmStates: msg.utm_states,
             utmSymbolChars: msg.utm_symbol_chars,
           });
-          console.log('total: at 20941:', msg.levels[0].overwrites[29041]);
           towerRef.current = msg.levels.map((level) => ({
             steps: level.steps,
+            maxHeadPos: level.max_head_pos,
             state: level.state,
             headPos: level.head_pos,
             tape: Array.from(
               {
-                length: Math.max(
+                length: 1+Math.max(
                   level.head_pos,
                   ...Object.keys(level.overwrites).map(Number),
                 ),
@@ -106,11 +109,12 @@ function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
         case "delta": {
           towerRef.current = msg.levels.map((level, depth) => ({
             steps: level.steps,
+            maxHeadPos: level.max_head_pos,
             state: level.state,
             headPos: level.head_pos,
             tape: Array.from(
               {
-                length: Math.max(
+                length: 1+Math.max(
                   towerRef.current?.[depth]?.tape.length ?? 0,
                   level.head_pos,
                   ...Object.keys(level.overwrites).map(Number),
@@ -178,7 +182,7 @@ export function TowerView() {
                   overflowWrap: "break-word",
                 }}
                 dangerouslySetInnerHTML={{
-                  __html: colorizeTape(level.tape, level.headPos),
+                  __html: colorizeTape(level.tape.slice(0, level.maxHeadPos+1), level.headPos),
                 }}
               />
             </div>

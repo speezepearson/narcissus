@@ -207,6 +207,7 @@ fn sse_client_thread(
 
                     TowerLevelJson {
                         steps: level.steps,
+                        max_head_pos: level.max_head_pos,
                         state: level.state.clone(),
                         head_pos: level.head_pos,
                         overwrites: new_overwrites
