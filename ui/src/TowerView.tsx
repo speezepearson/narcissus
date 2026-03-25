@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { useEffect, useRef, useState } from "react";
-import { updateTower, type TowerLevel, type UtmMeta } from "./tower";
+import {  type UtmMeta } from "./tower";
 
 const GREEN_SYMS = new Set(["*", "X", "Y", "^", ">"]);
 
@@ -23,7 +23,7 @@ function colorizeTape(tape: string, headPos: number): string {
 
 // ── L0 state from server ──
 
-interface L0State {
+interface TowerLevel {
   steps: number;
   state: string;
   headPos: number;
@@ -59,12 +59,12 @@ const DeltaEvent = z.object({
 type DeltaEvent = z.infer<typeof DeltaEvent>;
 const SseEvent = z.union([TotalEvent, DeltaEvent]);
 
-function useSseL0(): { meta: UtmMeta | null; l0: L0State | null } {
+function useSseTower(): { meta: UtmMeta | null; tower: TowerLevel[] | null } {
   const unblemishedRef = useRef<string>("");
   const [meta, setMeta] = useState<UtmMeta | null>(null);
 
-  const l0Ref = useRef<L0State | null>(null);
-  const [exposedL0, setExposedL0] = useState<L0State | null>(null);
+  const towerRef = useRef<TowerLevel[] | null>(null);
+  const [tower, setTower] = useState<TowerLevel[] | null>(null);
 
   useEffect(() => {
     const es = new EventSource("/api/tower");
@@ -78,47 +78,48 @@ function useSseL0(): { meta: UtmMeta | null; l0: L0State | null } {
             utmStates: msg.utm_states,
             utmSymbolChars: msg.utm_symbol_chars,
           });
-          l0Ref.current = {
-            steps: msg.levels[0].steps,
-            state: msg.levels[0].state,
-            headPos: msg.levels[0].head_pos,
+          console.log('total: at 20941:', msg.levels[0].overwrites[29041]);
+          towerRef.current = msg.levels.map((level) => ({
+            steps: level.steps,
+            state: level.state,
+            headPos: level.head_pos,
             tape: Array.from(
               {
                 length: Math.max(
-                  msg.levels[0].head_pos,
-                  ...Object.keys(msg.levels[0].overwrites).map(Number),
+                  level.head_pos,
+                  ...Object.keys(level.overwrites).map(Number),
                 ),
               },
               (_, i) =>
-                msg.levels[0].overwrites[i] ??
+                level.overwrites[i] ??
                 unblemishedRef.current.charAt(i) ??
                 "_",
             ).join(""),
-          };
-          setExposedL0(l0Ref.current);
+          }));
+          setTower(towerRef.current);
           break;
         }
         case "delta": {
-          l0Ref.current = {
-            steps: msg.levels[0].steps,
-            state: msg.levels[0].state,
-            headPos: msg.levels[0].head_pos,
+          towerRef.current = msg.levels.map((level, depth) => ({
+            steps: level.steps,
+            state: level.state,
+            headPos: level.head_pos,
             tape: Array.from(
               {
                 length: Math.max(
-                  l0Ref.current?.tape.length ?? 0,
-                  msg.levels[0].head_pos,
-                  ...Object.keys(msg.levels[0].overwrites).map(Number),
+                  towerRef.current?.[depth]?.tape.length ?? 0,
+                  level.head_pos,
+                  ...Object.keys(level.overwrites).map(Number),
                 ),
               },
               (_, i) =>
-                msg.levels[0].overwrites[i] ??
-                l0Ref.current?.tape[i] ??
+                level.overwrites[i] ??
+                towerRef.current?.[depth]?.tape[i] ??
                 unblemishedRef.current[i] ??
                 "_",
             ).join(""),
-          };
-          setExposedL0(l0Ref.current);
+          }));
+          setTower(towerRef.current);
           break;
         }
       }
@@ -128,34 +129,21 @@ function useSseL0(): { meta: UtmMeta | null; l0: L0State | null } {
 
   return {
     meta,
-    l0: exposedL0,
+    tower,
   };
 }
 
 // ── Main component ──
 
 export function TowerView() {
-  const { meta, l0 } = useSseL0();
-  const towerRef = useRef<TowerLevel[]>([]);
-  const [tower, setTower] = useState<TowerLevel[] | null>(null);
+  const { meta, tower } = useSseTower();
 
-  useEffect(() => console.log({ l0 }), [l0]);
-  useEffect(() => console.log({ tower }), [tower]);
-
-  useEffect(() => {
-    if (l0 && meta) updateTower(l0, towerRef.current, meta);
-    setTower([...towerRef.current]);
-  }, [l0, meta]);
-
-  if (!l0 || !tower) {
+  if (!meta || !tower) {
     return <div style={{ padding: "16px" }}>Loading...</div>;
   }
 
   return (
     <div style={{ textAlign: "left", padding: "16px" }}>
-      <h2 style={{ marginBottom: "8px" }}>
-        Tower &mdash; {l0.steps.toLocaleString()} steps
-      </h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {tower.map((level, i) => {
           return (
