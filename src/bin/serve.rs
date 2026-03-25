@@ -16,7 +16,7 @@ use utmmmmm::tm::{
     Dir, RunningTMStatus, RunningTuringMachine, SimpleTuringMachineSpec, TapeExtender,
     TuringMachineSpec,
 };
-use utmmmmm::tower::Tower;
+use utmmmmm::tower::{Tower, TowerLevel};
 use utmmmmm::utm::{State, Symbol, UTM_SPEC};
 
 // ── Snapshot: shared between tower thread and SSE client threads ──
@@ -58,24 +58,30 @@ struct DeltaEventJson {
 
 // ── Build snapshot from decompiled L0 machine ──
 
-fn build_snapshot(
-    tower: &Tower<'_>,
-    total_steps: u64,
+fn build_snapshot<'a>(
+    tower: &'_ Tower<'a>,
     inf_extender: &mut InfiniteTapeExtender,
     reference: &mut Vec<Symbol>,
 ) -> Snapshot {
     let decompiled = tower.base.tm.spec.decompile(&tower.base.tm);
     inf_extender.extend(reference, decompiled.tape.len());
+    let it = std::iter::once(TowerLevel {
+        total_steps: tower.base.total_steps,
+        tm: tower.base.tm.spec.decompile(&tower.base.tm),
+    })
+    .chain(tower.decoded.iter().map(|l| l.clone()));
     Snapshot {
-        levels: vec![TowerLevelJson {
-            steps: total_steps,
-            head_pos: decompiled.pos,
-            state: format!("{:?}", decompiled.state),
-            overwrites: current_overwrites(&decompiled.tape, &reference)
-                .iter()
-                .map(|(&i, s)| (i, s.to_string().chars().next().unwrap()))
-                .collect::<HashMap<_, _>>(),
-        }],
+        levels: it
+            .map(|l| TowerLevelJson {
+                steps: l.total_steps,
+                head_pos: l.tm.pos,
+                state: format!("{:?}", l.tm.state),
+                overwrites: current_overwrites(&l.tm.tape, &reference)
+                    .iter()
+                    .map(|(&i, s)| (i, s.to_string().chars().next().unwrap()))
+                    .collect::<HashMap<_, _>>(),
+            })
+            .collect(),
     }
 }
 
@@ -128,13 +134,7 @@ fn sim_thread(
 
     // Initial snapshot
     {
-        let decompiled = compiled.decompile(&tower.base.tm);
-        let snap = Arc::new(build_snapshot(
-            &tower,
-            tower.base.total_steps,
-            &mut inf_extender,
-            &mut reference,
-        ));
+        let snap = Arc::new(build_snapshot(&tower, &mut inf_extender, &mut reference));
         publish(&latest, &sse_clients, snap);
     }
 
@@ -162,13 +162,7 @@ fn sim_thread(
             }
 
             if last_snapshot.elapsed() >= snapshot_interval {
-                let decompiled = compiled.decompile(&tower.base.tm);
-                let snap = Arc::new(build_snapshot(
-                    &tower,
-                    total_steps,
-                    &mut inf_extender,
-                    &mut reference,
-                ));
+                let snap = Arc::new(build_snapshot(&tower, &mut inf_extender, &mut reference));
                 publish(&latest, &sse_clients, snap);
                 last_snapshot = Instant::now();
             }

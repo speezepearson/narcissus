@@ -43,15 +43,6 @@ impl<'a> Tower<'a> {
         }
     }
 
-    pub fn as_vec(&'a self) -> Vec<UtmTowerLevel<'a>> {
-        let mut result: Vec<UtmTowerLevel> = vec![TowerLevel {
-            total_steps: self.base.total_steps,
-            tm: self.base.tm.spec.decompile(&self.base.tm),
-        }];
-        result.extend(self.decoded.iter().map(|l| l.clone()));
-        result
-    }
-
     pub fn step(
         &mut self,
         extender: &mut CompiledTapeExtender<SimpleTuringMachineSpec<State, Symbol>>,
