@@ -227,7 +227,11 @@ fn sse_client_thread(
 
     // Initialize client state from the total snapshot's overwrites
     let mut client_state = ClientLevelState {
-        overwrites: vec![initial.levels[0].overwrites.clone()],
+        overwrites: initial
+            .levels
+            .iter()
+            .map(|level| level.overwrites.clone())
+            .collect(),
     };
 
     // Stream delta events
@@ -237,10 +241,14 @@ fn sse_client_thread(
             levels: snapshot
                 .levels
                 .iter()
-                .map(|level| {
+                .enumerate()
+                .map(|(i, level)| {
+                    while client_state.overwrites.len() <= i {
+                        client_state.overwrites.push(HashMap::new());
+                    }
                     let new_overwrites = compute_new_overwrites(
                         &level.overwrites,
-                        &mut client_state,
+                        &mut client_state.overwrites[i],
                         &unblemished_syms
                             .iter()
                             .map(|s| s.to_string().chars().next().unwrap())

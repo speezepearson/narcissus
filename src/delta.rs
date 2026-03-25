@@ -23,7 +23,9 @@ impl<Sym: Copy + Eq + Hash> ClientLevelState<Sym> {
             .filter(|(_, (c, r))| c != r)
             .map(|(i, (&c, _))| (i, c))
             .collect();
-        Self { overwrites: vec![overwrites] }
+        Self {
+            overwrites: vec![overwrites],
+        }
     }
 }
 
@@ -45,14 +47,14 @@ pub fn current_overwrites<Sym: Copy + Eq + Hash>(
 /// and updates `client` to match `current`.
 pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
     current: &HashMap<usize, Sym>,
-    client: &mut ClientLevelState<Sym>,
+    client: &mut HashMap<usize, Sym>,
     reference: &[Sym],
 ) -> Vec<(usize, String)> {
     let mut new_overwrites = Vec::new();
 
     // Positions in current that differ from what client knows
     for (&pos, &sym) in current {
-        match client.overwrites[0].get(&pos) {
+        match client.get(&pos) {
             Some(&known) if known == sym => {} // unchanged
             _ => {
                 let mut s = String::new();
@@ -63,7 +65,7 @@ pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
     }
 
     // Positions client has that are no longer overwritten (reverted to unblemished)
-    for (&pos, _) in &client.overwrites[0] {
+    for (&pos, _) in client.iter() {
         if !current.contains_key(&pos) {
             let sym = reference[pos];
             let mut s = String::new();
@@ -73,7 +75,7 @@ pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
     }
 
     // Update client state to match current
-    client.overwrites[0] = current.clone();
+    *client = current.clone();
 
     new_overwrites.sort_by_key(|(pos, _)| *pos);
     new_overwrites
@@ -122,7 +124,7 @@ mod tests {
         ];
 
         let cur_1 = current_overwrites(&tape_1, &reference);
-        let delta_1 = compute_new_overwrites(&cur_1, &mut client, &reference);
+        let delta_1 = compute_new_overwrites(&cur_1, &mut client.overwrites[0], &reference);
 
         // Only position 2 is new
         assert_eq!(delta_1, vec![(2, "Y".to_string())]);
@@ -139,7 +141,7 @@ mod tests {
         ];
 
         let cur_2 = current_overwrites(&tape_2, &reference);
-        let delta_2 = compute_new_overwrites(&cur_2, &mut client, &reference);
+        let delta_2 = compute_new_overwrites(&cur_2, &mut client.overwrites[0], &reference);
 
         // Position 1 reverted (client gets unblemished value "1")
         // Position 3 newly overwritten with "*"
