@@ -22,10 +22,7 @@ use utmmmmm::utm::{State, Symbol, UTM_SPEC};
 // ── Snapshot: shared between tower thread and SSE client threads ──
 
 struct Snapshot {
-    total_steps: u64,
-    head_pos: usize,
-    state: String,
-    overwrites: HashMap<usize, Symbol>,
+    levels: Vec<TowerLevelJson>,
 }
 
 type SseClient = mpsc::Sender<Arc<Snapshot>>;
@@ -33,7 +30,7 @@ type SseClients = Arc<Mutex<Vec<SseClient>>>;
 
 // ── JSON event types ──
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct TowerLevelJson {
     steps: u64,
     head_pos: usize,
@@ -69,10 +66,12 @@ fn build_snapshot(
 ) -> Snapshot {
     inf_extender.extend(reference, decompiled.tape.len());
     Snapshot {
-        total_steps,
-        head_pos: decompiled.pos,
-        state: format!("{:?}", decompiled.state),
-        overwrites: current_overwrites(&decompiled.tape, reference),
+        levels: vec![TowerLevelJson {
+            steps: total_steps,
+            head_pos: decompiled.pos,
+            state: format!("{:?}", decompiled.state),
+            overwrites: current_overwrites(&decompiled.tape, &reference).iter().map(|(&i, s)| (i, s.to_string().chars().next().unwrap())).collect::<HashMap<_, _>>(),
+        }],
     }
 }
 
@@ -216,16 +215,7 @@ fn sse_client_thread(
         unblemished: (*unblemished_str).clone(),
         utm_states: (*utm_states).clone(),
         utm_symbol_chars: (*utm_symbol_chars).clone(),
-        levels: vec![TowerLevelJson {
-            steps: initial.total_steps,
-            state: initial.state.clone(),
-            head_pos: initial.head_pos,
-            overwrites: initial
-                .overwrites
-                .iter()
-                .map(|(&pos, s)| (pos, s.to_string().chars().next().unwrap()))
-                .collect::<HashMap<_, _>>(),
-        }],
+        levels: initial.levels.clone(),
     };
     let json = serde_json::to_string(&total).unwrap();
     if write!(writer, "data: {}\n\n", json).is_err() || writer.flush().is_err() {
@@ -234,22 +224,22 @@ fn sse_client_thread(
 
     // Initialize client state from the total snapshot's overwrites
     let mut client_state = ClientLevelState {
-        overwrites: initial.overwrites.clone(),
+        overwrites: initial.levels[0].overwrites.clone(),
     };
 
     // Stream delta events
     while let Ok(snapshot) = rx.recv() {
         let new_overwrites =
-            compute_new_overwrites(&snapshot.overwrites, &mut client_state, &unblemished_syms);
+            compute_new_overwrites(&snapshot.levels[0].overwrites, &mut client_state, &unblemished_syms.iter().map(|s| s.to_string().chars().next().unwrap()).collect::<Vec<_>>());
         let delta = DeltaEventJson {
             event_type: "delta",
             levels: vec![TowerLevelJson {
-                steps: snapshot.total_steps,
-                state: snapshot.state.clone(),
-                head_pos: snapshot.head_pos,
+                steps: snapshot.levels[0].steps,
+                state: snapshot.levels[0].state.clone(),
+                head_pos: snapshot.levels[0].head_pos,
                 overwrites: new_overwrites
                     .into_iter()
-                    .map(|(pos, s)| (pos, s.chars().next().unwrap()))
+                    .map(|(pos, s)| (pos, s.to_string().chars().next().unwrap()))
                     .collect::<HashMap<_, _>>(),
             }],
         };
