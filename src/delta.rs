@@ -4,13 +4,13 @@ use std::hash::Hash;
 
 /// Per-level client state: the overwrites the client currently has applied.
 pub struct ClientLevelState<Sym> {
-    pub overwrites: HashMap<usize, Sym>,
+    pub overwrites: Vec<HashMap<usize, Sym>>,
 }
 
 impl<Sym: Copy + Eq + Hash> ClientLevelState<Sym> {
     pub fn new() -> Self {
         Self {
-            overwrites: HashMap::new(),
+            overwrites: vec![HashMap::new()],
         }
     }
 
@@ -23,7 +23,7 @@ impl<Sym: Copy + Eq + Hash> ClientLevelState<Sym> {
             .filter(|(_, (c, r))| c != r)
             .map(|(i, (&c, _))| (i, c))
             .collect();
-        Self { overwrites }
+        Self { overwrites: vec![overwrites] }
     }
 }
 
@@ -52,7 +52,7 @@ pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
 
     // Positions in current that differ from what client knows
     for (&pos, &sym) in current {
-        match client.overwrites.get(&pos) {
+        match client.overwrites[0].get(&pos) {
             Some(&known) if known == sym => {} // unchanged
             _ => {
                 let mut s = String::new();
@@ -63,7 +63,7 @@ pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
     }
 
     // Positions client has that are no longer overwritten (reverted to unblemished)
-    for (&pos, _) in &client.overwrites {
+    for (&pos, _) in &client.overwrites[0] {
         if !current.contains_key(&pos) {
             let sym = reference[pos];
             let mut s = String::new();
@@ -73,7 +73,7 @@ pub fn compute_new_overwrites<Sym: Copy + Eq + Hash + Display>(
     }
 
     // Update client state to match current
-    client.overwrites = current.clone();
+    client.overwrites[0] = current.clone();
 
     new_overwrites.sort_by_key(|(pos, _)| *pos);
     new_overwrites
@@ -109,8 +109,8 @@ mod tests {
 
         // Client state after total = overwrites relative to reference
         let mut client = ClientLevelState::from_tape(&tape_0, &reference);
-        assert_eq!(client.overwrites.len(), 1);
-        assert_eq!(client.overwrites[&1], Symbol::X);
+        assert_eq!(client.overwrites[0].len(), 1);
+        assert_eq!(client.overwrites[0][&1], Symbol::X);
 
         // === Delta 1: position 2 also changed to Y ===
         let tape_1 = vec![
@@ -127,7 +127,7 @@ mod tests {
         // Only position 2 is new
         assert_eq!(delta_1, vec![(2, "Y".to_string())]);
         // Client now knows about {1: X, 2: Y}
-        assert_eq!(client.overwrites.len(), 2);
+        assert_eq!(client.overwrites[0].len(), 2);
 
         // === Delta 2: position 1 reverted, position 3 changed to Star ===
         let tape_2 = vec![
@@ -146,9 +146,9 @@ mod tests {
         // Position 2 unchanged, not included
         assert_eq!(delta_2, vec![(1, "1".to_string()), (3, "*".to_string())]);
         // Client now knows about {2: Y, 3: Star}
-        assert_eq!(client.overwrites.len(), 2);
-        assert_eq!(client.overwrites.get(&1), None);
-        assert_eq!(client.overwrites[&2], Symbol::Y);
-        assert_eq!(client.overwrites[&3], Symbol::Star);
+        assert_eq!(client.overwrites[0].len(), 2);
+        assert_eq!(client.overwrites[0].get(&1), None);
+        assert_eq!(client.overwrites[0][&2], Symbol::Y);
+        assert_eq!(client.overwrites[0][&3], Symbol::Star);
     }
 }

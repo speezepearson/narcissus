@@ -227,7 +227,7 @@ fn sse_client_thread(
 
     // Initialize client state from the total snapshot's overwrites
     let mut client_state = ClientLevelState {
-        overwrites: initial.levels[0].overwrites.clone(),
+        overwrites: vec![initial.levels[0].overwrites.clone()],
     };
 
     // Stream delta events
