@@ -2,17 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   copySnapshot,
   getStatus,
+  State,
   step,
   type TuringMachineSnapshot,
 } from "./types";
 import { usePlayPause } from "./usePlayPause";
 
-export function useTuringMachine<State extends string, Symbol extends string>(
-  init: TuringMachineSnapshot<State, Symbol>,
+export function useTuringMachine(
+  init: TuringMachineSnapshot,
   opts?: {
     onStateChange?: (
       oldState: State,
-      cur: TuringMachineSnapshot<State, Symbol>,
+      cur: TuringMachineSnapshot,
     ) => void;
   },
 ) {
@@ -35,11 +36,11 @@ export function useTuringMachine<State extends string, Symbol extends string>(
     statusRef.current = status;
   }, [status]);
 
-  const publish = useCallback((snap: TuringMachineSnapshot<State, Symbol>) => {
+  const publish = useCallback((snap: TuringMachineSnapshot) => {
     const st = getStatus(snap);
     snapRef.current = snap;
     statusRef.current = st;
-    setSnapshot({ ...snap });
+    setSnapshot({ ...snap, tape: snap.tape.slice() });
     setStatus(st);
   }, []);
 

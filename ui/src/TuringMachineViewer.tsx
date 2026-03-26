@@ -3,21 +3,18 @@ import { TapeView } from "./TapeView";
 import { type TuringMachineSnapshot } from "./types";
 import { useTuringMachine } from "./useTuringMachine";
 
-type TuringMachineViewerProps<State extends string, Symbol extends string> = {
-  init: TuringMachineSnapshot<State, Symbol>;
+type TuringMachineViewerProps = {
+  init: TuringMachineSnapshot;
 };
 
-export function TuringMachineViewer<
-  State extends string,
-  Symbol extends string,
->({ init }: TuringMachineViewerProps<State, Symbol>) {
+export function TuringMachineViewer({ init }: TuringMachineViewerProps) {
   const { snapshot, status, playPause, doStep, reset } = useTuringMachine(init);
 
   const halted = status !== "running";
 
   return (
     <div className="tm-viewer">
-      <TapeView tm={snapshot} radius={40} />
+      <TapeView tm={snapshot} />
 
       {halted && (
         <div className={`tm-result tm-result-${status}`}>

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
-import { makeInitSnapshot, makeSimpleTapeOverlay } from "./types";
+import { makeInitSnapshot, Symbol } from "./types";
 import { machineSpecs } from "./parseSpec";
 
 export function MachineExplorer() {
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [tapeInput, setTapeInput] = useState("");
+  const [tapeInput, setTapeInput] = useState<readonly Symbol[]>([]);
 
   const selected = machineSpecs[selectedIdx];
 
@@ -34,13 +34,8 @@ export function MachineExplorer() {
     if (invalidChars.length > 0) return null;
     const { spec } = selected;
 
-    const tapeSymbols = [...tapeInput];
 
-    const overlay = makeSimpleTapeOverlay<string>((i) =>
-      i >= 0 && i < tapeSymbols.length ? tapeSymbols[i] : undefined,
-    );
-
-    return makeInitSnapshot(spec, overlay);
+    return makeInitSnapshot(spec, tapeInput);
   }, [selected, tapeInput, invalidChars]);
 
   return (
@@ -54,7 +49,7 @@ export function MachineExplorer() {
             value={selectedIdx}
             onChange={(e) => {
               setSelectedIdx(Number(e.target.value));
-              setTapeInput("");
+              setTapeInput([]);
             }}
           >
             {machineSpecs.map((s, i) => (
@@ -87,7 +82,7 @@ export function MachineExplorer() {
         <input
           type="text"
           value={tapeInput}
-          onChange={(e) => setTapeInput(e.target.value)}
+          onChange={(e) => setTapeInput(Symbol.array().parse(e.target.value.split("")))}
           placeholder={`Type using: ${inputSymbolChars.map(([, ch]) => ch).join("")}`}
           spellCheck={false}
         />

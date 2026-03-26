@@ -46,23 +46,77 @@ pub static REJECT_IMMEDIATELY_SPEC: LazyLock<SimpleTuringMachineSpec<RejImmState
     });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub     enum Letter {
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+}
+fn all_letters() -> [Letter; 26] {
+    [
+        Letter::A,
+        Letter::B,
+        Letter::C,
+        Letter::D,
+        Letter::E,
+        Letter::F,
+        Letter::G,
+        Letter::H,
+        Letter::I,
+        Letter::J,
+        Letter::K,
+        Letter::L,
+        Letter::M,
+        Letter::N,
+        Letter::O,
+        Letter::P,
+        Letter::Q,
+        Letter::R,
+        Letter::S,
+        Letter::T,
+        Letter::U,
+        Letter::V,
+        Letter::W,
+        Letter::X,
+        Letter::Y,
+        Letter::Z,
+    ]
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckPalindromeState {
     Start,
     Accept,
     SeekL,
-    SeekRA,
-    SeekRB,
-    SeekRC,
-    CheckA,
-    CheckB,
-    CheckC,
+    SeekR(Letter),
+    Check(Letter),
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckPalindromeSymbol {
     Blank,
-    A,
-    B,
-    C,
+    Letter(Letter),
 }
 
 pub static CHECK_PALINDROME_SPEC: LazyLock<
@@ -71,12 +125,6 @@ pub static CHECK_PALINDROME_SPEC: LazyLock<
     use CheckPalindromeState::*;
     use CheckPalindromeSymbol::*;
 
-    let letter_triplets = [
-        (A, CheckA, SeekRA),
-        (B, CheckB, SeekRB),
-        (C, CheckC, SeekRC),
-    ];
-
     let mut transitions: HashMap<
         (CheckPalindromeState, CheckPalindromeSymbol),
         (CheckPalindromeState, CheckPalindromeSymbol, Dir),
@@ -84,27 +132,27 @@ pub static CHECK_PALINDROME_SPEC: LazyLock<
 
     // start rules
     transitions.insert((Start, Blank), (Accept, Blank, Dir::Right));
-    transitions.insert((Start, A), (SeekRA, Blank, Dir::Right));
-    transitions.insert((Start, B), (SeekRB, Blank, Dir::Right));
-    transitions.insert((Start, C), (SeekRC, Blank, Dir::Right));
+    for letter in all_letters() {
+        transitions.insert((Start, Letter(letter)), (SeekR(letter), Blank, Dir::Right));
+    }
 
-    for (_letter, check, seek) in letter_triplets {
-        transitions.insert((seek, Blank), (check, Blank, Dir::Left));
-        for (l2, _, _) in letter_triplets {
-            transitions.insert((seek, l2), (seek, l2, Dir::Right));
+    for letter in all_letters() {
+        transitions.insert((SeekR(letter), Blank), (Check(letter), Blank, Dir::Left));
+        for l2 in all_letters() {
+            transitions.insert((SeekR(letter), Letter(l2)), (SeekR(letter), Letter(l2), Dir::Right));
         }
     }
 
     // check_x rules
-    for (letter, check, _seek) in letter_triplets {
-        transitions.insert((check, Blank), (Accept, Blank, Dir::Right));
-        transitions.insert((check, letter), (SeekL, Blank, Dir::Left));
+    for letter in all_letters() {
+        transitions.insert((Check(letter), Blank), (Accept, Blank, Dir::Right));
+        transitions.insert((Check(letter), Letter(letter)), (SeekL, Blank, Dir::Left));
     }
 
     // seekL rules
     transitions.insert((SeekL, Blank), (Start, Blank, Dir::Right));
-    for (letter, _, _) in letter_triplets {
-        transitions.insert((SeekL, letter), (SeekL, letter, Dir::Left));
+    for letter in all_letters() {
+        transitions.insert((SeekL, Letter(letter)), (SeekL, Letter(letter), Dir::Left));
     }
 
     SimpleTuringMachineSpec {
@@ -112,23 +160,27 @@ pub static CHECK_PALINDROME_SPEC: LazyLock<
         accepting: HashSet::from([CheckPalindromeState::Accept]),
         blank: CheckPalindromeSymbol::Blank,
         transitions: HashMap::from(transitions),
-        all_states: vec![
+        all_states: {
+            let mut v = vec![
             CheckPalindromeState::Start,
             CheckPalindromeState::Accept,
             CheckPalindromeState::SeekL,
-            CheckPalindromeState::SeekRA,
-            CheckPalindromeState::SeekRB,
-            CheckPalindromeState::SeekRC,
-            CheckPalindromeState::CheckA,
-            CheckPalindromeState::CheckB,
-            CheckPalindromeState::CheckC,
-        ],
-        all_symbols: vec![
+            ];
+            for letter in all_letters() {
+                v.push(CheckPalindromeState::SeekR(letter));
+                v.push(CheckPalindromeState::Check(letter));
+            }
+            v
+        },
+        all_symbols: {
+            let mut v = vec![
             CheckPalindromeSymbol::Blank,
-            CheckPalindromeSymbol::A,
-            CheckPalindromeSymbol::B,
-            CheckPalindromeSymbol::C,
-        ],
+            ];
+            for letter in all_letters() {
+                v.push(CheckPalindromeSymbol::Letter(letter));
+            }
+            v
+        },
     }
 });
 
@@ -249,27 +301,30 @@ mod tests {
 
     #[test]
     fn check_palindrome_accepts_odd_length_palindrome() {
+        use super::Letter::*;
         use CheckPalindromeSymbol::*;
         let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
-        tm.tape = vec![A, B, C, B, A];
+        tm.tape = [A, B, C, B, A].map(Letter).to_vec();
         let result = run_tm(&mut tm, 1000, None);
         assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
     }
 
     #[test]
     fn check_palindrome_accepts_even_length_palindrome() {
+        use super::Letter::*;
         use CheckPalindromeSymbol::*;
         let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
-        tm.tape = vec![A, B, B, A];
+        tm.tape = [A, B, B, A].map(Letter).to_vec();
         let result = run_tm(&mut tm, 1000, None);
         assert!(matches!(result, Ok(HaltReason::Accepted { .. })));
     }
 
     #[test]
     fn check_palindrome_rejects_non_palindrome() {
+        use super::Letter::*;
         use CheckPalindromeSymbol::*;
         let mut tm = RunningTuringMachine::new(&*CHECK_PALINDROME_SPEC);
-        tm.tape = vec![A, B, C, A];
+        tm.tape = [A, B, C, A].map(Letter).to_vec();
         let result = run_tm(&mut tm, 1000, None);
         assert!(matches!(result, Ok(HaltReason::Rejected { .. })));
     }

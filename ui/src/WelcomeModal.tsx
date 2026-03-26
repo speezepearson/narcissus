@@ -1,25 +1,24 @@
 import { useMemo, useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
-import { makeInitSnapshot, makeSimpleTapeOverlay } from "./types";
+import { makeInitSnapshot, Symbol } from "./types";
 import { machineSpecs } from "./parseSpec";
 
 const STORAGE_KEY = "welcomeModalDismissed";
-const PALINDROME_INPUT = "ABCBA";
 
 export function WelcomeModal() {
   const [visible, setVisible] = useState(
-    () => !localStorage.getItem(STORAGE_KEY),
+    true // () => !localStorage.getItem(STORAGE_KEY),
   );
+
+  const [palindromeInput, setPalindromeInput] = useState("racecar");
 
   const snapshot = useMemo(() => {
     const parsed = machineSpecs.find((s) => s.name === "Check Palindrome");
-    if (!parsed) return null;
-    const tapeSymbols = [...PALINDROME_INPUT];
-    const overlay = makeSimpleTapeOverlay<string>((i) =>
-      i >= 0 && i < tapeSymbols.length ? tapeSymbols[i] : undefined,
-    );
-    return makeInitSnapshot(parsed.spec, overlay);
-  }, []);
+    if (!parsed) throw new Error("Check Palindrome spec not found");
+    const tapeSymbols = [...palindromeInput];
+    return makeInitSnapshot(parsed.spec, tapeSymbols.map(c => Symbol.parse(c)));
+  }, [palindromeInput]);
+
 
   if (!visible) return null;
 
@@ -55,15 +54,38 @@ export function WelcomeModal() {
       >
         <h2 style={{ marginTop: 0 }}>Welcome to the Self-Simulating Tower!</h2>
 
-        <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
-          Here is a Turing machine:
+        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
+          Here's a Turing machine:
         </p>
 
-        {snapshot && <TuringMachineViewer init={snapshot} />}
+        <TuringMachineViewer key={palindromeInput} init={snapshot} />
+
+        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
+          It's a very simple mechanism: the machine has some list of "states" it can be in,
+          and it's pointed at a "tape" full of cells, each cell containing one of some fixed set of symbols
+          (in this case, "blank" or a letter).
+          At each time step, the machine looks at the cell it's pointed at, and depending on that symbol and the state it's in,
+          changes to a new state, writes a new symbol, and moves left or right.
+        </p>
+
+        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
+          This 
+        </p>
+
+        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
+          You can run it on input of your choice:
+          <input
+            type="text"
+            value={palindromeInput}
+            onChange={(e) => setPalindromeInput(e.target.value)}
+            style={{ marginLeft: "8px", width: "100%" }}
+          />
+        </p>
 
         <button
           onClick={dismiss}
           style={{
+            marginTop: "16px",
             fontFamily: "var(--mono)",
             fontSize: "14px",
             padding: "8px 20px",
@@ -74,7 +96,7 @@ export function WelcomeModal() {
             cursor: "pointer",
           }}
         >
-          Got it
+          Close
         </button>
       </div>
     </div>

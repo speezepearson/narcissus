@@ -1,41 +1,43 @@
 import { z } from "zod";
-import { type Dir, type TuringMachineSpec } from "./types";
+import { type Dir, type TuringMachineSpec ,State, Symbol} from "./types";
 import rawSpecs from "./machine-specs.json";
 
 const DirSchema = z.literal("L").or(z.literal("R"));
 const RuleTriple = z.tuple([z.string(), z.string(), DirSchema]);
+const SymbolName = z.string().brand<"SymbolName">();
+type SymbolName = z.infer<typeof SymbolName>;
 
 const JsonSpecSchema = z.object({
   name: z.string(),
   description: z.string(),
-  allStates: z.array(z.string()),
-  allSymbols: z.array(z.string()),
-  initial: z.string(),
-  acceptingStates: z.array(z.string()),
-  blank: z.string(),
-  rules: z.record(z.string(), z.record(z.string(), RuleTriple)),
-  symbolChars: z.record(z.string(), z.string()),
+    allStates: z.array(State),
+  allSymbols: z.array(Symbol),
+  initial: State,
+  acceptingStates: z.array(State),
+  blank: SymbolName,
+  rules: z.record(State, z.record(SymbolName, RuleTriple)),
+  symbolChars: z.record(z.string(), Symbol),
 });
 type JsonSpec = z.infer<typeof JsonSpecSchema>;
 
 export type ParsedSpec = {
   name: string;
   description: string;
-  spec: TuringMachineSpec<string, string>;
-  symbolChars: Record<string, string>;
-  blank: string;
+  spec: TuringMachineSpec;
+  symbolChars: Record<SymbolName, Symbol>;
+  blank: SymbolName;
 };
 
 function parseSpec(json: JsonSpec): ParsedSpec {
   const sc = json.symbolChars; // rustName -> displayChar
 
-  const rules = new Map<string, Map<string, [string, string, Dir]>>();
+  const rules = new Map<State, Map<Symbol, [State, Symbol, Dir]>>();
   for (const [state, symbolMap] of Object.entries(json.rules)) {
-    const inner = new Map<string, [string, string, Dir]>();
+    const inner = new Map<Symbol, [State, Symbol, Dir]>();
     for (const [symbol, [ns, nsym, dir]] of Object.entries(symbolMap)) {
-      inner.set(sc[symbol], [ns, sc[nsym], dir]);
+      inner.set(sc[symbol], [State.parse(ns), sc[nsym], dir]);
     }
-    rules.set(state, inner);
+    rules.set(State.parse(state), inner);
   }
 
   return {
