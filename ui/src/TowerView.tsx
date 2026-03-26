@@ -180,10 +180,8 @@ function TowerLevelView({ level, name }: { level: TowerLevel; name: string }) {
         }}
         dangerouslySetInnerHTML={{
           __html:
-            colorizeTape(
-              level.tape,
-              level.headPos,
-            ) + " &nbsp;&nbsp;&nbsp; and so on",
+            colorizeTape(level.tape, level.headPos) +
+            " &nbsp;&nbsp;&nbsp; and so on",
         }}
       />
     </div>

@@ -65,9 +65,7 @@ export function getStatus(
   return "reject";
 }
 
-export function step(
-  tm: TuringMachineSnapshot,
-): TuringMachineSnapshot {
+export function step(tm: TuringMachineSnapshot): TuringMachineSnapshot {
   const rule = getRule(tm);
   if (!rule) return tm;
 

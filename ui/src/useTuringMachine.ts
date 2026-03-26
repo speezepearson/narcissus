@@ -11,10 +11,7 @@ import { usePlayPause } from "./usePlayPause";
 export function useTuringMachine(
   init: TuringMachineSnapshot,
   opts?: {
-    onStateChange?: (
-      oldState: State,
-      cur: TuringMachineSnapshot,
-    ) => void;
+    onStateChange?: (oldState: State, cur: TuringMachineSnapshot) => void;
     initialFps?: number;
   },
 ) {
@@ -39,7 +36,7 @@ export function useTuringMachine(
 
   const publish = useCallback((snap: TuringMachineSnapshot) => {
     const st = getStatus(snap);
-    while (snapRef.current.tape.length < snapRef.current.pos+1) {
+    while (snapRef.current.tape.length < snapRef.current.pos + 1) {
       snapRef.current.tape.push(snapRef.current.spec.blank);
     }
     snapRef.current = snap;

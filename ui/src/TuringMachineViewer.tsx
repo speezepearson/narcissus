@@ -9,21 +9,20 @@ type TuringMachineViewerProps = {
   initialFps?: number;
 };
 
-export function TuringMachineViewer({ init, onStateChange, initialFps }: TuringMachineViewerProps) {
-  const { snapshot, status, playPause, doStep, reset } = useTuringMachine(init, { onStateChange, initialFps });
+export function TuringMachineViewer({
+  init,
+  onStateChange,
+  initialFps,
+}: TuringMachineViewerProps) {
+  const { snapshot, status, playPause, doStep, reset } = useTuringMachine(
+    init,
+    { onStateChange, initialFps },
+  );
 
   const halted = status !== "running";
 
   return (
     <div className="tm-viewer">
-      <TapeView tm={snapshot} />
-
-      {halted && (
-        <div className={`tm-result tm-result-${status}`}>
-          {status.toUpperCase()}
-        </div>
-      )}
-
       <div className="tm-controls">
         <button onClick={doStep} disabled={halted}>
           Step
@@ -40,6 +39,14 @@ export function TuringMachineViewer({ init, onStateChange, initialFps }: TuringM
           max={10000000}
         />
       </div>
+
+      <TapeView tm={snapshot} />
+
+      {halted && (
+        <div className={`tm-result tm-result-${status}`}>
+          {status.toUpperCase()}
+        </div>
+      )}
     </div>
   );
 }

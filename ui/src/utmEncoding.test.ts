@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getStatus,
-  makeInitSnapshot,
-  run,
-  Symbol,
-} from "./types";
+import { getStatus, makeInitSnapshot, run, Symbol } from "./types";
 import { machineSpecs } from "./parseSpec";
 import { decodeFromUtm, encodeForUtm } from "./utmEncoding";
 

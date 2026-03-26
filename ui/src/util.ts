@@ -1,8 +1,4 @@
-import {
-  type StateIdx,
-  type SymbolIdx,
-  type TapeIdx,
-} from "./types";
+import { type StateIdx, type SymbolIdx, type TapeIdx } from "./types";
 
 export function tapesEqual<Tape extends readonly string[]>(
   a: Tape,

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
-import { makeInitSnapshot, type State, type TuringMachineSnapshot } from "./types";
+import {
+  makeInitSnapshot,
+  type State,
+  type TuringMachineSnapshot,
+} from "./types";
 import { machineSpecs } from "./parseSpec";
 import { TapeInput, useTapeInput } from "./TapeInput";
 import { decodeFromUtm, encodeForUtm } from "./utmEncoding";
@@ -18,7 +22,7 @@ const utmSpec = getSpec("Universal Turing Machine");
 
 export function WelcomeModal() {
   const [visible, setVisible] = useState(
-    true // () => !localStorage.getItem(STORAGE_KEY),
+    true, // () => !localStorage.getItem(STORAGE_KEY),
   );
 
   const [flipBitsInput, setFlipBitsInput] = useState("010101");
@@ -45,7 +49,8 @@ export function WelcomeModal() {
     return decodeFromUtm(flipBitsSpec.spec, utm1Snapshot.tape);
   }, [utm1Snapshot]);
 
-  const [decodedFromL1, setDecodedFromL1] = useState<TuringMachineSnapshot | null>(null);
+  const [decodedFromL1, setDecodedFromL1] =
+    useState<TuringMachineSnapshot | null>(null);
 
   useEffect(() => {
     setDecodedFromL1(initialDecodedL1);
@@ -132,26 +137,58 @@ export function WelcomeModal() {
       >
         <h2 style={{ marginTop: 0 }}>Welcome to the Self-Simulating Tower!</h2>
 
-        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
-          Here's a simple Turing machine (you know what a <a href="https://en.wikipedia.org/wiki/Turing_machine">Turing machine</a> is, right?),
-          which flips all the bits on its tape:
+        <p
+          style={{ textAlign: "left", marginBottom: "16px", lineHeight: "1.6" }}
+        >
+          Here's a simple Turing machine (you know what a{" "}
+          <a href="https://en.wikipedia.org/wiki/Turing_machine">
+            Turing machine
+          </a>{" "}
+          is, right?), which flips all the bits on its tape:
         </p>
 
-        {snapshot && <TuringMachineViewer key={flipBitsInput} init={snapshot} initialFps={5} />}
+        {snapshot && (
+          <TuringMachineViewer
+            key={flipBitsInput}
+            init={snapshot}
+            initialFps={5}
+          />
+        )}
 
-        <TapeInput parsed={flipBitsSpec} value={flipBitsInput} onChange={setFlipBitsInput} />
+        <TapeInput
+          parsed={flipBitsSpec}
+          value={flipBitsInput}
+          onChange={setFlipBitsInput}
+        />
 
         <hr style={{ margin: "3em 0" }} />
 
-        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
-          Here's a universal Turing machine simulating the same flip-bits machine on the same input:
+        <p
+          style={{ textAlign: "left", marginBottom: "16px", lineHeight: "1.6" }}
+        >
+          Here's a universal Turing machine simulating the same flip-bits
+          machine on the same input:
         </p>
 
-        {utm1Snapshot && <TuringMachineViewer key={`utm1-${flipBitsInput}`} init={utm1Snapshot} onStateChange={onUtm1StateChange} initialFps={100} />}
+        {utm1Snapshot && (
+          <TuringMachineViewer
+            key={`utm1-${flipBitsInput}`}
+            init={utm1Snapshot}
+            onStateChange={onUtm1StateChange}
+            initialFps={30}
+          />
+        )}
 
         {decodedFromL1 && (
           <>
-            <p style={{ textAlign: 'left', marginBottom: "8px", marginTop: "16px", lineHeight: "1.6" }}>
+            <p
+              style={{
+                textAlign: "left",
+                marginBottom: "8px",
+                marginTop: "16px",
+                lineHeight: "1.6",
+              }}
+            >
               Decoded from the UTM's tape:
             </p>
             <TapeView tm={decodedFromL1} />
@@ -160,26 +197,85 @@ export function WelcomeModal() {
 
         <hr style={{ margin: "3em 0" }} />
 
-        <p style={{ textAlign: 'left', marginBottom: "16px", lineHeight: "1.6" }}>
-          Here's a UTM simulating that one:
+        <p
+          style={{ textAlign: "left", marginBottom: "16px", lineHeight: "1.6" }}
+        >
+          You can kinda see how it works:
+          <ul>
+            <li>
+              It has a description of all the simulated machine's state
+              transitions: <code>.0|10|0|01|R;</code> means "if you're in state
+              0, and you see symbol 10, then stay in state 0, and write symbol
+              01, and move right."
+            </li>
+            <li>
+              After the next <code>#</code>s, there's: the list of accepting
+              states (here, just state 1); the machine's current state (starting
+              in state 0); the machine's "blank" symbol that should be used to
+              fill in the right-hand side of the tape;
+            </li>
+            <li>
+              ...and, finally, the simulated machine's encoded tape, stretching
+              off to infinity. Each cell is delimited with a comma (or, for the
+              cell the simulated machine's head is pointing at, <code>^</code>).
+            </li>
+          </ul>
+          The UTM, simulating the machine, spends almost all of its time going
+          through the rule list trying to find which one matches the simulated
+          machine's current [state+symbol], going back and forth between [the
+          rule it's currently checking] and [the simulated state/head sections],
+          comparing one bit at a time.
+        </p>
+
+        <p
+          style={{ textAlign: "left", marginBottom: "16px", lineHeight: "1.6" }}
+        >
+          I find it pleasantly mesmerizing to watch.
+        </p>
+
+        <p
+          style={{ textAlign: "left", marginBottom: "16px", lineHeight: "1.6" }}
+        >
+          Anyway, here's a UTM simulating that one:
         </p>
 
         <div style={{ fontSize: "0.3em" }}>
+          {utm2Snapshot && (
+            <TuringMachineViewer
+              key={`utm2-${flipBitsInput}`}
+              init={utm2Snapshot}
+              onStateChange={onUtm2StateChange}
+              initialFps={10000000}
+            />
+          )}
+        </div>
 
-        {utm2Snapshot && <TuringMachineViewer key={`utm2-${flipBitsInput}`} init={utm2Snapshot} onStateChange={onUtm2StateChange} initialFps={10000000} />}
-
-{decodedFromL2 && (
-  <>
-    <p style={{ textAlign: 'left', marginBottom: "8px", marginTop: "16px", lineHeight: "1.6" }}>
-      Decoded (middle UTM):
-    </p>
-    <TapeView tm={decodedFromL2.l1} />
-    <p style={{ textAlign: 'left', marginBottom: "8px", marginTop: "8px", lineHeight: "1.6" }}>
-      Decoded (bit-flipper):
-    </p>
-    <TapeView tm={decodedFromL2.l0} />
-  </>
-)}</div>
+          {decodedFromL2 && (
+            <>
+              <p
+                style={{
+                  textAlign: "left",
+                  marginBottom: "8px",
+                  marginTop: "16px",
+                  lineHeight: "1.6",
+                }}
+              >
+                Decoded (middle UTM):
+              </p>
+              <TapeView tm={decodedFromL2.l1} />
+              <p
+                style={{
+                  textAlign: "left",
+                  marginBottom: "8px",
+                  marginTop: "8px",
+                  lineHeight: "1.6",
+                }}
+              >
+                Decoded (bit-flipper):
+              </p>
+              <TapeView tm={decodedFromL2.l0} />
+            </>
+          )}
 
         <button
           onClick={dismiss}

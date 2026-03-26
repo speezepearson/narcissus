@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Dir, type TuringMachineSpec ,State, Symbol} from "./types";
+import { type Dir, type TuringMachineSpec, State, Symbol } from "./types";
 import rawSpecs from "./machine-specs.json";
 
 const DirSchema = z.literal("L").or(z.literal("R"));
@@ -10,7 +10,7 @@ type SymbolName = z.infer<typeof SymbolName>;
 const JsonSpecSchema = z.object({
   name: z.string(),
   description: z.string(),
-    allStates: z.array(State),
+  allStates: z.array(State),
   allSymbols: z.array(Symbol),
   initial: State,
   acceptingStates: z.array(State),

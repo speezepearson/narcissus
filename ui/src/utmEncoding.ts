@@ -33,7 +33,11 @@ function toBinary(index: number, width: number): Symbol[] {
   return bits;
 }
 
-function fromBinary(tape: readonly Symbol[], start: number, width: number): number {
+function fromBinary(
+  tape: readonly Symbol[],
+  start: number,
+  width: number,
+): number {
   let val = 0;
   for (let i = 0; i < width; i++) {
     const b = tape[start + i];
