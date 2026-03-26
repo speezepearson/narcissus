@@ -3,14 +3,16 @@
 }
 
 .tm-tape {
+  text-align: left;
   font-family: var(--mono);
   font-size: 18px;
   line-height: 1.5;
   background: var(--code-bg);
   padding: 16px;
   border-radius: 8px;
-  overflow-x: auto;
   margin: 8px 0;
+  overflow-x: wrap;
+  word-wrap: break-all;
 }
 
 .tm-result {

@@ -1,28 +1,21 @@
 import { useMemo } from "react";
 import { type TuringMachineSnapshot } from "./types";
+import { colorizeTape } from "./colorizeTape";
 
 type TapeViewProps = {
   tm: TuringMachineSnapshot;
 };
 
 export function TapeView({ tm }: TapeViewProps) {
-  // Build tape display — pad with blanks so head is always visible
-  const displayTape = useMemo(
-    () => tm.tape.join(""),
-    [tm.tape],
+  const colorizedHtml = useMemo(
+    () => colorizeTape(tm.tape as string[], tm.pos),
+    [tm.tape, tm.pos],
   );
-  const pointerLine =
-    " ".repeat(tm.pos) + `^ ${tm.state}`;
 
   return (
-    <pre className="tm-tape">
-      <code>
-        {displayTape} ...
-      </code>
-      {"\n"}
-      <code>
-        {pointerLine}
-      </code>
-    </pre>
+    <div className="tm-tape">
+      <div style={{ fontSize: "0.8em", opacity: 0.7, marginBottom: "2px", wordBreak: "break-all" }}>{tm.state}</div>
+      <div  style={{ wordBreak: "break-all" }} dangerouslySetInnerHTML={{ __html: colorizedHtml + " ..." }} />
+    </div>
   );
 }

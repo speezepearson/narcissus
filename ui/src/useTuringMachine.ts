@@ -38,6 +38,9 @@ export function useTuringMachine(
 
   const publish = useCallback((snap: TuringMachineSnapshot) => {
     const st = getStatus(snap);
+    while (snapRef.current.tape.length < snapRef.current.pos+1) {
+      snapRef.current.tape.push(snapRef.current.spec.blank);
+    }
     snapRef.current = snap;
     statusRef.current = st;
     setSnapshot({ ...snap, tape: snap.tape.slice() });

@@ -1,14 +1,15 @@
 import { LogSlider } from "./LogSlider";
 import { TapeView } from "./TapeView";
-import { type TuringMachineSnapshot } from "./types";
+import { type State, type TuringMachineSnapshot } from "./types";
 import { useTuringMachine } from "./useTuringMachine";
 
 type TuringMachineViewerProps = {
   init: TuringMachineSnapshot;
+  onStateChange?: (oldState: State, cur: TuringMachineSnapshot) => void;
 };
 
-export function TuringMachineViewer({ init }: TuringMachineViewerProps) {
-  const { snapshot, status, playPause, doStep, reset } = useTuringMachine(init);
+export function TuringMachineViewer({ init, onStateChange }: TuringMachineViewerProps) {
+  const { snapshot, status, playPause, doStep, reset } = useTuringMachine(init, { onStateChange });
 
   const halted = status !== "running";
 

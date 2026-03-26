@@ -6,24 +6,7 @@ export interface UtmMeta {
   utmSymbolChars: string;
 }
 
-const GREEN_SYMS = new Set(["*", "X", "Y", "^", ">"]);
-
-function colorizeTape(tape: string[], headPos: number): string {
-  let out = "";
-  for (let i = 0; i < tape.length; i++) {
-    const ch = tape[i];
-    const escaped =
-      ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : ch;
-    if (i === headPos) {
-      out += `<span style="background:#f87171">${escaped}</span>`;
-    } else if (GREEN_SYMS.has(ch)) {
-      out += `<span style="background:#4ade80">${escaped}</span>`;
-    } else {
-      out += escaped;
-    }
-  }
-  return out;
-}
+import { colorizeTape } from "./colorizeTape";
 
 // ── L0 state from server ──
 
