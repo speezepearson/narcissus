@@ -1,14 +1,14 @@
 use utmmmmm::compiled::CompiledTuringMachineSpec;
 use utmmmmm::infinity::InfiniteTape;
 use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::utm::UTM_SPEC;
+use utmmmmm::utm::make_utm_spec;
 
 fn main() {
-    let utm = &*UTM_SPEC;
-    let compiled = CompiledTuringMachineSpec::compile(utm).expect("UTM should compile");
+    let utm_spec = make_utm_spec();
+    let compiled = CompiledTuringMachineSpec::compile(&utm_spec).expect("UTM should compile");
 
     let mut tm = RunningTuringMachine::new(&compiled);
-    let background = InfiniteTape::new(utm);
+    let background = InfiniteTape::new(&utm_spec);
 
     // Snapshot the original tape for dirty-cell counting
     let mut original_tape = tm.tape.clone();

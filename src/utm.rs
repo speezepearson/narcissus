@@ -5,7 +5,6 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
-    sync::LazyLock,
 };
 
 use crate::{
@@ -1719,11 +1718,14 @@ impl MyUtmSpec {
     }
 }
 
-pub static UTM_SPEC: LazyLock<MyUtmSpec> = LazyLock::new(|| SimpleTuringMachineSpec {
-    initial: State::Init,
-    accepting: HashSet::from([State::Accept]),
-    blank: Symbol::Blank,
-    transitions: build_utm_rules().0,
-    all_states: ALL_STATES.to_vec(),
-    all_symbols: ALL_SYMBOLS.to_vec(),
-});
+
+pub fn make_utm_spec() -> MyUtmSpec {
+    SimpleTuringMachineSpec {
+        initial: State::Init,
+        accepting: HashSet::from([State::Accept]),
+        blank: Symbol::Blank,
+        transitions: build_utm_rules().0,
+        all_states: ALL_STATES.to_vec(),
+        all_symbols: ALL_SYMBOLS.to_vec(),
+    }
+}

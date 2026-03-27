@@ -69,24 +69,25 @@ impl<'a> InfiniteTape<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utm::UTM_SPEC;
+
+    use crate::utm::make_utm_spec;
 
     use super::*;
 
     #[test]
     fn test_is_self_similar() {
-        let spec = &*UTM_SPEC;
-        let inf = InfiniteTape::new(spec);
+        let spec = make_utm_spec();
+        let inf = InfiniteTape::new(&spec);
 
-        let header_len = spec.encode(&RunningTuringMachine::new(spec)).len() + 10;
+        let header_len = spec.encode(&RunningTuringMachine::new(&spec)).len() + 10;
 
         let mut l0_tape = vec![];
         inf.extend(&mut l0_tape, 200 * header_len);
-        let l1 = spec.decode(spec, &l0_tape).unwrap();
+        let l1 = spec.decode(&spec, &l0_tape).unwrap();
         assert_eq!(l1.tape[..header_len], l0_tape[..header_len]);
-        let l2 = spec.decode(spec, &l1.tape).unwrap();
+        let l2 = spec.decode(&spec, &l1.tape).unwrap();
         assert_eq!(l2.tape[..header_len], l1.tape[..header_len]);
-        let l3 = spec.decode(spec, &l2.tape).unwrap();
+        let l3 = spec.decode(&spec, &l2.tape).unwrap();
         assert_eq!(l3.tape[..header_len], l2.tape[..header_len]);
     }
 }

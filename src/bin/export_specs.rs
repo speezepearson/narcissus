@@ -1,8 +1,11 @@
 use utmmmmm::json_export::export_spec;
 use utmmmmm::toy_machines::*;
 use utmmmmm::utm;
+use utmmmmm::utm::make_utm_spec;
 
 fn main() {
+    let utm_spec = make_utm_spec();
+
     let specs = vec![
         export_spec(
             &*ACCEPT_IMMEDIATELY_SPEC,
@@ -102,7 +105,7 @@ fn main() {
             },
         ),
         export_spec(
-            &*utm::UTM_SPEC,
+            &utm_spec,
             "Universal Turing Machine",
             "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
             |s| format!("{:?}", s),

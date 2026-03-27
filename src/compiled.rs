@@ -170,7 +170,7 @@ impl<'a, Guest: TuringMachineSpec> CompiledTuringMachineSpec<'a, Guest> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{tm::run_tm, toy_machines::CHECK_PALINDROME_SPEC};
+    use crate::{ tm::run_tm, toy_machines::CHECK_PALINDROME_SPEC, utm::make_utm_spec};
 
     use super::*;
 
@@ -195,14 +195,13 @@ mod tests {
     fn compiled_extender_run_matches_interpreted() {
         use crate::infinity::InfiniteTape;
         use crate::tm::step;
-        use crate::utm::UTM_SPEC;
 
-        let utm = &*UTM_SPEC;
-        let compiled = CompiledTuringMachineSpec::compile(utm).unwrap();
-        let background = InfiniteTape::new(utm);
+        let utm_spec = make_utm_spec();
+        let compiled = CompiledTuringMachineSpec::compile(&utm_spec).unwrap();
+        let background = InfiniteTape::new(&utm_spec);
 
         // Interpreted: run 1000 steps with InfiniteTape
-        let mut interp_tm = RunningTuringMachine::new(utm);
+        let mut interp_tm = RunningTuringMachine::new(&utm_spec);
         for _ in 0..1000 {
             if interp_tm.pos >= interp_tm.tape.len() {
                 background.extend(&mut interp_tm.tape, interp_tm.pos + 1);

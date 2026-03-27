@@ -15,7 +15,7 @@ use utmmmmm::savepoint::{
 };
 use utmmmmm::tm::{RunningTMStatus, RunningTuringMachine, TuringMachineSpec};
 use utmmmmm::tower::Tower;
-use utmmmmm::utm::{MyUtmSpec, State, Symbol, UTM_SPEC};
+use utmmmmm::utm::{MyUtmSpec, State, Symbol,  make_utm_spec};
 
 // ── Snapshot: shared between tower thread and SSE client threads ──
 
@@ -261,23 +261,22 @@ fn main() {
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    let spec = &*UTM_SPEC;
+    let utm_spec = make_utm_spec();
 
     // Pre-compute the unblemished infinite tape (1M symbols)
     // TODO: we should technically dynamically send updates to the clients,
     // as though the tape will ever get to 1M symbols
     let unblemished_str: Arc<String> = {
         let mut syms: Vec<Symbol> = Vec::new();
-        InfiniteTape::new(spec).extend(&mut syms, 1_000_000);
+        InfiniteTape::new(&utm_spec).extend(&mut syms, 1_000_000);
         Arc::new(syms.iter().map(|s| format!("{}", s)).collect())
     };
 
     // Pre-compute UTM metadata for client-side decoding
-    let utm = &*UTM_SPEC;
     let utm_states: Arc<Vec<String>> =
-        Arc::new(utm.iter_states().map(|s| format!("{:?}", s)).collect());
+        Arc::new(utm_spec.iter_states().map(|s| format!("{:?}", s)).collect());
     let utm_symbol_chars: Arc<String> =
-        Arc::new(utm.iter_symbols().map(|s| format!("{}", s)).collect());
+        Arc::new(utm_spec.iter_symbols().map(|s| format!("{}", s)).collect());
 
     let latest: Arc<RwLock<Option<Snapshot>>> = Arc::new(RwLock::new(None));
     let sse_clients: SseClients = Arc::new(Mutex::new(Vec::new()));
@@ -285,7 +284,7 @@ fn main() {
     // Start simulation background thread
     let latest_clone = Arc::clone(&latest);
     let sse_clone = Arc::clone(&sse_clients);
-    thread::spawn(move || sim_thread(spec, latest_clone, sse_clone, savepoint_path));
+    thread::spawn(move || sim_thread(&utm_spec, latest_clone, sse_clone, savepoint_path));
 
     let addr = format!("0.0.0.0:{}", port);
     let server = Server::http(&addr).expect("Failed to start HTTP server");

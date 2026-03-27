@@ -51,11 +51,12 @@ pub fn compute_new_overwrites(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utm::{Symbol, UTM_SPEC};
+    use crate::utm::{Symbol, make_utm_spec};
 
     #[test]
     fn test_total_then_two_deltas() {
-        let background = InfiniteTape::new(&*UTM_SPEC);
+        let utm_spec = make_utm_spec();
+        let background = InfiniteTape::new(&utm_spec);
 
         // === Total event: tape has position 1 changed to X ===
         let mut tape = vec![];

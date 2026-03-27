@@ -1,7 +1,7 @@
 use utmmmmm::gen_utm::UtmSpec as _;
 use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::{FlipBitsSymbol, FLIP_BITS_SPEC};
-use utmmmmm::utm::{Symbol, UTM_SPEC};
+use utmmmmm::utm::{Symbol, make_utm_spec};
 
 fn symbol_to_char(s: Symbol) -> char {
     match s {
@@ -25,7 +25,7 @@ fn symbol_to_char(s: Symbol) -> char {
 }
 
 fn main() {
-    let utm_spec = &*UTM_SPEC;
+    let utm_spec = make_utm_spec();
     let spec = &*FLIP_BITS_SPEC;
     let mut tm = RunningTuringMachine::new(spec);
     // Empty tape = just a blank
