@@ -464,6 +464,9 @@ pub fn num_bits(count: usize) -> usize {
 }
 
 pub fn to_binary(index: usize, width: usize) -> Vec<Symbol> {
+    if index >= 1 << width {
+        panic!("index {} is too large for width {}", index, width);
+    }
     let mut bits = Vec::with_capacity(width);
     for i in (0..width).rev() {
         bits.push(if (index >> i) & 1 == 1 {
@@ -1505,26 +1508,6 @@ fn build_utm_rules() -> RuleSet {
 
 pub type MyUtmSpec = SimpleTuringMachineSpec<State, Symbol>;
 impl UtmSpec for MyUtmSpec {
-    fn encode_tape<Guest: TuringMachineSpec>(
-        &self,
-        guest: &Guest,
-        tape: &[Guest::Symbol],
-    ) -> Vec<Self::Symbol> {
-        let guest_sym_to_idx = guest
-            .iter_symbols()
-            .enumerate()
-            .map(|(i, s)| (s, i))
-            .collect::<HashMap<Guest::Symbol, usize>>();
-        let n_bits = num_bits(guest_sym_to_idx.len());
-
-        let mut res = Vec::new();
-        for sym in tape {
-            res.push(Symbol::Comma);
-            res.extend_from_slice(&to_binary(guest_sym_to_idx[sym], n_bits));
-        }
-
-        res
-    }
     fn encode<Guest: TuringMachineSpec>(
         &self,
         tm: &RunningTuringMachine<Guest>,
@@ -1605,8 +1588,8 @@ impl UtmSpec for MyUtmSpec {
 
 pub struct MyUtmSpecOptimizationHints<Guest: TuringMachineSpec> {
     pub last_rules: Vec<(Guest::State, Guest::Symbol)>,
-    pub state_encodings: HashMap<Guest::State, Vec<Symbol>>,
-    pub symbol_encodings: HashMap<Guest::Symbol, Vec<Symbol>>,
+    pub state_encodings: HashMap<Guest::State, usize>,
+    pub symbol_encodings: HashMap<Guest::Symbol, usize>,
 }
 impl<Guest: TuringMachineSpec> Default for MyUtmSpecOptimizationHints<Guest> {
     fn default() -> Self {
@@ -1616,6 +1599,23 @@ impl<Guest: TuringMachineSpec> Default for MyUtmSpecOptimizationHints<Guest> {
             symbol_encodings: HashMap::new(),
         }
     }
+}
+
+fn complete_encoding<T: Copy + PartialEq + Eq + Hash>(
+    partial: &HashMap<T, usize>,
+    all: impl Iterator<Item = T>,
+) -> HashMap<T, usize> {
+    let preassigned_indexes: HashSet<usize> = partial.values().copied().collect();
+    let mut unassigned_indexes = (0..).filter(|i| !preassigned_indexes.contains(i));
+
+    let mut result = partial.clone();
+    for item in all {
+        if !result.contains_key(&item) {
+            result.insert(item, unassigned_indexes.next().unwrap());
+        }
+    }
+
+    result
 }
 
 impl MyUtmSpec {
@@ -1630,22 +1630,13 @@ impl MyUtmSpec {
         guest: &RunningTuringMachine<Guest>,
         hints: &MyUtmSpecOptimizationHints<Guest>,
     ) -> Vec<Symbol> {
-        let guest_states: Vec<Guest::State> = guest.spec.iter_states().collect();
-        let guest_symbols: Vec<Guest::Symbol> = guest.spec.iter_symbols().collect();
+        let guest_st_to_idx: HashMap<Guest::State, usize> =
+            complete_encoding(&hints.state_encodings, guest.spec.iter_states());
+        let guest_sym_to_idx: HashMap<Guest::Symbol, usize> =
+            complete_encoding(&hints.symbol_encodings, guest.spec.iter_symbols());
 
-        let guest_st_to_idx = guest_states
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (*s, i))
-            .collect::<HashMap<Guest::State, usize>>();
-        let guest_sym_to_idx = guest_symbols
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (*s, i))
-            .collect::<HashMap<Guest::Symbol, usize>>();
-
-        let n_state_bits = num_bits(guest_states.len());
-        let n_sym_bits = num_bits(guest_symbols.len());
+        let n_state_bits = num_bits(guest_st_to_idx.len());
+        let n_sym_bits = num_bits(guest_sym_to_idx.len());
 
         // Collect all rules
         type Rule<S, Y> = (S, Y, S, Y, Dir);
@@ -1653,7 +1644,7 @@ impl MyUtmSpec {
 
         // Reorder rules if last_rules is provided
         let ordered_rules: Vec<&Rule<Guest::State, Guest::Symbol>> = {
-            let last_set: std::collections::HashSet<(Guest::State, Guest::Symbol)> =
+            let last_set: HashSet<(Guest::State, Guest::Symbol)> =
                 hints.last_rules.iter().copied().collect();
             let mut front: Vec<&Rule<Guest::State, Guest::Symbol>> = all_rules
                 .iter()
@@ -1722,15 +1713,17 @@ impl MyUtmSpec {
         tape.push(Symbol::Hash);
 
         let caret_pos = tape.len();
-        let default_tape = &[guest.spec.blank()];
-        tape.extend_from_slice(&self.encode_tape(
-            guest.spec,
-            if guest.tape.is_empty() {
-                default_tape
-            } else {
-                guest.tape.as_slice()
-            },
-        ));
+
+        let default_tape = vec![guest.spec.blank()];
+        let nonempty_guest_tape = if guest.tape.is_empty() {
+            &default_tape
+        } else {
+            &guest.tape
+        };
+        for sym in nonempty_guest_tape {
+            tape.push(Symbol::Comma);
+            tape.extend_from_slice(&to_binary(guest_sym_to_idx[&sym], n_sym_bits));
+        }
         tape[caret_pos] = Symbol::Caret;
 
         tape
@@ -1745,5 +1738,18 @@ pub fn make_utm_spec() -> MyUtmSpec {
         transitions: build_utm_rules().0,
         all_states: ALL_STATES.to_vec(),
         all_symbols: ALL_SYMBOLS.to_vec(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_complete_encoding() {
+        let partial = HashMap::from([('a', 3), ('b', 1)]);
+        let enc = complete_encoding(&partial, ['a', 'b', 'c', 'd'].into_iter());
+        assert_eq!(enc[&'a'], 3);
+        assert_eq!(enc[&'b'], 1);
     }
 }
