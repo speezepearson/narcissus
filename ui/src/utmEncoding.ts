@@ -1,7 +1,7 @@
 /**
  * TypeScript port of the UTM tape encoding/decoding logic from Rust (utm.rs).
  *
- * Tape layout: $ # RULES # ACCEPTSTATES # STATE # BLANK # TAPE $
+ * Tape layout: # ACCEPTSTATES # BLANK # RULES $ STATE # TAPE
  *
  * RULES:   dot-separated entries, each = stateBits | symBits | newStateBits | newSymBits | dir
  * ACCEPTSTATES: semicolon-separated state encodings
@@ -65,10 +65,22 @@ export function encodeForUtm(
   const nStateBits = numBits(guestSpec.allStates.length);
   const nSymBits = numBits(guestSpec.allSymbols.length);
 
+  // New layout: # ACC # BLANK # RULES $ STATE # TAPE
   const tape: Symbol[] = [];
 
-  // $
-  tape.push(S("$"));
+  // # ACCEPTSTATES
+  tape.push(S("#"));
+  let firstAcc = true;
+  for (const state of guestSpec.allStates) {
+    if (!guestSpec.acceptingStates.has(state)) continue;
+    if (!firstAcc) tape.push(S(";"));
+    firstAcc = false;
+    tape.push(...toBinary(stateToIdx.get(state)!, nStateBits));
+  }
+
+  // # BLANK
+  tape.push(S("#"));
+  tape.push(...toBinary(symToIdx.get(guestSpec.blank)!, nSymBits));
 
   // # RULES
   tape.push(S("#"));
@@ -90,23 +102,9 @@ export function encodeForUtm(
     }
   }
 
-  // # ACCEPTSTATES
-  tape.push(S("#"));
-  let firstAcc = true;
-  for (const state of guestSpec.allStates) {
-    if (!guestSpec.acceptingStates.has(state)) continue;
-    if (!firstAcc) tape.push(S(";"));
-    firstAcc = false;
-    tape.push(...toBinary(stateToIdx.get(state)!, nStateBits));
-  }
-
-  // # STATE
-  tape.push(S("#"));
+  // $ STATE
+  tape.push(S("$"));
   tape.push(...toBinary(stateToIdx.get(guestSnapshot.state)!, nStateBits));
-
-  // # BLANK
-  tape.push(S("#"));
-  tape.push(...toBinary(symToIdx.get(guestSpec.blank)!, nSymBits));
 
   // # TAPE
   tape.push(S("#"));
@@ -138,21 +136,23 @@ export function decodeFromUtm(
   const nStateBits = numBits(guestStates.length);
   const nSymBits = numBits(guestSymbols.length);
 
-  // Find # delimiters
-  const hashes: number[] = [];
-  for (let i = 0; i < utmTape.length; i++) {
-    if (utmTape[i] === "#") hashes.push(i);
-  }
-  if (hashes.length < 5) {
-    throw new Error(`Expected at least 5 # delimiters, found ${hashes.length}`);
+  // New layout: # ACC # BLANK # RULES $ STATE # TAPE
+  // Find $ to locate STATE, find first # after $ for TAPE
+  const dollarPos = utmTape.indexOf("$");
+  if (dollarPos < 0) {
+    throw new Error("No $ delimiter found");
   }
 
-  // STATE section: between hashes[2] and hashes[3]
-  const stateStart = hashes[2] + 1;
+  // STATE section: right after $
+  const stateStart = dollarPos + 1;
   const state = guestStates[fromBinary(utmTape, stateStart, nStateBits)];
 
-  // TAPE section: after hashes[4]
-  const tapeStart = hashes[4] + 1;
+  // TAPE section: after first # following $
+  const tapeHash = utmTape.indexOf("#", dollarPos);
+  if (tapeHash < 0) {
+    throw new Error("No # after $ for TAPE section");
+  }
+  const tapeStart = tapeHash + 1;
   const tapeSection = utmTape.slice(tapeStart);
 
   const cells: number[] = [];

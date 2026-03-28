@@ -8,26 +8,36 @@ const flipBits = machineSpecs.find((s) => s.name === "Flip Bits")!;
 describe("UTM encoding cross-check with Rust", () => {
   it("encoding of flip-bits on empty tape matches Rust output (modulo rule order)", () => {
     // From `cargo run --bin export_flip_bits_encoding`:
-    const rustOutput = "$#.0|01|0|10|R;.0|00|1|00|L;.0|10|0|01|R#1#0#00#^00";
+    // New layout: # ACC # BLANK # RULES $ STATE # TAPE
+    const rustOutput = "#1#00#.0|01|0|10|R;.0|00|1|00|L;.0|10|0|01|R$0#^00";
 
     const snapshot = makeInitSnapshot(flipBits.spec, [flipBits.spec.blank]);
     const encoded = encodeForUtm(flipBits.spec, snapshot);
     const tsOutput = encoded.join("");
 
-    // Split into sections by #
-    const rustSections = rustOutput.split("#");
-    const tsSections = tsOutput.split("#");
-    expect(tsSections.length).toBe(rustSections.length);
+    // Split by $ to separate RULES from STATE
+    const rustParts = rustOutput.split("$");
+    const tsParts = tsOutput.split("$");
+    expect(tsParts.length).toBe(rustParts.length);
 
-    // Rules section (index 1) may differ in order; compare as sets
-    const rustRules = new Set(rustSections[1].split(";"));
-    const tsRules = new Set(tsSections[1].split(";"));
+    // Left of $: # ACC # BLANK # RULES
+    const rustLeftSections = rustParts[0].split("#");
+    const tsLeftSections = tsParts[0].split("#");
+    expect(tsLeftSections.length).toBe(rustLeftSections.length);
+
+    // Rules section (last # section before $) may differ in order
+    const rulesIdx = rustLeftSections.length - 1;
+    const rustRules = new Set(rustLeftSections[rulesIdx].split(";"));
+    const tsRules = new Set(tsLeftSections[rulesIdx].split(";"));
     expect(tsRules).toEqual(rustRules);
 
-    // All other sections must match exactly
-    for (let i = 0; i < rustSections.length; i++) {
-      if (i === 1) continue; // skip rules (checked above)
-      expect(tsSections[i], `section ${i}`).toBe(rustSections[i]);
+    // All other left sections must match exactly
+    for (let i = 0; i < rustLeftSections.length; i++) {
+      if (i === rulesIdx) continue;
+      expect(tsLeftSections[i], `left section ${i}`).toBe(rustLeftSections[i]);
     }
+
+    // Right of $: STATE # TAPE
+    expect(tsParts[1], "right of $").toBe(rustParts[1]);
   });
 });
