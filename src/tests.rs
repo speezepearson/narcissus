@@ -698,3 +698,135 @@ fn bench_rule_order_optimization() {
         );
     }
 }
+
+// ════════════════════════════════════════════════════════════════════
+// at_tick / run_until_at_tick tests
+// ════════════════════════════════════════════════════════════════════
+
+use crate::gen_utm::UtmSpec;
+use crate::tm::step;
+use crate::utm::run_until_at_tick;
+
+/// Helper: create a UTM running a guest, assert it starts at a tick,
+/// then for each of `n_steps` inner steps: step the guest directly once,
+/// advance the UTM to the next tick, decode, and assert equality.
+fn assert_tick_faithful<Spec: TuringMachineSpec>(
+    guest_spec: &Spec,
+    input: &[Spec::Symbol],
+    n_steps: usize,
+    max_utm_steps_per_tick: usize,
+) where
+    Spec::State: std::fmt::Debug + PartialEq,
+    Spec::Symbol: std::fmt::Debug + PartialEq,
+{
+    let utm_spec = make_utm_spec();
+
+    // Set up guest TM
+    let mut guest_tm = RunningTuringMachine::new(guest_spec);
+    guest_tm.tape = if input.is_empty() {
+        vec![guest_spec.blank()]
+    } else {
+        input.to_vec()
+    };
+
+    // Encode and create UTM
+    let encoded = utm_spec.encode(&guest_tm);
+    let mut utm_tm = RunningTuringMachine::new(&utm_spec);
+    utm_tm.tape = encoded;
+
+    // Freshly created UTM should be at a tick
+    assert!(
+        utm_spec.at_tick(&utm_tm),
+        "freshly created UTM should be at a tick"
+    );
+
+    // Decode at initial tick should match initial guest
+    let decoded = utm_spec
+        .decode(guest_spec, &utm_tm.tape)
+        .expect("decode at initial tick");
+    assert_eq!(decoded.state, guest_tm.state, "initial state mismatch");
+    assert_eq!(decoded.pos, guest_tm.pos, "initial pos mismatch");
+    assert_eq!(decoded.tape, guest_tm.tape, "initial tape mismatch");
+
+    for i in 0..n_steps {
+        // Step the guest directly
+        let guest_status = step(&mut guest_tm);
+        if !matches!(guest_status, crate::tm::RunningTMStatus::Running) {
+            // Guest halted; we can't step further
+            break;
+        }
+        // Extend guest tape if needed
+        if guest_tm.pos >= guest_tm.tape.len() {
+            guest_tm.tape.resize(guest_tm.pos + 1, guest_spec.blank());
+        }
+
+        // Advance UTM to next tick
+        let tick_result = run_until_at_tick(&utm_spec, &mut utm_tm, max_utm_steps_per_tick);
+        assert!(
+            tick_result.is_ok(),
+            "UTM should reach tick at step {} (got {:?})",
+            i + 1,
+            tick_result,
+        );
+
+        // Decode and compare
+        let decoded = utm_spec
+            .decode(guest_spec, &utm_tm.tape)
+            .expect(&format!("decode at tick {}", i + 1));
+
+        assert_eq!(
+            decoded.state, guest_tm.state,
+            "state mismatch at inner step {}",
+            i + 1
+        );
+        assert_eq!(
+            decoded.pos, guest_tm.pos,
+            "pos mismatch at inner step {}",
+            i + 1
+        );
+
+        // Compare tapes (strip trailing blanks)
+        let guest_tape_trimmed: Vec<_> = {
+            let mut t = guest_tm.tape.clone();
+            while t.last() == Some(&guest_spec.blank()) && t.len() > 1 {
+                t.pop();
+            }
+            t
+        };
+        let decoded_tape_trimmed: Vec<_> = {
+            let mut t = decoded.tape;
+            while t.last() == Some(&guest_spec.blank()) && t.len() > 1 {
+                t.pop();
+            }
+            t
+        };
+        assert_eq!(
+            decoded_tape_trimmed, guest_tape_trimmed,
+            "tape mismatch at inner step {}",
+            i + 1
+        );
+    }
+}
+
+#[test]
+fn test_at_tick_flip_bits_2() {
+    use FlipBitsSymbol::*;
+    assert_tick_faithful(&*FLIP_BITS_SPEC, &[Zero, One], 5, 10_000_000);
+}
+
+#[test]
+fn test_at_tick_flip_bits_5() {
+    use FlipBitsSymbol::*;
+    assert_tick_faithful(
+        &*FLIP_BITS_SPEC,
+        &[One, Zero, One, One, Zero],
+        8,
+        10_000_000,
+    );
+}
+
+#[test]
+fn test_at_tick_double_x() {
+    use DoubleXSymbol::*;
+    assert_tick_faithful(&*DOUBLE_X_SPEC, &[X, X], 20, 50_000_000);
+}
