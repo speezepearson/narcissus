@@ -1586,6 +1586,61 @@ impl UtmSpec for MyUtmSpec {
     }
 }
 
+/// Recursive greedy max-cut bisection for encoding assignment.
+///
+/// At each bit position, splits the group into two halves to maximize the
+/// "cut" — i.e., frequently-compared pairs land in different halves so the
+/// UTM can reject non-matching rules on this bit alone.
+fn greedy_bisect_recursive(
+    group: &[usize],
+    pair_weight: &[Vec<u64>],
+    encoding: &mut [usize],
+    width: usize,
+    bit: usize,
+) {
+    if bit >= width || group.len() <= 1 {
+        return;
+    }
+    let max_per_half = 1usize << (width - bit - 1);
+
+    // Sort by descending total weight to neighbors in this group (heavy hitters first)
+    let mut sorted = group.to_vec();
+    sorted.sort_by(|&a, &b| {
+        let wa: u64 = group.iter().map(|&j| pair_weight[a][j]).sum();
+        let wb: u64 = group.iter().map(|&j| pair_weight[b][j]).sum();
+        wb.cmp(&wa)
+    });
+
+    let mut group0: Vec<usize> = Vec::new();
+    let mut group1: Vec<usize> = Vec::new();
+
+    for &s in &sorted {
+        let w0: u64 = group0.iter().map(|&j| pair_weight[s][j]).sum();
+        let w1: u64 = group1.iter().map(|&j| pair_weight[s][j]).sum();
+
+        let can0 = group0.len() < max_per_half;
+        let can1 = group1.len() < max_per_half;
+
+        // Assign to the half with LESS internal weight (= maximizes cut)
+        let go_to_1 = match (can0, can1) {
+            (true, true) => w0 > w1,
+            (true, false) => false,
+            (false, true) => true,
+            (false, false) => panic!("both halves full"),
+        };
+
+        if go_to_1 {
+            group1.push(s);
+            encoding[s] |= 1 << (width - bit - 1);
+        } else {
+            group0.push(s);
+        }
+    }
+
+    greedy_bisect_recursive(&group0, pair_weight, encoding, width, bit + 1);
+    greedy_bisect_recursive(&group1, pair_weight, encoding, width, bit + 1);
+}
+
 pub struct TmTransitionStats<Guest: TuringMachineSpec>(
     pub HashMap<(Guest::State, Guest::Symbol), usize>,
 );
@@ -1613,20 +1668,107 @@ impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
     }
 
     pub fn get_optimal_state_encoding(&self, guest: &Guest) -> HashMap<Guest::State, usize> {
-        // todo!()
-        guest
-            .iter_states()
+        let states: Vec<Guest::State> = guest.iter_states().collect();
+        let n = states.len();
+        if n <= 1 {
+            return states.into_iter().enumerate().map(|(i, s)| (s, i)).collect();
+        }
+
+        let width = num_bits(n);
+        let rule_order = self.get_optimal_rule_order(guest);
+
+        // Map state -> compact index
+        let state_idx: HashMap<Guest::State, usize> =
+            states.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+
+        // Compute pair weights W(s, s'):
+        // For rule (s, σ) at position pos, rules at positions pos+1..n are scanned
+        // before it (UTM scans right-to-left, most-frequent last in array = first checked).
+        // For each such rule (s', σ') with s' ≠ s: W(s, s') += count(s, σ).
+        let mut pair_weight = vec![vec![0u64; n]; n];
+        for (pos, &(s, sym)) in rule_order.iter().enumerate() {
+            let count = *self.0.get(&(s, sym)).unwrap_or(&0) as u64;
+            if count == 0 {
+                continue;
+            }
+            let si = state_idx[&s];
+            for &(s2, _) in &rule_order[pos + 1..] {
+                if s2 != s {
+                    let s2i = state_idx[&s2];
+                    pair_weight[si][s2i] += count;
+                }
+            }
+        }
+        // Symmetrize: cost of comparing s vs s' is the same regardless of direction
+        for i in 0..n {
+            for j in i + 1..n {
+                let total = pair_weight[i][j] + pair_weight[j][i];
+                pair_weight[i][j] = total;
+                pair_weight[j][i] = total;
+            }
+        }
+
+        let mut encoding = vec![0usize; n];
+        let group: Vec<usize> = (0..n).collect();
+        greedy_bisect_recursive(&group, &pair_weight, &mut encoding, width, 0);
+        states
+            .into_iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, s)| (s, encoding[i]))
             .collect()
     }
 
     pub fn get_optimal_symbol_encoding(&self, guest: &Guest) -> HashMap<Guest::Symbol, usize> {
-        // todo!()
-        guest
-            .iter_symbols()
+        let symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
+        let n = symbols.len();
+        if n <= 1 {
+            return symbols
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| (s, i))
+                .collect();
+        }
+
+        let width = num_bits(n);
+        let rule_order = self.get_optimal_rule_order(guest);
+
+        // Map symbol -> compact index
+        let sym_idx: HashMap<Guest::Symbol, usize> =
+            symbols.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+
+        // Compute symbol pair weights:
+        // Symbol comparison only happens when the state already matched.
+        // For rule (s, σ) at position pos, rules at positions pos+1..n with the
+        // SAME state s but different symbol σ' contribute to W_sym(σ, σ').
+        let mut pair_weight = vec![vec![0u64; n]; n];
+        for (pos, &(s, sym)) in rule_order.iter().enumerate() {
+            let count = *self.0.get(&(s, sym)).unwrap_or(&0) as u64;
+            if count == 0 {
+                continue;
+            }
+            let si = sym_idx[&sym];
+            for &(s2, sym2) in &rule_order[pos + 1..] {
+                if s2 == s && sym2 != sym {
+                    let s2i = sym_idx[&sym2];
+                    pair_weight[si][s2i] += count;
+                }
+            }
+        }
+        for i in 0..n {
+            for j in i + 1..n {
+                let total = pair_weight[i][j] + pair_weight[j][i];
+                pair_weight[i][j] = total;
+                pair_weight[j][i] = total;
+            }
+        }
+
+        let mut encoding = vec![0usize; n];
+        let group: Vec<usize> = (0..n).collect();
+        greedy_bisect_recursive(&group, &pair_weight, &mut encoding, width, 0);
+        symbols
+            .into_iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, s)| (s, encoding[i]))
             .collect()
     }
 }
