@@ -22,12 +22,10 @@ pub struct Tower<'a> {
     pub utm_spec: &'a MyUtmSpec,
     pub base: CompiledTowerLevel<'a>,
     pub decoded: Vec<UtmTowerLevel<'a>>,
-    pub clean_compiled_state: CState,
 }
 
 impl<'a> Tower<'a> {
     pub fn new(utm_spec: &'a MyUtmSpec, tm: RunningTuringMachine<'a, CompiledUtmSpec<'a>>) -> Self {
-        let clean_compiled_state = tm.spec.compile_state(State::Init);
         Self {
             utm_spec,
             base: TowerLevel {
@@ -36,7 +34,6 @@ impl<'a> Tower<'a> {
                 max_head_pos: 0,
             },
             decoded: Vec::new(),
-            clean_compiled_state,
         }
     }
 
@@ -47,7 +44,7 @@ impl<'a> Tower<'a> {
         self.base.max_head_pos = max(self.base.max_head_pos, self.base.tm.pos);
         // eprintln!("step: {:?}", res);
 
-        if self.base.tm.state == prev_state || self.base.tm.state != self.clean_compiled_state {
+        if !self.base.tm.spec.is_tick_boundary(prev_state, self.base.tm.state) {
             // We didn't just transition into the clean state, so decoding isn't well-defined.
             return res;
         }
@@ -93,5 +90,5 @@ fn decode_into_level<'a>(
     dst.max_head_pos = max(dst.max_head_pos, decoded.pos);
     dst.tm = decoded;
 
-    return new_state != old_state && new_state == State::Init;
+    return utm_spec.is_tick_boundary(old_state, new_state);
 }
