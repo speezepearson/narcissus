@@ -822,5 +822,5 @@ fn test_at_tick_flip_bits_5() {
 #[test]
 fn test_at_tick_double_x() {
     use DoubleXSymbol::*;
-    assert_tick_faithful(&*DOUBLE_X_SPEC, &[X, X], 20, 50_000_000);
+    assert_tick_faithful(&*DOUBLE_X_SPEC, &[Dollar, X, X], 20, 50_000_000);
 }

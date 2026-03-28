@@ -1,8 +1,9 @@
 use utmmmmm::compiled::CompiledTuringMachineSpec;
+use utmmmmm::gen_utm::UtmSpec as _;
 use utmmmmm::infinity::InfiniteTape;
 use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
 use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::utm::{make_utm_spec, State};
+use utmmmmm::utm::make_utm_spec;
 
 fn main() {
     let max_steps: u64 = std::env::args()
@@ -15,8 +16,6 @@ fn main() {
     let optimization_hints = make_my_utm_self_optimization_hints();
     let utm_spec = make_utm_spec();
     let compiled = CompiledTuringMachineSpec::compile(&utm_spec).expect("UTM should compile");
-
-    let mark_rule_cstate = compiled.compile_state(State::MarkRule);
 
     let mut tm = RunningTuringMachine::new(&compiled);
     let background = InfiniteTape::new(&utm_spec, &optimization_hints);
@@ -52,8 +51,7 @@ fn main() {
             };
             total_steps += 1;
 
-            // Detect inner UTM completing a step: entering MarkRule (start of rule matching)
-            if tm.state == mark_rule_cstate && prev_state != mark_rule_cstate {
+            if compiled.is_tick_boundary(prev_state, tm.state) {
                 inner_steps += 1;
             }
             prev_state = tm.state;

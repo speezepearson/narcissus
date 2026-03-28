@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use utmmmmm::compiled::CompiledTuringMachineSpec;
+use utmmmmm::gen_utm::UtmSpec as _;
 use utmmmmm::infinity::InfiniteTape;
 use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
 use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol, TmTransitionStats};

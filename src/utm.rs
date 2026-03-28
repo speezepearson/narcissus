@@ -1635,9 +1635,7 @@ impl UtmSpec for MyUtmSpec {
     }
 }
 
-/// Step a UTM until it freshly *enters* a tick state (or halts).
-/// A tick is detected when `at_tick` returns true and the previous
-/// state was not a tick state (i.e. the machine just transitioned in).
+/// Step a UTM until `is_tick_boundary` fires (or it halts).
 /// Takes at least one step before checking.
 /// Returns Ok(num_steps) on tick, Err on halt or step limit.
 #[allow(dead_code)]
