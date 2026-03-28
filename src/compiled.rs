@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::gen_utm::UtmSpec;
 use crate::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -165,6 +166,36 @@ impl<'a, Guest: TuringMachineSpec> CompiledTuringMachineSpec<'a, Guest> {
                 .map(|s| self.original_symbols[s.0 as usize])
                 .collect(),
         }
+    }
+}
+
+impl<'a, Guest: UtmSpec> UtmSpec for CompiledTuringMachineSpec<'a, Guest> {
+    fn encode<Inner: TuringMachineSpec>(
+        &self,
+        tm: &RunningTuringMachine<Inner>,
+    ) -> Vec<CSymbol> {
+        let guest_tape = self.guest.encode(tm);
+        guest_tape
+            .iter()
+            .map(|&s| self.compile_symbol(s))
+            .collect()
+    }
+
+    fn decode<'b, Inner: TuringMachineSpec>(
+        &self,
+        inner: &'b Inner,
+        tape: &[CSymbol],
+    ) -> Result<RunningTuringMachine<'b, Inner>, String> {
+        let guest_tape: Vec<Guest::Symbol> = tape
+            .iter()
+            .map(|&s| self.decompile_symbol(s))
+            .collect();
+        self.guest.decode(inner, &guest_tape)
+    }
+
+    fn at_tick(&self, state: CState, symbol: CSymbol) -> bool {
+        self.guest
+            .at_tick(self.decompile_state(state), self.decompile_symbol(symbol))
     }
 }
 

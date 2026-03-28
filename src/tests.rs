@@ -736,7 +736,7 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
 
     // Freshly created UTM should be at a tick
     assert!(
-        utm_spec.at_tick(&utm_tm),
+        utm_spec.at_tick(utm_tm.state, utm_tm.tape[utm_tm.pos]),
         "freshly created UTM should be at a tick"
     );
 
