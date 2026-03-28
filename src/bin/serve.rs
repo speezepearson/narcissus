@@ -136,8 +136,7 @@ fn sim_thread(
     }
 
     loop {
-        background.extend_compiled(&mut tower.base.tm.tape, tower.base.tm.pos + 1, &compiled);
-        if let RunningTMStatus::Accepted | RunningTMStatus::Rejected = tower.step() {
+        if let RunningTMStatus::Accepted | RunningTMStatus::Rejected = tower.step_extending(&background) {
             panic!("infinite machine should never halt");
         }
 

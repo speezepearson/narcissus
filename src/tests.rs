@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
+use crate::compiled::CompiledTuringMachineSpec;
 use crate::gen_utm::UtmSpec as _;
+use crate::infinity::InfiniteTape;
 use crate::optimization_hints::make_my_utm_self_optimization_hints;
 use crate::tm::{
-    run_tm, run_until_enters_state, HaltReason, RunUntilResult, RunningTuringMachine,
-    TuringMachineSpec,
+    run_tm, run_until_enters_state, HaltReason, RunUntilResult, RunningTMStatus,
+    RunningTuringMachine, TuringMachineSpec,
 };
+use crate::tower::Tower;
 use crate::toy_machines::*;
 use crate::utm::*;
 
@@ -695,6 +698,100 @@ fn bench_rule_order_optimization() {
         eprintln!(
             "  Ratio (opt/unopt): {:.2}x",
             opt_guest_steps as f64 / unopt_guest_steps as f64
+        );
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Test: optimized encode/decode round-trips correctly
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_encode_decode_optimized_roundtrip() {
+    // Verify that encoding with optimized hints and decoding with the same
+    // hints produces the original state. This is the core property that was
+    // broken when decode() used sequential indices instead of the hints' encoding.
+    let utm_spec = make_utm_spec();
+    let hints = make_my_utm_self_optimization_hints();
+
+    let original = RunningTuringMachine::new(&utm_spec);
+    let encoded = utm_spec.encode_optimized(&original, &hints);
+    let decoded = utm_spec
+        .decode_optimized(&utm_spec, &encoded, &hints)
+        .expect("decode_optimized should succeed");
+
+    assert_eq!(original.state, decoded.state, "state mismatch");
+    assert_eq!(original.pos, decoded.pos, "head position mismatch");
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Test: tower decoding produces valid UTM tape with optimized encoding
+// ════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_tower_decode_produces_valid_utm_tape() {
+    // Run the self-simulating tower until it decodes a level, then verify
+    // the decoded tape has valid UTM structure. With buggy decoding (wrong
+    // index mapping), the tape would contain garbled symbols.
+    let utm_spec = make_utm_spec();
+    let hints = make_my_utm_self_optimization_hints();
+    let background = InfiniteTape::new(&utm_spec, &hints);
+    let compiled = CompiledTuringMachineSpec::compile(&utm_spec).unwrap();
+    let mut tower = Tower::new(&utm_spec, &hints, RunningTuringMachine::new(&compiled));
+
+    let max_steps = 50_000_000u64;
+    for _ in 0..max_steps {
+        if let RunningTMStatus::Accepted | RunningTMStatus::Rejected =
+            tower.step_extending(&background)
+        {
+            panic!("infinite machine should never halt");
+        }
+        if !tower.decoded.is_empty() {
+            break;
+        }
+    }
+    assert!(
+        !tower.decoded.is_empty(),
+        "tower should have decoded at least one level within {} steps",
+        max_steps
+    );
+
+    // Keep running until the decoded tape is long enough to check structure.
+    // The decoded tape grows as the outer UTM explores more of its tape.
+    let min_tape_len = 20;
+    for _ in 0..max_steps {
+        if let RunningTMStatus::Accepted | RunningTMStatus::Rejected =
+            tower.step_extending(&background)
+        {
+            panic!("infinite machine should never halt");
+        }
+        if tower.decoded[0].tm.tape.len() >= min_tape_len {
+            break;
+        }
+    }
+
+    // The decoded tape should have valid UTM structure: $ # ... # ... # ...
+    let tape = &tower.decoded[0].tm.tape;
+    assert!(
+        tape.len() >= min_tape_len,
+        "decoded tape only {} symbols after {} steps",
+        tape.len(),
+        max_steps
+    );
+    assert_eq!(tape[0], Symbol::Dollar, "tape should start with $");
+    assert_eq!(tape[1], Symbol::Hash, "tape[1] should be #");
+
+    // Verify the first few decoded symbols match the background
+    // (at the start of the tape, before any mutations from the inner UTM's execution)
+    for i in 0..5 {
+        assert_eq!(
+            tape[i],
+            background.get(i),
+            "decoded tape[{}] = {:?} but background[{}] = {:?}",
+            i,
+            tape[i],
+            i,
+            background.get(i),
         );
     }
 }

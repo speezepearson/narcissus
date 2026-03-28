@@ -1,4 +1,5 @@
 use crate::compiled::{CState, CompiledTuringMachineSpec};
+use crate::infinity::InfiniteTape;
 use crate::tm::{step, RunningTMStatus, RunningTuringMachine, SimpleTuringMachineSpec};
 use crate::utm::{MyUtmSpec, MyUtmSpecOptimizationHints};
 use crate::utm::{State, Symbol};
@@ -43,6 +44,13 @@ impl<'a> Tower<'a> {
             decoded: Vec::new(),
             clean_compiled_state,
         }
+    }
+
+    /// Step the tower, extending the tape from the background as needed.
+    pub fn step_extending(&mut self, background: &InfiniteTape) -> RunningTMStatus {
+        let compiled = self.base.tm.spec;
+        background.extend_compiled(&mut self.base.tm.tape, self.base.tm.pos + 1, compiled);
+        self.step()
     }
 
     pub fn step(&mut self) -> RunningTMStatus {
