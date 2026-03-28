@@ -1606,6 +1606,9 @@ fn complete_encoding<T: Copy + PartialEq + Eq + Hash>(
     all: impl Iterator<Item = T>,
 ) -> HashMap<T, usize> {
     let preassigned_indexes: HashSet<usize> = partial.values().copied().collect();
+    if preassigned_indexes.len() < partial.len() {
+        panic!("multiple items assigned to same index");
+    }
     let mut unassigned_indexes = (0..).filter(|i| !preassigned_indexes.contains(i));
 
     let mut result = partial.clone();
