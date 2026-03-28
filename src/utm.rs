@@ -1260,7 +1260,10 @@ fn build_utm_rules() -> RuleSet {
         // MrExtH3: skip RULES going right to $
         let h3 = MrExtH3;
         scan_right(&mut r, h3, rule_all);
-        r.add(h3, Dollar, MarkRule, Dollar, Dir::Left);
+        // When we hit the `$`, in an ideal sense we would just move left and go into MarkRule;
+        // but instead we go right and DoneSeekHome, so that transitioning into DoneSeekHome
+        // is always a reliable signal that the inner step has completed.
+        r.add(h3, Dollar, DoneSeekHome, Dollar, Dir::Right);
     }
 
     // ══════════════════════════════════════════════════════════════
