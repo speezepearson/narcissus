@@ -705,7 +705,7 @@ fn bench_rule_order_optimization() {
 
 use crate::gen_utm::UtmSpec;
 use crate::tm::step;
-use crate::utm::run_until_at_tick;
+use crate::utm::run_until_inner_step;
 
 /// Helper: create a UTM running a guest, assert it starts at a tick,
 /// then for each of `n_steps` inner steps: step the guest directly once,
@@ -755,7 +755,7 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
         }
 
         // Advance UTM to next tick
-        let tick_result = run_until_at_tick(&utm_spec, &mut utm_tm, max_utm_steps_per_tick);
+        let tick_result = run_until_inner_step(&utm_spec, &mut utm_tm, max_utm_steps_per_tick);
         assert!(
             tick_result.is_ok(),
             "UTM should reach tick at step {} (got {:?})",

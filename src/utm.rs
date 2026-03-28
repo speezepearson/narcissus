@@ -1630,8 +1630,8 @@ impl UtmSpec for MyUtmSpec {
         })
     }
 
-    fn at_tick(&self, state: State, _symbol: Symbol) -> bool {
-        state == State::DoneSeekHome
+    fn is_tick_boundary(&self, prev_state: State, state: State) -> bool {
+        prev_state != state && state == State::DoneSeekHome
     }
 }
 
@@ -1641,14 +1641,14 @@ impl UtmSpec for MyUtmSpec {
 /// Takes at least one step before checking.
 /// Returns Ok(num_steps) on tick, Err on halt or step limit.
 #[allow(dead_code)]
-pub fn run_until_at_tick<Spec: UtmSpec>(
+pub fn run_until_inner_step<Spec: UtmSpec>(
     spec: &Spec,
     tm: &mut RunningTuringMachine<Spec>,
     max_steps: usize,
 ) -> Result<usize, crate::tm::RunUntilResult> {
     use crate::tm::{step, RunUntilResult, RunningTMStatus};
 
-    let mut was_at_tick = spec.at_tick(tm.state, if tm.pos < tm.tape.len() { tm.tape[tm.pos] } else { spec.blank() });
+    let mut prev_state = tm.state;
 
     for step_count in 1..=max_steps {
         if tm.pos >= tm.tape.len() {
@@ -1659,11 +1659,10 @@ pub fn run_until_at_tick<Spec: UtmSpec>(
                 if tm.pos >= tm.tape.len() {
                     tm.tape.resize(tm.pos + 1, spec.blank());
                 }
-                let now_at_tick = spec.at_tick(tm.state, tm.tape[tm.pos]);
-                if now_at_tick && !was_at_tick {
+                if spec.is_tick_boundary(prev_state, tm.state) {
                     return Ok(step_count);
                 }
-                was_at_tick = now_at_tick;
+                prev_state = tm.state;
             }
             RunningTMStatus::Accepted => {
                 return Err(RunUntilResult::Accepted {

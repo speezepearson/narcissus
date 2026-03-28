@@ -14,5 +14,5 @@ pub trait UtmSpec: TuringMachineSpec {
     /// Returns true once per completed inner step. Decoding the tape at a
     /// tick should yield a valid snapshot of the guest machine after one
     /// more step than at the previous tick.
-    fn at_tick(&self, state: Self::State, symbol: Self::Symbol) -> bool;
+    fn is_tick_boundary(&self, prev_state: Self::State, new_state: Self::State) -> bool;
 }

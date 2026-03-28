@@ -193,9 +193,9 @@ impl<'a, Guest: UtmSpec> UtmSpec for CompiledTuringMachineSpec<'a, Guest> {
         self.guest.decode(inner, &guest_tape)
     }
 
-    fn at_tick(&self, state: CState, symbol: CSymbol) -> bool {
+    fn is_tick_boundary(&self, old_state: CState, state: CState) -> bool {
         self.guest
-            .at_tick(self.decompile_state(state), self.decompile_symbol(symbol))
+            .is_tick_boundary(self.decompile_state(old_state), self.decompile_state(state))
     }
 }
 
