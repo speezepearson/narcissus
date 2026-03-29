@@ -1632,6 +1632,76 @@ pub fn run_until_inner_step<Spec: UtmSpec>(
     Err(RunUntilResult::StepLimit)
 }
 
+/// Greedy max-cut encoding: recursively split indices into two groups at each bit level,
+/// maximizing inter-group interaction (so high-interaction pairs get different prefixes).
+fn greedy_max_cut_encoding(
+    interaction: &[Vec<u64>],
+    indices: &[usize],
+    encoding: &mut [usize],
+    bit_depth: usize,
+    total_bits: usize,
+) {
+    if indices.len() <= 1 || bit_depth >= total_bits {
+        return;
+    }
+
+    // Sort by total interaction (descending) for better greedy decisions
+    let mut sorted = indices.to_vec();
+    sorted.sort_by(|&a, &b| {
+        let total_a: u64 = indices
+            .iter()
+            .map(|&j| interaction[a][j] + interaction[j][a])
+            .sum();
+        let total_b: u64 = indices
+            .iter()
+            .map(|&j| interaction[b][j] + interaction[j][b])
+            .sum();
+        total_b.cmp(&total_a)
+    });
+
+    let mut group_a: Vec<usize> = Vec::new();
+    let mut group_b: Vec<usize> = Vec::new();
+
+    for &idx in &sorted {
+        let cost_a: u64 = group_a
+            .iter()
+            .map(|&j| interaction[idx][j] + interaction[j][idx])
+            .sum();
+        let cost_b: u64 = group_b
+            .iter()
+            .map(|&j| interaction[idx][j] + interaction[j][idx])
+            .sum();
+
+        if cost_a < cost_b {
+            group_a.push(idx);
+        } else if cost_b < cost_a {
+            group_b.push(idx);
+        } else {
+            // Tie-break: prefer the smaller group for balance
+            if group_a.len() <= group_b.len() {
+                group_a.push(idx);
+            } else {
+                group_b.push(idx);
+            }
+        }
+    }
+
+    // Ensure both groups are non-empty
+    if group_a.is_empty() {
+        group_a.push(group_b.pop().unwrap());
+    } else if group_b.is_empty() {
+        group_b.push(group_a.pop().unwrap());
+    }
+
+    let bit_value = 1 << (total_bits - 1 - bit_depth);
+    for &idx in &group_b {
+        encoding[idx] |= bit_value;
+    }
+
+    greedy_max_cut_encoding(interaction, &group_a, encoding, bit_depth + 1, total_bits);
+    greedy_max_cut_encoding(interaction, &group_b, encoding, bit_depth + 1, total_bits);
+}
+
 pub struct TmTransitionStats<Guest: TuringMachineSpec>(
     pub HashMap<(Guest::State, Guest::Symbol), usize>,
 );
@@ -1642,10 +1712,14 @@ impl<Guest: TuringMachineSpec> Default for TmTransitionStats<Guest> {
 }
 impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
     pub fn make_optimization_hints(&self, guest: &Guest) -> MyUtmSpecOptimizationHints<Guest> {
+        let rule_order = self.get_optimal_rule_order(guest);
+        let state_encodings = self.get_optimal_state_encoding(guest, &rule_order);
+        let symbol_encodings = self.get_optimal_symbol_encoding(guest, &rule_order);
+
         MyUtmSpecOptimizationHints {
-            rule_order: self.get_optimal_rule_order(guest),
-            state_encodings: self.get_optimal_state_encoding(guest),
-            symbol_encodings: self.get_optimal_symbol_encoding(guest),
+            rule_order,
+            state_encodings,
+            symbol_encodings,
         }
     }
 
@@ -1658,21 +1732,97 @@ impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
         rules
     }
 
-    pub fn get_optimal_state_encoding(&self, guest: &Guest) -> HashMap<Guest::State, usize> {
-        // todo!()
-        guest
-            .iter_states()
+    pub fn get_optimal_state_encoding(
+        &self,
+        guest: &Guest,
+        rule_order: &[(Guest::State, Guest::Symbol)],
+    ) -> HashMap<Guest::State, usize> {
+        let states: Vec<Guest::State> = guest.iter_states().collect();
+        let n_states = states.len();
+        if n_states <= 1 || self.0.is_empty() {
+            return states.into_iter().enumerate().map(|(i, s)| (s, i)).collect();
+        }
+        let state_to_idx: HashMap<Guest::State, usize> =
+            states.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+
+        let rule_idx_map: HashMap<(Guest::State, Guest::Symbol), usize> = rule_order
+            .iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, &(st, sym))| ((st, sym), i))
+            .collect();
+
+        // interaction[s][r] = total weighted times state s is compared against rule-state r
+        // (for rules checked before the matching rule, i.e. later in rule_order)
+        let mut interaction = vec![vec![0u64; n_states]; n_states];
+        for (&(st, sym), &weight) in &self.0 {
+            if let Some(&match_idx) = rule_idx_map.get(&(st, sym)) {
+                let s_idx = state_to_idx[&st];
+                for j in (match_idx + 1)..rule_order.len() {
+                    let r_idx = state_to_idx[&rule_order[j].0];
+                    interaction[s_idx][r_idx] += weight as u64;
+                }
+            }
+        }
+
+        let n_bits = num_bits(n_states);
+        let all_indices: Vec<usize> = (0..n_states).collect();
+        let mut encoding = vec![0usize; n_states];
+        greedy_max_cut_encoding(&interaction, &all_indices, &mut encoding, 0, n_bits);
+
+        states
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| (s, encoding[i]))
             .collect()
     }
 
-    pub fn get_optimal_symbol_encoding(&self, guest: &Guest) -> HashMap<Guest::Symbol, usize> {
-        // todo!()
-        guest
-            .iter_symbols()
+    pub fn get_optimal_symbol_encoding(
+        &self,
+        guest: &Guest,
+        rule_order: &[(Guest::State, Guest::Symbol)],
+    ) -> HashMap<Guest::Symbol, usize> {
+        let symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
+        let n_symbols = symbols.len();
+        if n_symbols <= 1 || self.0.is_empty() {
+            return symbols
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| (s, i))
+                .collect();
+        }
+        let symbol_to_idx: HashMap<Guest::Symbol, usize> =
+            symbols.iter().enumerate().map(|(i, &s)| (s, i)).collect();
+
+        let rule_idx_map: HashMap<(Guest::State, Guest::Symbol), usize> = rule_order
+            .iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, &(st, sym))| ((st, sym), i))
+            .collect();
+
+        // interaction[s1][s2] = total weighted times symbol s1 is compared against rule-symbol s2
+        // (only for rules where the state already matched)
+        let mut interaction = vec![vec![0u64; n_symbols]; n_symbols];
+        for (&(st, sym), &weight) in &self.0 {
+            if let Some(&match_idx) = rule_idx_map.get(&(st, sym)) {
+                let s_idx = symbol_to_idx[&sym];
+                for j in (match_idx + 1)..rule_order.len() {
+                    if rule_order[j].0 == st {
+                        let r_idx = symbol_to_idx[&rule_order[j].1];
+                        interaction[s_idx][r_idx] += weight as u64;
+                    }
+                }
+            }
+        }
+
+        let n_bits = num_bits(n_symbols);
+        let all_indices: Vec<usize> = (0..n_symbols).collect();
+        let mut encoding = vec![0usize; n_symbols];
+        greedy_max_cut_encoding(&interaction, &all_indices, &mut encoding, 0, n_bits);
+
+        symbols
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| (s, encoding[i]))
             .collect()
     }
 }
@@ -1805,6 +1955,83 @@ impl MyUtmSpec {
         tape[caret_pos] = Symbol::Caret;
 
         tape
+    }
+
+    pub fn decode_optimized<'a, Guest: TuringMachineSpec>(
+        &self,
+        guest: &'a Guest,
+        tape: &[Symbol],
+        hints: &MyUtmSpecOptimizationHints<Guest>,
+    ) -> Result<RunningTuringMachine<'a, Guest>, String> {
+        let n_state_bits = num_bits(hints.state_encodings.len());
+        let n_sym_bits = num_bits(hints.symbol_encodings.len());
+
+        // Build reverse maps: encoding value -> guest state/symbol
+        let enc_to_state: HashMap<usize, Guest::State> = hints
+            .state_encodings
+            .iter()
+            .map(|(&s, &e)| (e, s))
+            .collect();
+        let enc_to_symbol: HashMap<usize, Guest::Symbol> = hints
+            .symbol_encodings
+            .iter()
+            .map(|(&s, &e)| (e, s))
+            .collect();
+
+        let mut hashes: Vec<usize> = Vec::new();
+        for (i, &s) in tape.iter().enumerate() {
+            if s == Symbol::Hash {
+                hashes.push(i);
+            }
+        }
+        if hashes.len() < 5 {
+            return Err(format!(
+                "expected at least 5 # delimiters, found {}",
+                hashes.len()
+            ));
+        }
+
+        let state_start = hashes[2] + 1;
+        let enc_state = from_binary_at(tape, state_start, n_state_bits);
+        let state = enc_to_state[&enc_state];
+
+        let tape_start = hashes[4] + 1;
+        let tape_section = &tape[tape_start..];
+        let mut cells: Vec<Guest::Symbol> = Vec::new();
+        let mut head_pos: usize = 0;
+        let mut i = 0;
+        let mut cell_idx = 0;
+        while i < tape_section.len() {
+            let s = tape_section[i];
+            if s == Symbol::Blank || s == Symbol::Dollar {
+                break;
+            }
+            if s == Symbol::Comma {
+                i += 1;
+                cell_idx += 1;
+                continue;
+            }
+            if s == Symbol::Caret || s == Symbol::Gt {
+                if s == Symbol::Caret {
+                    head_pos = cell_idx;
+                }
+                i += 1;
+                continue;
+            }
+            if i + n_sym_bits > tape_section.len() {
+                break;
+            }
+            let val = from_binary_at(tape_section, i, n_sym_bits);
+            cells.push(enc_to_symbol[&val]);
+            i += n_sym_bits;
+        }
+
+        Ok(RunningTuringMachine {
+            spec: guest,
+            state,
+            pos: head_pos,
+            tape: cells,
+        })
     }
 }
 

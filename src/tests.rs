@@ -365,11 +365,9 @@ fn test_encode_with_last_rules_faithful_flip_bits() {
 
     // Put one specific rule last
     let utm_spec = make_utm_spec();
-    let encoded = utm_spec.encode_optimized(
-        &tm,
-        &TmTransitionStats(HashMap::from([((FlipBitsState::Flip, Zero), 1)]))
-            .make_optimization_hints(&spec),
-    );
+    let hints = TmTransitionStats(HashMap::from([((FlipBitsState::Flip, Zero), 1)]))
+        .make_optimization_hints(spec);
+    let encoded = utm_spec.encode_optimized(&tm, &hints);
 
     // Run directly
     let mut direct_tm = RunningTuringMachine {
@@ -393,7 +391,7 @@ fn test_encode_with_last_rules_faithful_flip_bits() {
     );
 
     let decoded = utm_spec
-        .decode(spec, &utm_tm.tape)
+        .decode_optimized(spec, &utm_tm.tape, &hints)
         .expect("should decode UTM tape");
     strip_trailing_blanks(&mut direct_tm);
     let mut decoded_stripped = decoded;
