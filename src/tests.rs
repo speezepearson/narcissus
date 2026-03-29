@@ -856,7 +856,7 @@ fn test_noop_encoding_has_commas() {
     let encoded = utm.encode(&tm);
 
     // Find rules section: between #[1] and #[2] in new layout
-    // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] SYMCACHE #[4] TAPE
+    // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] TAPE
     let hashes: Vec<usize> = encoded
         .iter()
         .enumerate()

@@ -182,9 +182,11 @@ fn main() {
                 utm::State::CmpSymC0 => "carrying symbol bit 0 from rule; scanning right past rules",
                 utm::State::CmpSymC0S1 => "carrying symbol bit 0; skipping past accept states",
                 utm::State::CmpSymC0Fb => "carrying symbol bit 0; finding next unmarked bit in head cell",
+                utm::State::CmpSymC0Fh => "carrying symbol bit 0; finding head marker in tape",
                 utm::State::CmpSymC1 => "carrying symbol bit 1 from rule; scanning right past rules",
                 utm::State::CmpSymC1S1 => "carrying symbol bit 1; skipping past accept states",
                 utm::State::CmpSymC1Fb => "carrying symbol bit 1; finding next unmarked bit in head cell",
+                utm::State::CmpSymC1Fh => "carrying symbol bit 1; finding head marker in tape",
                 utm::State::CmpSymOk => "symbol bit matched; seeking back to rule's star marker",
                 utm::State::CmpSymNextbit => "at star marker; advancing past state bits to next symbol bit",
                 utm::State::CmpSymNb2 => "past state field pipe; finding next unmarked symbol bit in rule",
@@ -200,7 +202,8 @@ fn main() {
 
                 // Symbol Match Cleanup
                 utm::State::SymMatchCleanup => "rule fully matched! scanning right to restore marks before applying",
-                utm::State::SmcS1 => "match cleanup; skipping past accept states section",
+                utm::State::SmcS1 => "match cleanup; skipping past state section",
+                utm::State::SmcFh => "match cleanup; finding head marker in tape",
                 utm::State::SmcRestHead => "match cleanup; restoring marked head cell bits back to 0/1",
                 utm::State::SmcRestDone => "head cell restored; seeking star marker in rule",
                 utm::State::SmcSkipSt => "match cleanup; skipping state bits in rule to reach symbol field",
@@ -337,25 +340,6 @@ fn main() {
                 utm::State::RejRestSkip2 => "rejecting; skipping rules section to reach state",
                 utm::State::RejRestState => "rejecting; restoring state section marks to 0/1",
                 utm::State::RejFinalHome => "rejecting; seeking $ to enter final reject state",
-
-                // Load (SYMCACHE)
-                utm::State::LdC0 | utm::State::LdC1 => "load: carrying bit from tape to SYMCACHE",
-                utm::State::LdC0Tp | utm::State::LdC1Tp => "load: scanning left through tape",
-                utm::State::LdC0Bl | utm::State::LdC1Bl => "load: scanning left through blank section",
-                utm::State::LdC0Sc | utm::State::LdC1Sc => "load: scanning left through SYMCACHE",
-                utm::State::LdC0Wr | utm::State::LdC1Wr => "load: writing bit in SYMCACHE",
-                utm::State::LdRead => "load: reading next bit from tape head cell",
-                utm::State::LdRetSc => "load: returning right through SYMCACHE",
-                utm::State::LdRetBl => "load: returning right through blank section",
-                utm::State::LdRetFh => "load: returning right through tape to find head",
-                utm::State::LdDone => "load: all bits loaded, starting restore",
-                utm::State::LdRestTp => "load: restoring tape head cell marks",
-                utm::State::LdNavSc1 => "load: navigating left to SYMCACHE through tape",
-                utm::State::LdNavSc2 => "load: navigating left through blank section",
-                utm::State::LdNavSc3 => "load: navigating left through SYMCACHE",
-                utm::State::LdRestSc => "load: restoring SYMCACHE marks",
-                utm::State::LdSeekHead => "load: seeking head marker after move right",
-                utm::State::MlNavHead => "load: seeking head marker after move left",
 
                 // Noop compact rule handling
                 utm::State::NpNextbit => "noop rule; at caret marker, skipping marked bits to read next symbol bit",
