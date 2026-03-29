@@ -138,7 +138,7 @@ export function decodeFromUtm(
 
   // New layout: # ACC # BLANK # RULES $ STATE # TAPE
   // Find $ to locate STATE, find first # after $ for TAPE
-  const dollarPos = utmTape.indexOf("$");
+  const dollarPos = utmTape.indexOf(S("$"));
   if (dollarPos < 0) {
     throw new Error("No $ delimiter found");
   }
@@ -148,7 +148,7 @@ export function decodeFromUtm(
   const state = guestStates[fromBinary(utmTape, stateStart, nStateBits)];
 
   // TAPE section: after first # following $
-  const tapeHash = utmTape.indexOf("#", dollarPos);
+  const tapeHash = utmTape.indexOf(S("#"), dollarPos);
   if (tapeHash < 0) {
     throw new Error("No # after $ for TAPE section");
   }
