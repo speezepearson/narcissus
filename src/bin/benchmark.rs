@@ -72,10 +72,24 @@ fn main() {
                 );
             }
         } else {
+            let orig_state = compiled.original_states[tm.state.0 as usize];
+            let orig_sym = compiled.original_symbols[sym.0 as usize];
             println!(
-                "UTM halted after {} steps ({} inner steps)",
-                total_steps, inner_steps
+                "UTM halted after {} steps ({} inner steps) in state {:?} reading {:?} at pos {}",
+                total_steps, inner_steps, orig_state, orig_sym, tm.pos
             );
+            // Print surrounding tape context
+            let start = tm.pos.saturating_sub(30);
+            let end = (tm.pos + 30).min(tm.tape.len());
+            for i in start..end {
+                let s = compiled.original_symbols[tm.tape[i].0 as usize];
+                if i == tm.pos {
+                    print!("[{:?}]", s);
+                } else {
+                    print!("{:?} ", s);
+                }
+            }
+            println!();
             break;
         }
     }

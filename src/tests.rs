@@ -821,3 +821,60 @@ fn test_at_tick_double_x() {
     use DoubleXSymbol::*;
     assert_tick_faithful(&*DOUBLE_X_SPEC, &[Dollar, X, X], 20, 50_000_000);
 }
+
+/// Test that the UTM self-simulation with Huffman-optimized state encoding
+/// can complete at least one inner step without halting.
+#[test]
+fn test_huffman_self_sim_one_inner_step() {
+    use crate::compiled::CompiledTuringMachineSpec;
+    use crate::infinity::InfiniteTape;
+
+    let optimization_hints = make_my_utm_self_optimization_hints();
+    let utm_spec = make_utm_spec();
+    let compiled = CompiledTuringMachineSpec::compile(&utm_spec).expect("UTM should compile");
+
+    let mut tm = RunningTuringMachine::new(&compiled);
+    let background = InfiniteTape::new(&utm_spec, &optimization_hints);
+
+    let mut total_steps: u64 = 0;
+    let mut inner_steps: u64 = 0;
+    let mut prev_state = tm.state;
+    let max_steps: u64 = 200_000_000;
+
+    while total_steps < max_steps && inner_steps < 1 {
+        if tm.pos >= tm.tape.len() {
+            background.extend_compiled(&mut tm.tape, tm.pos + 1, &compiled);
+        }
+        let sym = tm.tape[tm.pos];
+        match compiled.get_transition(tm.state, sym) {
+            Some((ns, nsym, dir)) => {
+                tm.state = ns;
+                tm.tape[tm.pos] = nsym;
+                tm.pos = match dir {
+                    crate::tm::Dir::Left => tm.pos.saturating_sub(1),
+                    crate::tm::Dir::Right => tm.pos + 1,
+                };
+                total_steps += 1;
+                if compiled.is_tick_boundary(prev_state, tm.state) {
+                    inner_steps += 1;
+                }
+                prev_state = tm.state;
+            }
+            None => {
+                let orig_state = compiled.original_states[tm.state.0 as usize];
+                let orig_sym = compiled.original_symbols[sym.0 as usize];
+                panic!(
+                    "UTM halted unexpectedly at step {} in state {:?} reading {:?} at pos {}",
+                    total_steps, orig_state, orig_sym, tm.pos
+                );
+            }
+        }
+    }
+
+    assert!(
+        inner_steps >= 1,
+        "Expected at least 1 inner step in {} outer steps, got {}",
+        total_steps,
+        inner_steps
+    );
+}

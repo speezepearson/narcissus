@@ -1632,6 +1632,123 @@ pub fn run_until_inner_step<Spec: UtmSpec>(
     Err(RunUntilResult::StepLimit)
 }
 
+/// Build a length-limited Huffman prefix-free code for a set of items.
+/// Items with higher frequency get shorter codes. No code exceeds `max_bits` bits.
+/// Uses canonical Huffman codes: compute optimal lengths, clamp to max_bits,
+/// then assign canonical codes.
+pub fn huffman_codes<T: Copy + Eq + Hash>(
+    items: &[T],
+    freq: impl Fn(&T) -> usize,
+    max_bits: usize,
+) -> HashMap<T, Vec<Symbol>> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+
+    let n = items.len();
+    if n == 0 {
+        return HashMap::new();
+    }
+    if n == 1 {
+        let mut m = HashMap::new();
+        m.insert(items[0], vec![Symbol::Zero]);
+        return m;
+    }
+
+    // Step 1: Build standard Huffman tree to get code lengths
+    let mut node_freq: Vec<usize> = Vec::with_capacity(2 * n - 1);
+    for item in items {
+        node_freq.push(freq(item).max(1));
+    }
+
+    let mut heap: BinaryHeap<Reverse<(usize, usize)>> = BinaryHeap::new();
+    for i in 0..n {
+        heap.push(Reverse((node_freq[i], i)));
+    }
+
+    let mut parent: Vec<usize> = vec![usize::MAX; 2 * n - 1];
+
+    while heap.len() > 1 {
+        let Reverse((f1, n1)) = heap.pop().unwrap();
+        let Reverse((f2, n2)) = heap.pop().unwrap();
+        let new_idx = node_freq.len();
+        node_freq.push(f1 + f2);
+        parent.push(usize::MAX);
+        parent[n1] = new_idx;
+        parent[n2] = new_idx;
+        heap.push(Reverse((f1 + f2, new_idx)));
+    }
+
+    // Step 2: Compute code lengths from tree depth, clamped to max_bits
+    let mut lengths: Vec<usize> = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut depth = 0;
+        let mut node = i;
+        while parent[node] != usize::MAX {
+            depth += 1;
+            node = parent[node];
+        }
+        lengths.push(depth.min(max_bits));
+    }
+
+    // Step 3: Adjust lengths to satisfy the Kraft inequality: sum(2^-l_i) <= 1
+    // Sort items by length (desc), then by frequency (asc) for tie-breaking
+    let mut indices: Vec<usize> = (0..n).collect();
+    indices.sort_by(|&a, &b| lengths[b].cmp(&lengths[a]).then(node_freq[a].cmp(&node_freq[b])));
+
+    loop {
+        let kraft_sum: f64 = lengths.iter().map(|&l| (1u64 << max_bits) as f64 / (1u64 << l) as f64).sum();
+        let capacity = (1u64 << max_bits) as f64;
+        if kraft_sum <= capacity + 0.5 {
+            break;
+        }
+        // Find the longest code and shorten it by giving a shorter code more length
+        // Strategy: increase the shortest code by 1 bit to free capacity
+        // Actually, find the item with shortest code and longest code
+        let longest_idx = *indices.first().unwrap();
+        if lengths[longest_idx] <= 1 {
+            break; // Can't reduce further
+        }
+        // Reduce longest by 1 and increase some shorter one by 1
+        // But this is complex. Simpler: just increase all clamped codes' lengths
+        // until Kraft is satisfied, using canonical Huffman length adjustment.
+
+        // Simpler approach: iteratively steal from longest
+        let shortest_idx = *indices.last().unwrap();
+        if lengths[shortest_idx] >= max_bits {
+            break;
+        }
+        lengths[shortest_idx] += 1;
+        lengths[longest_idx] -= 1;
+        indices.sort_by(|&a, &b| lengths[b].cmp(&lengths[a]).then(node_freq[a].cmp(&node_freq[b])));
+    }
+
+    // Step 4: Assign canonical codes based on lengths
+    // Sort by (length, original_index) for canonical assignment
+    let mut items_with_lengths: Vec<(usize, usize)> = (0..n).map(|i| (lengths[i], i)).collect();
+    items_with_lengths.sort();
+
+    let mut codes: HashMap<T, Vec<Symbol>> = HashMap::new();
+    let mut code: u64 = 0;
+    let mut prev_len = items_with_lengths[0].0;
+
+    for &(len, idx) in &items_with_lengths {
+        code <<= len - prev_len;
+        let mut bits = Vec::with_capacity(len);
+        for b in (0..len).rev() {
+            bits.push(if (code >> b) & 1 == 1 {
+                Symbol::One
+            } else {
+                Symbol::Zero
+            });
+        }
+        codes.insert(items[idx], bits);
+        code += 1;
+        prev_len = len;
+    }
+
+    codes
+}
+
 pub struct TmTransitionStats<Guest: TuringMachineSpec>(
     pub HashMap<(Guest::State, Guest::Symbol), usize>,
 );
@@ -1658,13 +1775,25 @@ impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
         rules
     }
 
-    pub fn get_optimal_state_encoding(&self, guest: &Guest) -> HashMap<Guest::State, usize> {
-        // todo!()
-        guest
-            .iter_states()
-            .enumerate()
-            .map(|(i, s)| (s, i))
-            .collect()
+    pub fn get_optimal_state_encoding(&self, guest: &Guest) -> HashMap<Guest::State, Vec<Symbol>> {
+        let states: Vec<Guest::State> = guest.iter_states().collect();
+        let n = states.len();
+        if n <= 1 {
+            return states.into_iter().map(|s| (s, vec![Symbol::Zero])).collect();
+        }
+
+        // Compute per-state frequencies by summing over all symbols
+        let mut freq: HashMap<Guest::State, usize> = HashMap::new();
+        for ((st, _sym), count) in self.0.iter() {
+            *freq.entry(*st).or_insert(0) += count;
+        }
+        // Ensure all states have an entry (min freq 1 to avoid zero-weight nodes)
+        for &st in &states {
+            freq.entry(st).or_insert(1);
+        }
+
+        let max_bits = num_bits(n);
+        huffman_codes(&states, |s| *freq.get(s).unwrap_or(&1), max_bits)
     }
 
     pub fn get_optimal_symbol_encoding(&self, guest: &Guest) -> HashMap<Guest::Symbol, usize> {
@@ -1679,13 +1808,33 @@ impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
 
 pub struct MyUtmSpecOptimizationHints<Guest: TuringMachineSpec> {
     pub rule_order: Vec<(Guest::State, Guest::Symbol)>,
-    pub state_encodings: HashMap<Guest::State, usize>,
+    pub state_encodings: HashMap<Guest::State, Vec<Symbol>>,
     pub symbol_encodings: HashMap<Guest::Symbol, usize>,
 }
 impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
+    /// Default encoding: fixed-width sequential codes (compatible with decode).
     pub fn guess(guest: &Guest) -> Self {
-        let stats = TmTransitionStats::default();
-        stats.make_optimization_hints(guest)
+        let states: Vec<Guest::State> = guest.iter_states().collect();
+        let n_state_bits = num_bits(states.len());
+        let state_encodings = states
+            .iter()
+            .enumerate()
+            .map(|(i, &s)| (s, to_binary(i, n_state_bits)))
+            .collect();
+        let symbol_encodings = guest
+            .iter_symbols()
+            .enumerate()
+            .map(|(i, s)| (s, i))
+            .collect();
+        let rule_order = guest
+            .iter_rules()
+            .map(|(st, sym, _, _, _)| (st, sym))
+            .collect();
+        Self {
+            rule_order,
+            state_encodings,
+            symbol_encodings,
+        }
     }
 }
 
@@ -1710,7 +1859,6 @@ impl MyUtmSpec {
         if hints.rule_order.len() != guest.spec.iter_rules().count() {
             panic!("rule order length mismatch");
         }
-        let n_state_bits = num_bits(hints.state_encodings.len());
         let n_sym_bits = num_bits(hints.symbol_encodings.len());
 
         // Collect all rules
@@ -1749,11 +1897,11 @@ impl MyUtmSpec {
             }
             first_rule = false;
             tape.push(Symbol::Dot);
-            tape.extend_from_slice(&to_binary(hints.state_encodings[&st], n_state_bits));
+            tape.extend_from_slice(&hints.state_encodings[&st]);
             tape.push(Symbol::Pipe);
             tape.extend_from_slice(&to_binary(hints.symbol_encodings[&sym], n_sym_bits));
             tape.push(Symbol::Pipe);
-            tape.extend_from_slice(&to_binary(hints.state_encodings[&nst], n_state_bits));
+            tape.extend_from_slice(&hints.state_encodings[&nst]);
             tape.push(Symbol::Pipe);
             tape.extend_from_slice(&to_binary(hints.symbol_encodings[&nsym], n_sym_bits));
             tape.push(Symbol::Pipe);
@@ -1773,14 +1921,22 @@ impl MyUtmSpec {
             if i > 0 {
                 tape.push(Symbol::Semi);
             }
-            tape.extend_from_slice(&to_binary(hints.state_encodings[&state], n_state_bits));
+            tape.extend_from_slice(&hints.state_encodings[&state]);
         }
 
         tape.push(Symbol::Hash);
-        tape.extend_from_slice(&to_binary(
-            hints.state_encodings[&guest.state],
-            n_state_bits,
-        ));
+        // Pad the STATE section to max_state_code_len so the UTM's
+        // copy-new-state phase always has enough room.
+        let max_state_code_len = hints
+            .state_encodings
+            .values()
+            .map(|c| c.len())
+            .max()
+            .unwrap_or(0);
+        tape.extend_from_slice(&hints.state_encodings[&guest.state]);
+        for _ in hints.state_encodings[&guest.state].len()..max_state_code_len {
+            tape.push(Symbol::Zero); // padding
+        }
 
         tape.push(Symbol::Hash);
         tape.extend_from_slice(&to_binary(
