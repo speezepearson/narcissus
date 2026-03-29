@@ -481,5 +481,5 @@ fn main() {
         },
     };
 
-    println!("{}", serde_json::to_string_pretty(&export).unwrap());
+    println!("{}", serde_json::to_string(&export).unwrap());
 }
