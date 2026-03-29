@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type Dir, type TuringMachineSpec, State, Symbol } from "./types";
-import rawSpecs from "./machine-specs.json";
+import rawRustExport from "./rust-export.json";
 
 const DirSchema = z.literal("L").or(z.literal("R"));
 const RuleTriple = z.tuple([z.string(), z.string(), DirSchema]);
@@ -59,7 +59,17 @@ function parseSpec(json: JsonSpec): ParsedSpec {
   };
 }
 
-export const machineSpecs: ParsedSpec[] = z
-  .array(JsonSpecSchema)
-  .parse(rawSpecs)
-  .map(parseSpec);
+export const RustExportSchema = z.object({
+  machineSpecs: z.array(JsonSpecSchema),
+  welcomeModalExample: z.object({
+    bitFlipperSpec: JsonSpecSchema,
+    utmSpec: JsonSpecSchema,
+    bitFlipperInput: z.array(Symbol),
+    utmInput: z.array(Symbol),
+    doubleUtmInput: z.array(Symbol),
+  }),
+});
+
+export const rustExport = RustExportSchema.parse(rawRustExport);
+
+export const machineSpecs: ParsedSpec[] = rustExport.machineSpecs.map(parseSpec);

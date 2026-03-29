@@ -5,9 +5,8 @@ import {
   type State,
   type TuringMachineSnapshot,
 } from "./types";
-import { machineSpecs } from "./parseSpec";
-import { TapeInput, useTapeInput } from "./TapeInput";
-import { decodeFromUtm, encodeForUtm } from "./utmEncoding";
+import { machineSpecs, rustExport } from "./parseSpec";
+import { decodeFromUtm } from "./utmEncoding";
 import { TapeView } from "./TapeView";
 
 const STORAGE_KEY = "welcomeModalDismissed";
@@ -25,29 +24,34 @@ export function WelcomeModal() {
     () => !localStorage.getItem(STORAGE_KEY),
   );
 
-  const [flipBitsInput, setFlipBitsInput] = useState("010101");
+  const { welcomeModalExample } = rustExport;
 
-  const { snapshot } = useTapeInput(flipBitsSpec.spec, flipBitsInput);
+  const snapshot = useMemo(
+    () =>
+      makeInitSnapshot(
+        flipBitsSpec.spec,
+        welcomeModalExample.bitFlipperInput,
+      ),
+    [welcomeModalExample],
+  );
 
   // L1: UTM simulating flip-bits
-  const utm1Snapshot = useMemo(() => {
-    if (!snapshot) return null;
-    const utmTape = encodeForUtm(flipBitsSpec.spec, snapshot);
-    return makeInitSnapshot(utmSpec.spec, utmTape);
-  }, [snapshot]);
+  const utm1Snapshot = useMemo(
+    () => makeInitSnapshot(utmSpec.spec, welcomeModalExample.utmInput),
+    [welcomeModalExample],
+  );
 
   // L2: UTM simulating L1
-  const utm2Snapshot = useMemo(() => {
-    if (!utm1Snapshot) return null;
-    const utmTape = encodeForUtm(utmSpec.spec, utm1Snapshot);
-    return makeInitSnapshot(utmSpec.spec, utmTape);
-  }, [utm1Snapshot]);
+  const utm2Snapshot = useMemo(
+    () => makeInitSnapshot(utmSpec.spec, welcomeModalExample.doubleUtmInput),
+    [welcomeModalExample],
+  );
 
   // Decoded L1 -> flip-bits guest
-  const initialDecodedL1 = useMemo(() => {
-    if (!utm1Snapshot) return null;
-    return decodeFromUtm(flipBitsSpec.spec, utm1Snapshot.tape);
-  }, [utm1Snapshot]);
+  const initialDecodedL1 = useMemo(
+    () => decodeFromUtm(flipBitsSpec.spec, utm1Snapshot.tape),
+    [utm1Snapshot],
+  );
 
   const [decodedFromL1, setDecodedFromL1] =
     useState<TuringMachineSnapshot | null>(null);
@@ -71,7 +75,6 @@ export function WelcomeModal() {
 
   // Decoded L2 -> L1 UTM guest, then L1 -> flip-bits guest
   const initialDecodedL2 = useMemo(() => {
-    if (!utm2Snapshot) return null;
     const l1 = decodeFromUtm(utmSpec.spec, utm2Snapshot.tape);
     const l0 = decodeFromUtm(flipBitsSpec.spec, l1.tape);
     return { l1, l0 };
@@ -177,19 +180,10 @@ export function WelcomeModal() {
         </p>
 
         <div style={{ margin: "0 10%" }}>
-          {snapshot && (
-            <TuringMachineViewer
-              key={flipBitsInput}
-              init={snapshot}
-              initialFps={5}
-              stateDescriptions={flipBitsSpec.stateDescriptions}
-            />
-          )}
-
-          <TapeInput
-            parsed={flipBitsSpec}
-            value={flipBitsInput}
-            onChange={setFlipBitsInput}
+          <TuringMachineViewer
+            init={snapshot}
+            initialFps={5}
+            stateDescriptions={flipBitsSpec.stateDescriptions}
           />
         </div>
 
@@ -201,15 +195,12 @@ export function WelcomeModal() {
         </p>
 
         <div style={{ margin: "0 10%" }}>
-          {utm1Snapshot && (
-            <TuringMachineViewer
-              key={`utm1-${flipBitsInput}`}
-              init={utm1Snapshot}
-              onStateChange={onUtm1StateChange}
-              initialFps={30}
-              stateDescriptions={utmSpec.stateDescriptions}
-            />
-          )}
+          <TuringMachineViewer
+            init={utm1Snapshot}
+            onStateChange={onUtm1StateChange}
+            initialFps={30}
+            stateDescriptions={utmSpec.stateDescriptions}
+          />
 
           {decodedFromL1 && (
             <>
@@ -271,15 +262,12 @@ export function WelcomeModal() {
 
         <div style={{ margin: "0 10%" }}>
           <div style={{ fontSize: "0.3em" }}>
-            {utm2Snapshot && (
-              <TuringMachineViewer
-                key={`utm2-${flipBitsInput}`}
-                init={utm2Snapshot}
-                onStateChange={onUtm2StateChange}
-                initialFps={10000000}
-                stateDescriptions={utmSpec.stateDescriptions}
-              />
-            )}
+            <TuringMachineViewer
+              init={utm2Snapshot}
+              onStateChange={onUtm2StateChange}
+              initialFps={10000000}
+              stateDescriptions={utmSpec.stateDescriptions}
+            />
           </div>
 
           {decodedFromL2 && (

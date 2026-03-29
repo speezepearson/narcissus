@@ -1,7 +1,36 @@
-use utmmmmm::json_export::export_spec;
+use serde::Serialize;
+use utmmmmm::gen_utm::UtmSpec as _;
+use utmmmmm::json_export::{export_spec, JsonTuringMachineSpec};
+use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::*;
 use utmmmmm::utm;
 use utmmmmm::utm::make_utm_spec;
+
+fn utm_symbol_to_string(s: utm::Symbol) -> String {
+    format!("{}", s)
+}
+
+#[derive(Serialize)]
+struct RustExport {
+    #[serde(rename = "machineSpecs")]
+    machine_specs: Vec<JsonTuringMachineSpec>,
+    #[serde(rename = "welcomeModalExample")]
+    welcome_modal_example: WelcomeModalExample,
+}
+
+#[derive(Serialize)]
+struct WelcomeModalExample {
+    #[serde(rename = "bitFlipperSpec")]
+    bit_flipper_spec: JsonTuringMachineSpec,
+    #[serde(rename = "utmSpec")]
+    utm_spec: JsonTuringMachineSpec,
+    #[serde(rename = "bitFlipperInput")]
+    bit_flipper_input: Vec<String>,
+    #[serde(rename = "utmInput")]
+    utm_input: Vec<String>,
+    #[serde(rename = "doubleUtmInput")]
+    double_utm_input: Vec<String>,
+}
 
 fn main() {
     let utm_spec = make_utm_spec();
@@ -346,5 +375,100 @@ fn main() {
         ),
     ];
 
-    println!("{}", serde_json::to_string_pretty(&specs).unwrap());
+    // Build welcome modal example tapes
+    // bitFlipperInput: the flip-bits machine's own initial tape (display symbols)
+    let flip_bits_tape = {
+        use FlipBitsSymbol::*;
+        vec![Zero, One, Zero, One, Zero, One]
+    };
+    let bit_flipper_input: Vec<String> = flip_bits_tape
+        .iter()
+        .map(|s| match s {
+            FlipBitsSymbol::Blank => "_",
+            FlipBitsSymbol::Zero => "0",
+            FlipBitsSymbol::One => "1",
+        }.to_string())
+        .collect();
+
+    // utmInput: UTM tape encoding the flip-bits machine (L1)
+    let utm_input: Vec<String> = {
+        let mut guest = RunningTuringMachine::new(&*FLIP_BITS_SPEC);
+        guest.tape = flip_bits_tape.clone();
+        utm_spec.encode(&guest).iter().map(|s| utm_symbol_to_string(*s)).collect()
+    };
+
+    // doubleUtmInput: UTM tape encoding UTM-simulating-flip-bits (L2)
+    let double_utm_input: Vec<String> = {
+        let mut guest = RunningTuringMachine::new(&*FLIP_BITS_SPEC);
+        guest.tape = flip_bits_tape;
+        let l1_tape = utm_spec.encode(&guest);
+        let mut l1_tm = RunningTuringMachine::new(&utm_spec);
+        l1_tm.tape = l1_tape;
+        utm_spec.encode(&l1_tm).iter().map(|s| utm_symbol_to_string(*s)).collect()
+    };
+
+    // Reuse the flip bits and UTM specs already in `specs` for the welcome modal
+    let bit_flipper_idx = specs.iter().position(|s| s.name == "Flip Bits").unwrap();
+    let utm_idx = specs.iter().position(|s| s.name == "Universal Turing Machine").unwrap();
+
+    // We need owned copies for the welcome modal example
+    let bit_flipper_spec = export_spec(
+        &*FLIP_BITS_SPEC,
+        "Flip Bits",
+        "Flips 0s to 1s and vice versa, then halts at blank.",
+        |s| format!("{:?}", s),
+        |s| format!("{:?}", s),
+        |s| format!("{:?}", s),
+        |s| match s {
+            FlipBitsSymbol::Blank => '_',
+            FlipBitsSymbol::Zero => '0',
+            FlipBitsSymbol::One => '1',
+        },
+    );
+
+    // For the UTM spec in welcome modal, reuse the same export logic
+    let utm_spec_export = export_spec(
+        &utm_spec,
+        "Universal Turing Machine",
+        "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
+        |s| format!("{:?}", s),
+        |s| match s {
+            utm::State::Accept => "accepted!".to_string(),
+            _ => format!("{:?}", s),
+        },
+        |s| format!("{:?}", s),
+        |s| match s {
+            utm::Symbol::Blank => '_',
+            utm::Symbol::Zero => '0',
+            utm::Symbol::One => '1',
+            utm::Symbol::X => 'X',
+            utm::Symbol::Y => 'Y',
+            utm::Symbol::Hash => '#',
+            utm::Symbol::Pipe => '|',
+            utm::Symbol::Semi => ';',
+            utm::Symbol::Comma => ',',
+            utm::Symbol::Caret => '^',
+            utm::Symbol::L => 'L',
+            utm::Symbol::R => 'R',
+            utm::Symbol::Dot => '.',
+            utm::Symbol::Star => '*',
+            utm::Symbol::Gt => '>',
+            utm::Symbol::Dollar => '$',
+        },
+    );
+
+    let _ = (bit_flipper_idx, utm_idx); // suppress unused warnings
+
+    let export = RustExport {
+        machine_specs: specs,
+        welcome_modal_example: WelcomeModalExample {
+            bit_flipper_spec,
+            utm_spec: utm_spec_export,
+            bit_flipper_input,
+            utm_input,
+            double_utm_input,
+        },
+    };
+
+    println!("{}", serde_json::to_string_pretty(&export).unwrap());
 }
