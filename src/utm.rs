@@ -1555,11 +1555,26 @@ impl UtmSpec for MyUtmSpec {
         guest: &'a Guest,
         tape: &[Self::Symbol],
     ) -> Result<RunningTuringMachine<'a, Guest>, String> {
-        let guest_states: Vec<Guest::State> = guest.iter_states().collect();
-        let guest_symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
+        let hints = MyUtmSpecOptimizationHints::<Guest>::guess(guest);
 
-        let n_state_bits = num_bits(guest_states.len());
-        let n_sym_bits = num_bits(guest_symbols.len());
+        // Build reverse mappings: index → guest state/symbol
+        let n_states = hints.state_encodings.len();
+        let n_symbols = hints.symbol_encodings.len();
+        let mut guest_states: Vec<Option<Guest::State>> = vec![None; n_states];
+        for (&state, &idx) in &hints.state_encodings {
+            guest_states[idx] = Some(state);
+        }
+        let guest_states: Vec<Guest::State> =
+            guest_states.into_iter().map(|s| s.unwrap()).collect();
+        let mut guest_symbols: Vec<Option<Guest::Symbol>> = vec![None; n_symbols];
+        for (&sym, &idx) in &hints.symbol_encodings {
+            guest_symbols[idx] = Some(sym);
+        }
+        let guest_symbols: Vec<Guest::Symbol> =
+            guest_symbols.into_iter().map(|s| s.unwrap()).collect();
+
+        let n_state_bits = num_bits(n_states);
+        let n_sym_bits = num_bits(n_symbols);
 
         // Find the sections separated by #
         // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] TAPE
@@ -1678,28 +1693,102 @@ impl<Guest: TuringMachineSpec> Default for TmTransitionStats<Guest> {
 }
 impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
     pub fn make_optimization_hints(&self, guest: &Guest) -> MyUtmSpecOptimizationHints<Guest> {
+        let symbol_encodings = self.get_optimal_symbol_encoding(guest);
+        let state_encodings = self.get_optimal_state_encoding(guest, &symbol_encodings);
         MyUtmSpecOptimizationHints {
             transition_stats: self.0.clone(),
-            state_encodings: self.get_optimal_state_encoding(guest),
-            symbol_encodings: self.get_optimal_symbol_encoding(guest),
+            state_encodings,
+            symbol_encodings,
         }
     }
 
-    pub fn get_optimal_state_encoding(&self, guest: &Guest) -> HashMap<Guest::State, usize> {
-        // todo!()
-        guest
-            .iter_states()
+    pub fn get_optimal_state_encoding(
+        &self,
+        guest: &Guest,
+        symbol_encodings: &HashMap<Guest::Symbol, usize>,
+    ) -> HashMap<Guest::State, usize> {
+        let rules: Vec<_> = guest.iter_rules().collect();
+
+        // Compute noop profile for each state: Dir -> set of encoded sym indices.
+        let mut noop_profiles: HashMap<Guest::State, BTreeMap<Dir, BTreeSet<usize>>> =
+            HashMap::new();
+        for &(st, sym, nst, nsym, dir) in &rules {
+            if nst == st && nsym == sym {
+                noop_profiles
+                    .entry(st)
+                    .or_default()
+                    .entry(dir)
+                    .or_default()
+                    .insert(symbol_encodings[&sym]);
+            }
+        }
+
+        // Sort states so those with the same noop profile are contiguous
+        // (enables state-prefix merging). States with noop profiles come first.
+        let empty_profile = BTreeMap::new();
+        let mut states: Vec<Guest::State> = guest.iter_states().collect();
+        states.sort_by(|a, b| {
+            let pa = noop_profiles.get(a).unwrap_or(&empty_profile);
+            let pb = noop_profiles.get(b).unwrap_or(&empty_profile);
+            let a_has = !pa.is_empty();
+            let b_has = !pb.is_empty();
+            b_has.cmp(&a_has).then_with(|| pa.cmp(pb))
+        });
+
+        states
+            .iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, &s)| (s, i))
             .collect()
     }
 
     pub fn get_optimal_symbol_encoding(&self, guest: &Guest) -> HashMap<Guest::Symbol, usize> {
-        // todo!()
-        guest
-            .iter_symbols()
+        let rules: Vec<_> = guest.iter_rules().collect();
+
+        // Identify noop groups (by state+dir) and assign each a numeric ID.
+        let mut noop_group_syms: Vec<Vec<Guest::Symbol>> = Vec::new();
+        let mut state_dir_to_group: HashMap<(Guest::State, Dir), usize> = HashMap::new();
+
+        for &(st, sym, nst, nsym, dir) in &rules {
+            if nst == st && nsym == sym {
+                let group_id =
+                    *state_dir_to_group
+                        .entry((st, dir))
+                        .or_insert_with(|| {
+                            let id = noop_group_syms.len();
+                            noop_group_syms.push(Vec::new());
+                            id
+                        });
+                noop_group_syms[group_id].push(sym);
+            }
+        }
+
+        // For each symbol, compute which noop groups it belongs to.
+        let mut sym_membership: HashMap<Guest::Symbol, BTreeSet<usize>> = HashMap::new();
+        for (gid, group) in noop_group_syms.iter().enumerate() {
+            for &sym in group {
+                sym_membership.entry(sym).or_default().insert(gid);
+            }
+        }
+
+        // Sort symbols by membership fingerprint for good prefix clustering:
+        // symbols in more noop groups first, then by fingerprint for grouping,
+        // non-noop symbols last.
+        let mut symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
+        symbols.sort_by(|a, b| {
+            let fa: Vec<usize> = sym_membership
+                .get(a)
+                .map_or_else(Vec::new, |s| s.iter().copied().collect());
+            let fb: Vec<usize> = sym_membership
+                .get(b)
+                .map_or_else(Vec::new, |s| s.iter().copied().collect());
+            fb.len().cmp(&fa.len()).then_with(|| fa.cmp(&fb))
+        });
+
+        symbols
+            .iter()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, &s)| (s, i))
             .collect()
     }
 }
@@ -1715,10 +1804,13 @@ pub enum GuestRule {
         new_sym: usize,
         dir: Dir,
     },
-    /// Compact noop rule: state , sym1 , sym2 , ... | dir
+    /// Compact noop rule: state_prefix , sym1 , sym2 , ... | dir
     /// All listed symbols leave state and symbol unchanged, just move.
+    /// `state_bits` may be shorter than `n_state_bits` (a prefix) when
+    /// multiple states share the same noop group and their encodings
+    /// share a common prefix.
     NoopGroup {
-        state: usize,
+        state_bits: Vec<Symbol>,
         syms: Vec<usize>,
         dir: Dir,
     },
@@ -1802,9 +1894,9 @@ impl GuestRule {
                     Dir::Right => Symbol::R,
                 });
             }
-            GuestRule::NoopGroup { state, syms, dir } => {
+            GuestRule::NoopGroup { state_bits, syms, dir } => {
                 out.push(Symbol::Dot);
-                out.extend_from_slice(&to_binary(*state, n_state_bits));
+                out.extend_from_slice(state_bits);
                 let prefixes = compress_prefixes(syms, n_sym_bits);
                 for prefix in &prefixes {
                     out.push(Symbol::Comma);
@@ -1837,6 +1929,9 @@ pub fn serialize_rules(rules: &[GuestRule], n_state_bits: usize, n_sym_bits: usi
 ///
 /// A noop rule is one where new_state == state and new_sym == sym.
 /// Noop rules for the same (state, direction) are grouped into a single NoopGroup.
+/// Noop groups with identical symbol sets and direction across different states
+/// are merged: the states are prefix-compressed so a single rule can match
+/// multiple guest states via a shorter-than-full-width state prefix.
 /// The resulting Vec is sorted by ascending sum of transition stat counts,
 /// so the UTM (which scans rules right-to-left) finds frequent rules first.
 pub fn group_rules<Guest: TuringMachineSpec>(
@@ -1851,10 +1946,11 @@ pub fn group_rules<Guest: TuringMachineSpec>(
     symbol_encodings: &HashMap<Guest::Symbol, usize>,
     transition_stats: &HashMap<(Guest::State, Guest::Symbol), usize>,
 ) -> Vec<GuestRule> {
-    // Identify noop rules and group by (state_encoding, dir)
+    let n_state_bits = num_bits(state_encodings.len());
+
+    // Step 1: Identify noop rules and group by (state_encoding, dir)
     let mut noop_groups: HashMap<(usize, Dir), Vec<usize>> = HashMap::new();
     let mut noop_set: HashSet<(Guest::State, Guest::Symbol)> = HashSet::new();
-    // Track Guest-typed keys per noop group for stat lookups
     let mut noop_group_keys: HashMap<(usize, Dir), Vec<(Guest::State, Guest::Symbol)>> =
         HashMap::new();
 
@@ -1871,7 +1967,30 @@ pub fn group_rules<Guest: TuringMachineSpec>(
         }
     }
 
-    // Build result: one entry per noop group, one per non-noop rule
+    // Step 2: Merge noop groups across states when they share the same (sorted syms, dir).
+    // merge_key = (sorted_sym_indices, dir) → list of state indices
+    let mut merge_map: HashMap<(Vec<usize>, Dir), Vec<usize>> = HashMap::new();
+    let mut merge_keys_by_state_dir: HashMap<(usize, Dir), (Vec<usize>, Dir)> = HashMap::new();
+    let mut merge_group_guest_keys: HashMap<(Vec<usize>, Dir), Vec<(Guest::State, Guest::Symbol)>> =
+        HashMap::new();
+
+    for ((st_idx, dir), syms) in &noop_groups {
+        let mut sorted_syms = syms.clone();
+        sorted_syms.sort();
+        sorted_syms.dedup();
+        let merge_key = (sorted_syms, *dir);
+        merge_map
+            .entry(merge_key.clone())
+            .or_default()
+            .push(*st_idx);
+        merge_keys_by_state_dir.insert((*st_idx, *dir), merge_key.clone());
+        merge_group_guest_keys
+            .entry(merge_key)
+            .or_default()
+            .extend_from_slice(&noop_group_keys[&(*st_idx, *dir)]);
+    }
+
+    // Step 3: Build result — one entry per state-prefix × noop group, one per non-noop rule
     let mut emitted_noop_groups: HashSet<(usize, Dir)> = HashSet::new();
     let mut result: Vec<(GuestRule, usize)> = Vec::new();
 
@@ -1883,20 +2002,33 @@ pub fn group_rules<Guest: TuringMachineSpec>(
             if emitted_noop_groups.contains(&key) {
                 continue;
             }
-            emitted_noop_groups.insert(key);
-            let syms = noop_groups[&key].clone();
-            let group_count: usize = noop_group_keys[&key]
+
+            let merge_key = &merge_keys_by_state_dir[&key];
+            let all_state_idxs = &merge_map[merge_key];
+
+            // Mark all states in this merged group as emitted
+            for &s_idx in all_state_idxs {
+                emitted_noop_groups.insert((s_idx, dir));
+            }
+
+            // Compute state prefixes and combined group count
+            let state_prefixes = compress_prefixes(all_state_idxs, n_state_bits);
+            let group_count: usize = merge_group_guest_keys[merge_key]
                 .iter()
                 .map(|k| transition_stats.get(k).unwrap_or(&0))
                 .sum();
-            result.push((
-                GuestRule::NoopGroup {
-                    state: st_idx,
-                    syms,
-                    dir,
-                },
-                group_count,
-            ));
+
+            // Emit one NoopGroup per state prefix
+            for state_prefix in &state_prefixes {
+                result.push((
+                    GuestRule::NoopGroup {
+                        state_bits: state_prefix.clone(),
+                        syms: merge_key.0.clone(),
+                        dir,
+                    },
+                    group_count,
+                ));
+            }
         } else {
             result.push((
                 GuestRule::Single {
