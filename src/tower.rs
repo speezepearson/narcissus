@@ -44,7 +44,12 @@ impl<'a> Tower<'a> {
         self.base.max_head_pos = max(self.base.max_head_pos, self.base.tm.pos);
         // eprintln!("step: {:?}", res);
 
-        if !self.base.tm.spec.is_tick_boundary(prev_state, self.base.tm.state) {
+        if !self
+            .base
+            .tm
+            .spec
+            .is_tick_boundary(prev_state, self.base.tm.state)
+        {
             // We didn't just transition into the clean state, so decoding isn't well-defined.
             return res;
         }

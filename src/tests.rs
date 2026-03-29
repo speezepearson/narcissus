@@ -763,12 +763,14 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
             .expect(&format!("decode at tick {}", i + 1));
 
         assert_eq!(
-            decoded.state, guest_tm.state,
+            decoded.state,
+            guest_tm.state,
             "state mismatch at inner step {}",
             i + 1
         );
         assert_eq!(
-            decoded.pos, guest_tm.pos,
+            decoded.pos,
+            guest_tm.pos,
             "pos mismatch at inner step {}",
             i + 1
         );
@@ -789,7 +791,8 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
             t
         };
         assert_eq!(
-            decoded_tape_trimmed, guest_tape_trimmed,
+            decoded_tape_trimmed,
+            guest_tape_trimmed,
             "tape mismatch at inner step {}",
             i + 1
         );

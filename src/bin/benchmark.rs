@@ -72,7 +72,10 @@ fn main() {
                 );
             }
         } else {
-            println!("UTM halted after {} steps ({} inner steps)", total_steps, inner_steps);
+            println!(
+                "UTM halted after {} steps ({} inner steps)",
+                total_steps, inner_steps
+            );
             break;
         }
     }
@@ -82,7 +85,11 @@ fn main() {
         "\nDone: {} outer steps, {} inner steps, ratio {:.1}, {:.1}s total ({:.1}M steps/s)",
         total_steps,
         inner_steps,
-        if inner_steps > 0 { total_steps as f64 / inner_steps as f64 } else { f64::INFINITY },
+        if inner_steps > 0 {
+            total_steps as f64 / inner_steps as f64
+        } else {
+            f64::INFINITY
+        },
         elapsed,
         total_steps as f64 / elapsed / 1e6,
     );
