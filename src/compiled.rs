@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::gen_utm::UtmSpec;
 use crate::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -165,6 +166,13 @@ impl<'a, Guest: TuringMachineSpec> CompiledTuringMachineSpec<'a, Guest> {
                 .map(|s| self.original_symbols[s.0 as usize])
                 .collect(),
         }
+    }
+}
+
+impl<'a, Guest: UtmSpec> CompiledTuringMachineSpec<'a, Guest> {
+    pub fn is_tick_boundary(&self, old_state: CState, state: CState) -> bool {
+        self.guest
+            .is_tick_boundary(self.decompile_state(old_state), self.decompile_state(state))
     }
 }
 

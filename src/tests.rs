@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::gen_utm::UtmSpec as _;
 use crate::optimization_hints::make_my_utm_self_optimization_hints;
 use crate::tm::{
-    run_tm, run_until_enters_state, HaltReason, RunUntilResult, RunningTuringMachine,
-    TuringMachineSpec,
+    run_tm, run_until_enters_state, step, HaltReason, RunUntilResult, RunningTMStatus,
+    RunningTuringMachine, TuringMachineSpec,
 };
 use crate::toy_machines::*;
 use crate::utm::*;
@@ -648,28 +648,24 @@ fn bench_rule_order_optimization() {
         compiled_tm
     };
 
-    // Find the CState index corresponding to State::Init
-    let init_cstate = compiled
-        .original_states
-        .iter()
-        .position(|&s| s == State::Init)
-        .map(|i| crate::compiled::CState(i as u8))
-        .expect("Init state should exist");
-
-    // Helper: count how many times the UTM enters Init in STEPS total steps
+    // Helper: count how many times the UTM completes an inner step in STEPS total steps
     let count_guest_steps = |tm: &mut RunningTuringMachine<
         CompiledTuringMachineSpec<crate::tm::SimpleTuringMachineSpec<State, Symbol>>,
     >|
      -> u64 {
         let mut guest_steps = 0u64;
+        let mut prev_state = tm.state;
         let mut remaining = STEPS;
         while remaining > 0 {
-            match run_until_enters_state(tm, init_cstate, remaining, None) {
-                Ok(steps) => {
-                    remaining -= steps;
-                    guest_steps += 1;
+            match step(tm) {
+                RunningTMStatus::Running => {
+                    if compiled.is_tick_boundary(prev_state, tm.state) {
+                        guest_steps += 1;
+                    }
+                    prev_state = tm.state;
+                    remaining -= 1;
                 }
-                Err(_) => break,
+                _ => break,
             }
         }
         guest_steps

@@ -1584,6 +1584,52 @@ impl UtmSpec for MyUtmSpec {
             tape: cells.iter().map(|&i| guest_symbols[i]).collect(),
         })
     }
+
+    fn is_tick_boundary(&self, prev_state: State, state: State) -> bool {
+        prev_state != state && state == State::DoneSeekHome
+    }
+}
+
+/// Step a UTM until `is_tick_boundary` fires (or it halts).
+/// Takes at least one step before checking.
+/// Returns Ok(num_steps) on tick, Err on halt or step limit.
+#[allow(dead_code)]
+pub fn run_until_inner_step<Spec: UtmSpec>(
+    spec: &Spec,
+    tm: &mut RunningTuringMachine<Spec>,
+    max_steps: usize,
+) -> Result<usize, crate::tm::RunUntilResult> {
+    use crate::tm::{step, RunUntilResult, RunningTMStatus};
+
+    let mut prev_state = tm.state;
+
+    for step_count in 1..=max_steps {
+        if tm.pos >= tm.tape.len() {
+            tm.tape.resize(tm.pos + 1, spec.blank());
+        }
+        match step(tm) {
+            RunningTMStatus::Running => {
+                if tm.pos >= tm.tape.len() {
+                    tm.tape.resize(tm.pos + 1, spec.blank());
+                }
+                if spec.is_tick_boundary(prev_state, tm.state) {
+                    return Ok(step_count);
+                }
+                prev_state = tm.state;
+            }
+            RunningTMStatus::Accepted => {
+                return Err(RunUntilResult::Accepted {
+                    num_steps: step_count,
+                });
+            }
+            RunningTMStatus::Rejected => {
+                return Err(RunUntilResult::Rejected {
+                    num_steps: step_count,
+                });
+            }
+        }
+    }
+    Err(RunUntilResult::StepLimit)
 }
 
 pub struct TmTransitionStats<Guest: TuringMachineSpec>(
