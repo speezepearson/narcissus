@@ -1877,6 +1877,133 @@ impl<Guest: TuringMachineSpec> TmTransitionStats<Guest> {
     }
 }
 
+/// A rule in the encoded guest program, using encoded indices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GuestRule {
+    /// Normal rule: state | sym | new_state | new_sym | dir
+    Single {
+        state: usize,
+        sym: usize,
+        new_state: usize,
+        new_sym: usize,
+        dir: Dir,
+    },
+    /// Compact noop rule: state , sym1 , sym2 , ... | dir
+    /// All listed symbols leave state and symbol unchanged, just move.
+    NoopGroup {
+        state: usize,
+        syms: Vec<usize>,
+        dir: Dir,
+    },
+}
+
+impl GuestRule {
+    /// Serialize this rule into UTM tape symbols.
+    pub fn serialize(&self, n_state_bits: usize, n_sym_bits: usize) -> Vec<Symbol> {
+        let mut out = Vec::new();
+        match self {
+            GuestRule::Single {
+                state,
+                sym,
+                new_state,
+                new_sym,
+                dir,
+            } => {
+                out.push(Symbol::Dot);
+                out.extend_from_slice(&to_binary(*state, n_state_bits));
+                out.push(Symbol::Pipe);
+                out.extend_from_slice(&to_binary(*sym, n_sym_bits));
+                out.push(Symbol::Pipe);
+                out.extend_from_slice(&to_binary(*new_state, n_state_bits));
+                out.push(Symbol::Pipe);
+                out.extend_from_slice(&to_binary(*new_sym, n_sym_bits));
+                out.push(Symbol::Pipe);
+                out.push(match dir {
+                    Dir::Left => Symbol::L,
+                    Dir::Right => Symbol::R,
+                });
+            }
+            GuestRule::NoopGroup { state, syms, dir } => {
+                out.push(Symbol::Dot);
+                out.extend_from_slice(&to_binary(*state, n_state_bits));
+                for &sym_idx in syms {
+                    out.push(Symbol::Comma);
+                    out.extend_from_slice(&to_binary(sym_idx, n_sym_bits));
+                }
+                out.push(Symbol::Pipe);
+                out.push(match dir {
+                    Dir::Left => Symbol::L,
+                    Dir::Right => Symbol::R,
+                });
+            }
+        }
+        out
+    }
+}
+
+/// Serialize a list of GuestRules into the RULES section content (without surrounding #).
+pub fn serialize_rules(rules: &[GuestRule], n_state_bits: usize, n_sym_bits: usize) -> Vec<Symbol> {
+    let mut tape = Vec::new();
+    for (i, rule) in rules.iter().enumerate() {
+        if i > 0 {
+            tape.push(Symbol::Semi);
+        }
+        tape.extend(rule.serialize(n_state_bits, n_sym_bits));
+    }
+    tape
+}
+
+/// Group an ordered list of guest rules into GuestRules, consolidating noops.
+///
+/// A noop rule is one where new_state == state and new_sym == sym.
+/// Consecutive noop rules for the same (state, direction) are grouped.
+/// The group is placed at the position of the last member.
+pub fn group_rules<Guest: TuringMachineSpec>(
+    ordered_rules: &[(Guest::State, Guest::Symbol, Guest::State, Guest::Symbol, Dir)],
+    state_encodings: &HashMap<Guest::State, usize>,
+    symbol_encodings: &HashMap<Guest::Symbol, usize>,
+) -> Vec<GuestRule> {
+    // Identify noop rules and group by (state_encoding, dir)
+    let mut noop_groups: HashMap<(usize, Dir), Vec<usize>> = HashMap::new();
+    let mut noop_set: HashSet<(Guest::State, Guest::Symbol)> = HashSet::new();
+    let mut noop_last_pos: HashMap<(usize, Dir), usize> = HashMap::new();
+
+    for (i, &(st, sym, nst, nsym, dir)) in ordered_rules.iter().enumerate() {
+        if nst == st && nsym == sym {
+            let st_idx = state_encodings[&st];
+            let sym_idx = symbol_encodings[&sym];
+            noop_groups.entry((st_idx, dir)).or_default().push(sym_idx);
+            noop_set.insert((st, sym));
+            noop_last_pos.insert((st_idx, dir), i);
+        }
+    }
+
+    let mut result = Vec::new();
+    for (i, &(st, sym, nst, nsym, dir)) in ordered_rules.iter().enumerate() {
+        if noop_set.contains(&(st, sym)) {
+            let st_idx = state_encodings[&st];
+            if noop_last_pos.get(&(st_idx, dir)) != Some(&i) {
+                continue;
+            }
+            let syms = noop_groups[&(st_idx, dir)].clone();
+            result.push(GuestRule::NoopGroup {
+                state: st_idx,
+                syms,
+                dir,
+            });
+        } else {
+            result.push(GuestRule::Single {
+                state: state_encodings[&st],
+                sym: symbol_encodings[&sym],
+                new_state: state_encodings[&nst],
+                new_sym: symbol_encodings[&nsym],
+                dir,
+            });
+        }
+    }
+    result
+}
+
 pub struct MyUtmSpecOptimizationHints<Guest: TuringMachineSpec> {
     pub rule_order: Vec<(Guest::State, Guest::Symbol)>,
     pub state_encodings: HashMap<Guest::State, usize>,
@@ -1962,70 +2089,12 @@ impl MyUtmSpec {
             n_sym_bits,
         ));
 
-        // Identify noop rules: (state, sym) -> (state, sym, dir) where nst==st && nsym==sym
-        // Group noop rules by (state_encoding, dir) for compact encoding
-        let mut noop_groups: HashMap<(usize, Dir), Vec<usize>> = HashMap::new();
-        let mut noop_set: HashSet<(Guest::State, Guest::Symbol)> = HashSet::new();
-        // Track last position of each noop group for placement
-        let mut noop_last_pos: HashMap<(usize, Dir), usize> = HashMap::new();
-        for (i, &&(st, sym, nst, nsym, dir)) in ordered_rules.iter().enumerate() {
-            if nst == st && nsym == sym {
-                let st_idx = hints.state_encodings[&st];
-                let sym_idx = hints.symbol_encodings[&sym];
-                noop_groups.entry((st_idx, dir)).or_default().push(sym_idx);
-                noop_set.insert((st, sym));
-                noop_last_pos.insert((st_idx, dir), i);
-            }
-        }
-
         // RULES section: # .rule1 ; .rule2 ; .rule3 ...
         tape.push(Symbol::Hash);
-        let mut first_rule = true;
-        for (i, &&(st, sym, nst, nsym, dir)) in ordered_rules.iter().enumerate() {
-            let is_noop = noop_set.contains(&(st, sym));
-            if is_noop {
-                // Emit compact noop rule at the position of the last member
-                let st_idx = hints.state_encodings[&st];
-                if noop_last_pos.get(&(st_idx, dir)) != Some(&i) {
-                    continue; // Skip; will be emitted at last position
-                }
-                let syms = &noop_groups[&(st_idx, dir)];
-                if !first_rule {
-                    tape.push(Symbol::Semi);
-                }
-                first_rule = false;
-                // Format: . STATE , SYM1 , SYM2 , ... | DIR
-                tape.push(Symbol::Dot);
-                tape.extend_from_slice(&to_binary(st_idx, n_state_bits));
-                for &sym_idx in syms {
-                    tape.push(Symbol::Comma);
-                    tape.extend_from_slice(&to_binary(sym_idx, n_sym_bits));
-                }
-                tape.push(Symbol::Pipe);
-                tape.push(match dir {
-                    Dir::Left => Symbol::L,
-                    Dir::Right => Symbol::R,
-                });
-            } else {
-                if !first_rule {
-                    tape.push(Symbol::Semi);
-                }
-                first_rule = false;
-                tape.push(Symbol::Dot);
-                tape.extend_from_slice(&to_binary(hints.state_encodings[&st], n_state_bits));
-                tape.push(Symbol::Pipe);
-                tape.extend_from_slice(&to_binary(hints.symbol_encodings[&sym], n_sym_bits));
-                tape.push(Symbol::Pipe);
-                tape.extend_from_slice(&to_binary(hints.state_encodings[&nst], n_state_bits));
-                tape.push(Symbol::Pipe);
-                tape.extend_from_slice(&to_binary(hints.symbol_encodings[&nsym], n_sym_bits));
-                tape.push(Symbol::Pipe);
-                tape.push(match dir {
-                    Dir::Left => Symbol::L,
-                    Dir::Right => Symbol::R,
-                });
-            }
-        }
+        let ordered: Vec<_> = ordered_rules.iter().map(|r| **r).collect();
+        let guest_rules =
+            group_rules::<Guest>(&ordered, &hints.state_encodings, &hints.symbol_encodings);
+        tape.extend(serialize_rules(&guest_rules, n_state_bits, n_sym_bits));
 
         // STATE section
         tape.push(Symbol::Hash);
