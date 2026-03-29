@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# UI checks
+(cd ui && npx prettier --check src scripts && npm run lint && npm run build)
+
+# Rust checks
+(export PATH="$HOME/.cargo/bin:$PATH" && cd ui/rust-utmmmmm && cargo fmt --check && cargo build)
