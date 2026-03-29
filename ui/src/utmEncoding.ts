@@ -1,12 +1,13 @@
 /**
  * TypeScript port of the UTM tape encoding/decoding logic from Rust (utm.rs).
  *
- * Tape layout: $ # RULES # ACCEPTSTATES # STATE # BLANK # TAPE $
+ * Tape layout: $ ACCEPTSTATES # BLANK # RULES # STATE # SYMCACHE # TAPE
  *
- * RULES:   dot-separated entries, each = stateBits | symBits | newStateBits | newSymBits | dir
  * ACCEPTSTATES: semicolon-separated state encodings
- * STATE:   current state bits
  * BLANK:   blank symbol bits
+ * RULES:   dot-separated entries, each = stateBits | symBits | newStateBits | newSymBits | dir
+ * STATE:   current state bits
+ * SYMCACHE: copy of head cell symbol bits
  * TAPE:    comma-separated cells, head cell prefixed with ^
  */
 
@@ -70,6 +71,19 @@ export function encodeForUtm(
   // $
   tape.push(S("$"));
 
+  // ACCEPTSTATES (right after $)
+  let firstAcc = true;
+  for (const state of guestSpec.allStates) {
+    if (!guestSpec.acceptingStates.has(state)) continue;
+    if (!firstAcc) tape.push(S(";"));
+    firstAcc = false;
+    tape.push(...toBinary(stateToIdx.get(state)!, nStateBits));
+  }
+
+  // # BLANK
+  tape.push(S("#"));
+  tape.push(...toBinary(symToIdx.get(guestSpec.blank)!, nSymBits));
+
   // # RULES
   tape.push(S("#"));
   let firstRule = true;
@@ -90,23 +104,18 @@ export function encodeForUtm(
     }
   }
 
-  // # ACCEPTSTATES
-  tape.push(S("#"));
-  let firstAcc = true;
-  for (const state of guestSpec.allStates) {
-    if (!guestSpec.acceptingStates.has(state)) continue;
-    if (!firstAcc) tape.push(S(";"));
-    firstAcc = false;
-    tape.push(...toBinary(stateToIdx.get(state)!, nStateBits));
-  }
-
   // # STATE
   tape.push(S("#"));
   tape.push(...toBinary(stateToIdx.get(guestSnapshot.state)!, nStateBits));
 
-  // # BLANK
+  // # SYMCACHE (head cell symbol)
   tape.push(S("#"));
-  tape.push(...toBinary(symToIdx.get(guestSpec.blank)!, nSymBits));
+  {
+    const guestTapeForSym =
+      guestSnapshot.tape.length === 0 ? [guestSpec.blank] : guestSnapshot.tape;
+    const headSym = guestTapeForSym[guestSnapshot.pos];
+    tape.push(...toBinary(symToIdx.get(headSym)!, nSymBits));
+  }
 
   // # TAPE
   tape.push(S("#"));

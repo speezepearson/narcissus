@@ -51,16 +51,16 @@ impl InfiniteTape {
         let cell_width = 1 + n_sym_bits;
 
         // Fix SYMCACHE: the first cell encodes header[0] (Dollar), not blank.
-        // SYMCACHE is between #[2] and #[3] in the header.
-        // Find the hash positions in the header.
+        // SYMCACHE is between #[3] and #[4] in the header.
+        // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] SYMCACHE #[4] TAPE
         let hashes: Vec<usize> = header
             .iter()
             .enumerate()
             .filter(|(_, &s)| s == Symbol::Hash)
             .map(|(i, _)| i)
             .collect();
-        if hashes.len() >= 3 {
-            let symcache_start = hashes[2] + 1;
+        if hashes.len() >= 4 {
+            let symcache_start = hashes[3] + 1;
             // The first tape cell encodes header[0] (typically Dollar)
             let first_cell_sym = header[0];
             let first_cell_idx = sym_to_idx[&first_cell_sym];

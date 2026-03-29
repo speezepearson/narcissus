@@ -855,14 +855,15 @@ fn test_noop_encoding_has_commas() {
     tm.tape = vec![1, 2, 0]; // S0, S1, Blank
     let encoded = utm.encode(&tm);
 
-    // Find rules section: between first and second #
+    // Find rules section: between #[1] and #[2] in new layout
+    // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] SYMCACHE #[4] TAPE
     let hashes: Vec<usize> = encoded
         .iter()
         .enumerate()
         .filter(|(_, s)| **s == Symbol::Hash)
         .map(|(i, _)| i)
         .collect();
-    let rules_section = &encoded[hashes[0] + 1..hashes[1]];
+    let rules_section = &encoded[hashes[1] + 1..hashes[2]];
 
     // Count commas in rules section - should be 2 (one per noop symbol: ,S0,S1)
     let comma_count = rules_section

@@ -144,12 +144,12 @@ fn main() {
 
                 // Phase 0: Init
                 utm::State::Init => "starting a new simulation cycle",
-                utm::State::InitSkip => "skipping initial $ delimiter",
+                utm::State::InitSkip => "skipping accept and blank sections to reach rules",
                 utm::State::InitSeekEnd => "scanning right to find end of rules section",
 
                 // Phase 1: Mark Rule
                 utm::State::MarkRule => "searching left for next rule to try",
-                utm::State::MarkRuleNoMatch => "no more rules to try; scanning right to check accept states",
+                utm::State::MarkRuleNoMatch => "no more rules to try; seeking home to check accept states",
 
                 // Phase 2: Compare State
                 utm::State::CmpStRead => "reading next state bit from current rule",
@@ -277,6 +277,7 @@ fn main() {
                 utm::State::MrExtH1 => "extending tape; skipping past rules section",
                 utm::State::MrExtH2 => "extending tape; skipping past accept states",
                 utm::State::MrExtH3 => "extending tape; skipping past state section to reach blank definition",
+                utm::State::MrExtNavToHead => "extending tape; navigating right to find head marker",
                 utm::State::MrExtReadBlank => "extending tape; reading next blank symbol bit to copy",
                 utm::State::MrExtBc0 => "extending tape; carrying blank bit 0 to new cell",
                 utm::State::MrExtBc1 => "extending tape; carrying blank bit 1 to new cell",
@@ -301,9 +302,15 @@ fn main() {
                 utm::State::ChkAccInit => "no rule matched; beginning to check if current state is accepting",
                 utm::State::ChkAccC0 => "checking accept; carrying bit 0 from accept entry toward state section",
                 utm::State::ChkAccC0Find => "checking accept; carrying bit 0, finding next unmarked state bit",
+                utm::State::ChkAccC0Sk1 => "checking accept; carrying bit 0, skipping blank section",
+                utm::State::ChkAccC0Sk2 => "checking accept; carrying bit 0, skipping rules section",
                 utm::State::ChkAccC1 => "checking accept; carrying bit 1 from accept entry toward state section",
                 utm::State::ChkAccC1Find => "checking accept; carrying bit 1, finding next unmarked state bit",
+                utm::State::ChkAccC1Sk1 => "checking accept; carrying bit 1, skipping blank section",
+                utm::State::ChkAccC1Sk2 => "checking accept; carrying bit 1, skipping rules section",
                 utm::State::ChkAccOk => "accept check bit matched; going back for next bit",
+                utm::State::ChkAccOkSk1 => "accept check; skipping left through rules to reach accept section",
+                utm::State::ChkAccOkSk2 => "accept check; skipping left through blank to reach accept section",
                 utm::State::ChkAccOkAcc => "accept check bit matched; scanning left through accept section",
                 utm::State::ChkAccOkFind => "accept check; finding next marked bit in accept entry",
                 utm::State::ChkAccOkSkip => "accept check; skipping past already-matched bits",
@@ -318,12 +325,16 @@ fn main() {
                 // Accept
                 utm::State::AcceptSeekHome => "state is accepting! restoring marks and seeking home",
                 utm::State::AccRestAcc => "accepting; restoring accept states section marks to 0/1",
+                utm::State::AccRestSkip1 => "accepting; skipping blank section to reach state",
+                utm::State::AccRestSkip2 => "accepting; skipping rules section to reach state",
                 utm::State::AccRestState => "accepting; restoring state section marks to 0/1",
                 utm::State::AccFinalHome => "accepting; seeking $ to enter final accept state",
 
                 // Reject
                 utm::State::RejectSeekHome => "state is not accepting; restoring marks and seeking home",
                 utm::State::RejRestAcc => "rejecting; restoring accept states section marks to 0/1",
+                utm::State::RejRestSkip1 => "rejecting; skipping blank section to reach state",
+                utm::State::RejRestSkip2 => "rejecting; skipping rules section to reach state",
                 utm::State::RejRestState => "rejecting; restoring state section marks to 0/1",
                 utm::State::RejFinalHome => "rejecting; seeking $ to enter final reject state",
 
