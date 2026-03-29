@@ -39,36 +39,26 @@ pub enum State {
     ChkAccRestState,
     CmpStC0,
     CmpStC0Find,
-    CmpStC0Sk1,
     CmpStC1,
     CmpStC1Find,
-    CmpStC1Sk1,
     CmpStFail,
     CmpStNextbit,
     CmpStOk,
     CmpStRead,
     CmpSymC0,
     CmpSymC0Fb,
-    CmpSymC0Fh,
     CmpSymC0S1,
-    CmpSymC0S2,
-    CmpSymC0S3,
     CmpSymC1,
     CmpSymC1Fb,
-    CmpSymC1Fh,
     CmpSymC1S1,
-    CmpSymC1S2,
-    CmpSymC1S3,
     CmpSymFail,
     CmpSymNb2,
     CmpSymNextbit,
     CmpSymOk,
     CmpSymRead,
     CpNstC0,
-    CpNstC0S1,
     CpNstC0W,
     CpNstC1,
-    CpNstC1S1,
     CpNstC1W,
     CpNstDone,
     CpNstNext,
@@ -76,7 +66,6 @@ pub enum State {
     CpNstNext3,
     CpNstRestDo,
     CpNstRestNav,
-    CpNstRestS1,
     CpNstRet,
     CpNsymC0,
     CpNsymC0Fb,
@@ -109,6 +98,27 @@ pub enum State {
     CpNsymSeek,
     DoneSeekHome,
     Init,
+    LdC0,
+    LdC0Bl,
+    LdC0Sc,
+    LdC0Tp,
+    LdC0Wr,
+    LdC1,
+    LdC1Bl,
+    LdC1Sc,
+    LdC1Tp,
+    LdC1Wr,
+    LdDone,
+    LdNavSc1,
+    LdNavSc2,
+    LdNavSc3,
+    LdRead,
+    LdRestSc,
+    LdRestTp,
+    LdRetBl,
+    LdRetFh,
+    LdRetSc,
+    LdSeekHead,
     InitSeekEnd,
     InitSkip,
     MarkRule,
@@ -116,6 +126,7 @@ pub enum State {
     MlFindHead,
     MlMark,
     MlNav,
+    MlNavHead,
     MlRestore,
     MlS1,
     MlS2,
@@ -158,13 +169,10 @@ pub enum State {
     RejFinalHome,
     RejRestAcc,
     RejRestState,
-    SmcFh,
     SmcRestDone,
     SmcRestHead,
     SmcRestSym,
     SmcS1,
-    SmcS2,
-    SmcS3,
     SmcSkipSt,
     StfFindStar,
     StfGoPrev,
@@ -175,7 +183,6 @@ pub enum State {
     StmBackToRule,
     StmGoLeft,
     StmGotoState,
-    StmGsSk1,
     StmRestoreRule,
     StmRestoreState,
     SymfDeactivate,
@@ -187,7 +194,7 @@ pub enum State {
     SymMatchCleanup,
     SymSkipState,
 }
-const ALL_STATES: [State; 171] = [
+const ALL_STATES: [State; 178] = [
     State::Accept,
     State::AcceptSeekHome,
     State::AccFinalHome,
@@ -212,36 +219,26 @@ const ALL_STATES: [State; 171] = [
     State::ChkAccRestState,
     State::CmpStC0,
     State::CmpStC0Find,
-    State::CmpStC0Sk1,
     State::CmpStC1,
     State::CmpStC1Find,
-    State::CmpStC1Sk1,
     State::CmpStFail,
     State::CmpStNextbit,
     State::CmpStOk,
     State::CmpStRead,
     State::CmpSymC0,
     State::CmpSymC0Fb,
-    State::CmpSymC0Fh,
     State::CmpSymC0S1,
-    State::CmpSymC0S2,
-    State::CmpSymC0S3,
     State::CmpSymC1,
     State::CmpSymC1Fb,
-    State::CmpSymC1Fh,
     State::CmpSymC1S1,
-    State::CmpSymC1S2,
-    State::CmpSymC1S3,
     State::CmpSymFail,
     State::CmpSymNb2,
     State::CmpSymNextbit,
     State::CmpSymOk,
     State::CmpSymRead,
     State::CpNstC0,
-    State::CpNstC0S1,
     State::CpNstC0W,
     State::CpNstC1,
-    State::CpNstC1S1,
     State::CpNstC1W,
     State::CpNstDone,
     State::CpNstNext,
@@ -249,7 +246,6 @@ const ALL_STATES: [State; 171] = [
     State::CpNstNext3,
     State::CpNstRestDo,
     State::CpNstRestNav,
-    State::CpNstRestS1,
     State::CpNstRet,
     State::CpNsymC0,
     State::CpNsymC0Fb,
@@ -282,6 +278,27 @@ const ALL_STATES: [State; 171] = [
     State::CpNsymSeek,
     State::DoneSeekHome,
     State::Init,
+    State::LdC0,
+    State::LdC0Bl,
+    State::LdC0Sc,
+    State::LdC0Tp,
+    State::LdC0Wr,
+    State::LdC1,
+    State::LdC1Bl,
+    State::LdC1Sc,
+    State::LdC1Tp,
+    State::LdC1Wr,
+    State::LdDone,
+    State::LdNavSc1,
+    State::LdNavSc2,
+    State::LdNavSc3,
+    State::LdRead,
+    State::LdRestSc,
+    State::LdRestTp,
+    State::LdRetBl,
+    State::LdRetFh,
+    State::LdRetSc,
+    State::LdSeekHead,
     State::InitSeekEnd,
     State::InitSkip,
     State::MarkRule,
@@ -289,6 +306,7 @@ const ALL_STATES: [State; 171] = [
     State::MlFindHead,
     State::MlMark,
     State::MlNav,
+    State::MlNavHead,
     State::MlRestore,
     State::MlS1,
     State::MlS2,
@@ -331,13 +349,10 @@ const ALL_STATES: [State; 171] = [
     State::RejFinalHome,
     State::RejRestAcc,
     State::RejRestState,
-    State::SmcFh,
     State::SmcRestDone,
     State::SmcRestHead,
     State::SmcRestSym,
     State::SmcS1,
-    State::SmcS2,
-    State::SmcS3,
     State::SmcSkipSt,
     State::StfFindStar,
     State::StfGoPrev,
@@ -348,7 +363,6 @@ const ALL_STATES: [State; 171] = [
     State::StmBackToRule,
     State::StmGoLeft,
     State::StmGotoState,
-    State::StmGsSk1,
     State::StmRestoreRule,
     State::StmRestoreState,
     State::SymfDeactivate,
@@ -578,6 +592,7 @@ fn seek_star(m: &mut RuleSet, from: State, to: State) {
             Symbol::Dot,
             Symbol::L,
             Symbol::R,
+            Symbol::Gt,
         ],
     );
     m.add(from, Symbol::Star, to, Symbol::Star, Dir::Right);
@@ -594,7 +609,7 @@ fn build_utm_rules() -> RuleSet {
 
     // Symbol groups
     let rule_internals: &[Symbol] = &[Zero, One, X, Y, Pipe, L, R, Comma];
-    let rule_all: &[Symbol] = &[Zero, One, X, Y, Pipe, L, R, Semi, Dot, Star, Comma];
+    let rule_all: &[Symbol] = &[Zero, One, X, Y, Pipe, L, R, Semi, Dot, Star, Comma, Gt];
     let bits: &[Symbol] = &[Zero, One];
     let marked_bits: &[Symbol] = &[X, Y];
     let bits_and_marked: &[Symbol] = &[Zero, One, X, Y];
@@ -608,7 +623,7 @@ fn build_utm_rules() -> RuleSet {
     {
         let s = InitSeekEnd;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, s, &syms);
         r.add(s, Hash, MarkRule, Hash, Dir::Left);
     }
@@ -620,6 +635,7 @@ fn build_utm_rules() -> RuleSet {
         let mr = MarkRule;
         scan_left(&mut r, mr, rule_internals);
         r.add(mr, Semi, mr, Semi, Dir::Left);
+        r.add(mr, Gt, mr, Gt, Dir::Left);
         r.add(mr, Dot, CmpStRead, Star, Dir::Right);
         r.add(mr, Hash, MarkRuleNoMatch, Hash, Dir::Right);
     }
@@ -628,7 +644,7 @@ fn build_utm_rules() -> RuleSet {
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
         syms.extend_from_slice(&[Semi, Dot]);
         scan_right(&mut r, nm, &syms);
-        r.add(nm, Hash, ChkAccInit, Hash, Dir::Right);
+        r.add(nm, Gt, ChkAccInit, Gt, Dir::Right);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -639,17 +655,12 @@ fn build_utm_rules() -> RuleSet {
     r.add(CmpStRead, Pipe, StMatchCleanup, Pipe, Dir::Right);
     r.add(CmpStRead, Comma, StMatchCleanup, Comma, Dir::Right);
 
-    for (c_sym, carry, sk1, find) in [
-        (Zero, CmpStC0, CmpStC0Sk1, CmpStC0Find),
-        (One, CmpStC1, CmpStC1Sk1, CmpStC1Find),
+    for (c_sym, carry, find) in [
+        (Zero, CmpStC0, CmpStC0Find),
+        (One, CmpStC1, CmpStC1Find),
     ] {
         scan_right(&mut r, carry, rule_all);
-        r.add(carry, Hash, sk1, Hash, Dir::Right);
-
-        let mut sk1_syms: Vec<Symbol> = bits_and_marked.to_vec();
-        sk1_syms.push(Semi);
-        scan_right(&mut r, sk1, &sk1_syms);
-        r.add(sk1, Hash, find, Hash, Dir::Right);
+        r.add(carry, Hash, find, Hash, Dir::Right);
 
         scan_right(&mut r, find, marked_bits);
         if c_sym == Zero {
@@ -697,16 +708,9 @@ fn build_utm_rules() -> RuleSet {
     {
         let gs = StmGotoState;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, gs, &syms);
-        r.add(gs, Hash, StmGsSk1, Hash, Dir::Right);
-    }
-    {
-        let sk = StmGsSk1;
-        let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, sk, &syms);
-        r.add(sk, Hash, StmRestoreState, Hash, Dir::Right);
+        r.add(gs, Hash, StmRestoreState, Hash, Dir::Right);
     }
     {
         let rs = StmRestoreState;
@@ -743,7 +747,7 @@ fn build_utm_rules() -> RuleSet {
     }
     {
         let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-        syms.extend_from_slice(&[Semi, Hash, Pipe, Dot, L, R, Comma]);
+        syms.extend_from_slice(&[Semi, Hash, Pipe, Dot, L, R, Comma, Gt]);
         scan_left(&mut r, StfFindStar, &syms);
         r.add(StfFindStar, Star, StfRestoreRule, Dot, Dir::Right);
     }
@@ -769,40 +773,21 @@ fn build_utm_rules() -> RuleSet {
     r.add(CmpSymRead, Pipe, SymMatchCleanup, Pipe, Dir::Right);
 
     for c in [0u8, 1u8] {
-        let (carry, s1, s2, s3, fh, fb) = if c == 0 {
-            (
-                CmpSymC0, CmpSymC0S1, CmpSymC0S2, CmpSymC0S3, CmpSymC0Fh, CmpSymC0Fb,
-            )
+        let (carry, s1, fb) = if c == 0 {
+            (CmpSymC0, CmpSymC0S1, CmpSymC0Fb)
         } else {
-            (
-                CmpSymC1, CmpSymC1S1, CmpSymC1S2, CmpSymC1S3, CmpSymC1Fh, CmpSymC1Fb,
-            )
+            (CmpSymC1, CmpSymC1S1, CmpSymC1Fb)
         };
 
+        // Skip rules+accept to #[1]
         scan_right(&mut r, carry, rule_all);
         r.add(carry, Hash, s1, Hash, Dir::Right);
 
-        // Skip ACC
-        {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Semi);
-            scan_right(&mut r, s1, &syms);
-            r.add(s1, Hash, s2, Hash, Dir::Right);
-        }
-        // Skip STATE
-        scan_right(&mut r, s2, bits_and_marked);
-        r.add(s2, Hash, s3, Hash, Dir::Right);
-        // Skip BLANK
-        scan_right(&mut r, s3, bits);
-        r.add(s3, Hash, fh, Hash, Dir::Right);
-        // Find ^
-        {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Comma);
-            scan_right(&mut r, fh, &syms);
-            r.add(fh, Caret, fb, Caret, Dir::Right);
-        }
-        // Find next unmarked bit in head cell
+        // Skip STATE to #[2], enter SYMCACHE
+        scan_right(&mut r, s1, bits_and_marked);
+        r.add(s1, Hash, fb, Hash, Dir::Right);
+
+        // Find next unmarked bit in SYMCACHE
         scan_right(&mut r, fb, marked_bits);
         if c == 0 {
             r.add(fb, Zero, CmpSymOk, X, Dir::Left);
@@ -853,15 +838,14 @@ fn build_utm_rules() -> RuleSet {
     {
         let sf = CmpSymFail;
         scan_left(&mut r, sf, bits_and_marked);
-        r.add(sf, Caret, SymfRestHead, Caret, Dir::Right);
+        r.add(sf, Hash, SymfRestHead, Hash, Dir::Right);
     }
     {
         let rh = SymfRestHead;
         r.add(rh, X, rh, Zero, Dir::Right);
         r.add(rh, Y, rh, One, Dir::Right);
         scan_right(&mut r, rh, bits);
-        r.add(rh, Comma, SymfSeekStar, Comma, Dir::Left);
-        r.add(rh, Blank, SymfSeekStar, Blank, Dir::Left);
+        r.add(rh, Hash, SymfSeekStar, Hash, Dir::Left);
     }
     {
         seek_star(&mut r, SymfSeekStar, SymfSkipSt);
@@ -907,41 +891,23 @@ fn build_utm_rules() -> RuleSet {
     {
         let sc = SymMatchCleanup;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, sc, &syms);
         r.add(sc, Hash, SmcS1, Hash, Dir::Right);
     }
     {
+        // SmcS1: skip STATE to #[2], enter SYMCACHE
         let s1 = SmcS1;
-        let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, s1, &syms);
-        r.add(s1, Hash, SmcS2, Hash, Dir::Right);
+        scan_right(&mut r, s1, bits_and_marked);
+        r.add(s1, Hash, SmcRestHead, Hash, Dir::Right);
     }
     {
-        let s2 = SmcS2;
-        scan_right(&mut r, s2, bits_and_marked);
-        r.add(s2, Hash, SmcS3, Hash, Dir::Right);
-    }
-    {
-        let s3 = SmcS3;
-        scan_right(&mut r, s3, bits);
-        r.add(s3, Hash, SmcFh, Hash, Dir::Right);
-    }
-    {
-        let fh = SmcFh;
-        let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-        syms.push(Comma);
-        scan_right(&mut r, fh, &syms);
-        r.add(fh, Caret, SmcRestHead, Caret, Dir::Right);
-    }
-    {
+        // SmcRestHead: restore SYMCACHE marks
         let rh = SmcRestHead;
         r.add(rh, X, rh, Zero, Dir::Right);
         r.add(rh, Y, rh, One, Dir::Right);
         scan_right(&mut r, rh, bits);
-        r.add(rh, Comma, SmcRestDone, Comma, Dir::Left);
-        r.add(rh, Blank, SmcRestDone, Blank, Dir::Left);
+        r.add(rh, Hash, SmcRestDone, Hash, Dir::Left);
     }
     {
         seek_star(&mut r, SmcRestDone, SmcSkipSt);
@@ -981,21 +947,15 @@ fn build_utm_rules() -> RuleSet {
     r.add(ApplyReadNst, Pipe, CpNstDone, Pipe, Dir::Left);
 
     for c in [0u8, 1u8] {
-        let (carry, s1, w, mark) = if c == 0 {
-            (CpNstC0, CpNstC0S1, CpNstC0W, X)
+        let (carry, w, mark) = if c == 0 {
+            (CpNstC0, CpNstC0W, X)
         } else {
-            (CpNstC1, CpNstC1S1, CpNstC1W, Y)
+            (CpNstC1, CpNstC1W, Y)
         };
 
+        // Skip rules+accept to #[1], then directly in STATE
         scan_right(&mut r, carry, rule_all);
-        r.add(carry, Hash, s1, Hash, Dir::Right);
-
-        {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Semi);
-            scan_right(&mut r, s1, &syms);
-            r.add(s1, Hash, w, Hash, Dir::Right);
-        }
+        r.add(carry, Hash, w, Hash, Dir::Right);
 
         scan_right(&mut r, w, marked_bits);
         r.add(w, Zero, CpNstRet, mark, Dir::Left);
@@ -1032,16 +992,9 @@ fn build_utm_rules() -> RuleSet {
     {
         let nav = CpNstRestNav;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, nav, &syms);
-        r.add(nav, Hash, CpNstRestS1, Hash, Dir::Right);
-    }
-    {
-        let s1 = CpNstRestS1;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, s1, &syms);
-        r.add(s1, Hash, CpNstRestDo, Hash, Dir::Right);
+        r.add(nav, Hash, CpNstRestDo, Hash, Dir::Right);
     }
     {
         let rd = CpNstRestDo;
@@ -1077,7 +1030,7 @@ fn build_utm_rules() -> RuleSet {
     r.add(CpNsymRead, One, CpNsymC1, Y, Dir::Right);
     r.add(CpNsymRead, Pipe, CpNsymDone, Pipe, Dir::Left);
 
-    // Carry to head cell: skip rules, ACC, STATE, BLANK, find ^
+    // Carry to head cell: skip rules+accept, STATE, SYMCACHE, BLANK, find ^
     for c in [0u8, 1u8] {
         let (carry, s1, s2, s3, fh, fb, mark) = if c == 0 {
             (
@@ -1092,18 +1045,19 @@ fn build_utm_rules() -> RuleSet {
         scan_right(&mut r, carry, rule_all);
         r.add(carry, Hash, s1, Hash, Dir::Right);
 
-        {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Semi);
-            scan_right(&mut r, s1, &syms);
-            r.add(s1, Hash, s2, Hash, Dir::Right);
-        }
-        scan_right(&mut r, s2, bits_and_marked);
+        // s1: skip STATE
+        scan_right(&mut r, s1, bits_and_marked);
+        r.add(s1, Hash, s2, Hash, Dir::Right);
+
+        // s2: skip SYMCACHE
+        scan_right(&mut r, s2, bits);
         r.add(s2, Hash, s3, Hash, Dir::Right);
 
+        // s3: skip BLANK
         scan_right(&mut r, s3, bits);
         r.add(s3, Hash, fh, Hash, Dir::Right);
 
+        // fh: find ^ in TAPE
         {
             let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
             syms.push(Comma);
@@ -1151,28 +1105,30 @@ fn build_utm_rules() -> RuleSet {
     {
         let nav = CpNsymRestNav;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, nav, &syms);
         r.add(nav, Hash, CpNsymRnS1, Hash, Dir::Right);
     }
     {
+        // CpNsymRnS1: skip STATE
         let s1 = CpNsymRnS1;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, s1, &syms);
+        scan_right(&mut r, s1, bits);
         r.add(s1, Hash, CpNsymRnS2, Hash, Dir::Right);
     }
     {
+        // CpNsymRnS2: skip SYMCACHE
         let s2 = CpNsymRnS2;
         scan_right(&mut r, s2, bits);
         r.add(s2, Hash, CpNsymRnS3, Hash, Dir::Right);
     }
     {
+        // CpNsymRnS3: skip BLANK
         let s3 = CpNsymRnS3;
         scan_right(&mut r, s3, bits);
         r.add(s3, Hash, CpNsymRnFh, Hash, Dir::Right);
     }
     {
+        // CpNsymRnFh: find ^ in TAPE
         let fh = CpNsymRnFh;
         let mut syms: Vec<Symbol> = bits.to_vec();
         syms.push(Comma);
@@ -1232,23 +1188,24 @@ fn build_utm_rules() -> RuleSet {
     {
         let nav = MrNav;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, nav, &syms);
         r.add(nav, Hash, MrS1, Hash, Dir::Right);
     }
     {
+        // MrS1: skip STATE
         let s1 = MrS1;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, s1, &syms);
+        scan_right(&mut r, s1, bits);
         r.add(s1, Hash, MrS2, Hash, Dir::Right);
     }
     {
+        // MrS2: skip SYMCACHE
         let s2 = MrS2;
         scan_right(&mut r, s2, bits);
         r.add(s2, Hash, MrS3, Hash, Dir::Right);
     }
     {
+        // MrS3: skip BLANK
         let s3 = MrS3;
         scan_right(&mut r, s3, bits);
         r.add(s3, Hash, MrFindHead, Hash, Dir::Right);
@@ -1269,7 +1226,7 @@ fn build_utm_rules() -> RuleSet {
     {
         let ph = MrPlaceHead;
         scan_left(&mut r, ph, bits);
-        r.add(ph, Gt, DoneSeekHome, Comma, Dir::Left);
+        r.add(ph, Gt, LdSeekHead, Comma, Dir::Right);
     }
 
     // EXTEND TAPE (move right past end)
@@ -1291,20 +1248,21 @@ fn build_utm_rules() -> RuleSet {
         r.add(eh, Hash, MrExtH1, Hash, Dir::Right);
     }
     {
+        // h1: skip rules+accept
         let h1 = MrExtH1;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, h1, &syms);
         r.add(h1, Hash, MrExtH2, Hash, Dir::Right);
     }
     {
+        // h2: skip STATE
         let h2 = MrExtH2;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, h2, &syms);
+        scan_right(&mut r, h2, bits);
         r.add(h2, Hash, MrExtH3, Hash, Dir::Right);
     }
     {
+        // h3: skip SYMCACHE
         let h3 = MrExtH3;
         scan_right(&mut r, h3, bits);
         r.add(h3, Hash, MrExtReadBlank, Hash, Dir::Right);
@@ -1346,7 +1304,8 @@ fn build_utm_rules() -> RuleSet {
         r.add(rb, X, rb, Zero, Dir::Left);
         r.add(rb, Y, rb, One, Dir::Left);
         scan_left(&mut r, rb, bits);
-        r.add(rb, Hash, DoneSeekHome, Hash, Dir::Left);
+        // Navigate right to TAPE for load: skip BLANK → # → TAPE → find ^
+        r.add(rb, Hash, LdRetBl, Hash, Dir::Right);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1362,23 +1321,24 @@ fn build_utm_rules() -> RuleSet {
     {
         let nav = MlNav;
         let mut syms: Vec<Symbol> = rule_internals.to_vec();
-        syms.extend_from_slice(&[Semi, Dot]);
+        syms.extend_from_slice(&[Semi, Dot, Gt]);
         scan_right(&mut r, nav, &syms);
         r.add(nav, Hash, MlS1, Hash, Dir::Right);
     }
     {
+        // MlS1: skip STATE
         let s1 = MlS1;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Semi);
-        scan_right(&mut r, s1, &syms);
+        scan_right(&mut r, s1, bits);
         r.add(s1, Hash, MlS2, Hash, Dir::Right);
     }
     {
+        // MlS2: skip SYMCACHE
         let s2 = MlS2;
         scan_right(&mut r, s2, bits);
         r.add(s2, Hash, MlS3, Hash, Dir::Right);
     }
     {
+        // MlS3: skip BLANK
         let s3 = MlS3;
         scan_right(&mut r, s3, bits);
         r.add(s3, Hash, MlFindHead, Hash, Dir::Right);
@@ -1398,7 +1358,7 @@ fn build_utm_rules() -> RuleSet {
     {
         let rs = MlRestore;
         scan_right(&mut r, rs, bits);
-        r.add(rs, Gt, DoneSeekHome, Comma, Dir::Left);
+        r.add(rs, Gt, MlNavHead, Comma, Dir::Left);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1443,7 +1403,7 @@ fn build_utm_rules() -> RuleSet {
         let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
         syms.push(Semi);
         scan_left(&mut r, oa, &syms);
-        r.add(oa, Hash, ChkAccOkFind, Hash, Dir::Right);
+        r.add(oa, Gt, ChkAccOkFind, Gt, Dir::Right);
     }
     {
         let of_ = ChkAccOkFind;
@@ -1486,7 +1446,7 @@ fn build_utm_rules() -> RuleSet {
         let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
         syms.push(Semi);
         scan_left(&mut r, ia, &syms);
-        r.add(ia, Hash, ChkAccDoRest, Hash, Dir::Right);
+        r.add(ia, Gt, ChkAccDoRest, Gt, Dir::Right);
     }
     {
         let dr = ChkAccDoRest;
@@ -1517,7 +1477,7 @@ fn build_utm_rules() -> RuleSet {
         let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
         syms.push(Semi);
         scan_left(&mut r, ash, &syms);
-        r.add(ash, Hash, AccRestAcc, Hash, Dir::Right);
+        r.add(ash, Gt, AccRestAcc, Gt, Dir::Right);
     }
     {
         let ra = AccRestAcc;
@@ -1543,7 +1503,7 @@ fn build_utm_rules() -> RuleSet {
         let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
         syms.push(Semi);
         scan_left(&mut r, rsh, &syms);
-        r.add(rsh, Hash, RejRestAcc, Hash, Dir::Right);
+        r.add(rsh, Gt, RejRestAcc, Gt, Dir::Right);
     }
     {
         let ra = RejRestAcc;
@@ -1562,6 +1522,136 @@ fn build_utm_rules() -> RuleSet {
         r.add(rs, Hash, RejFinalHome, Hash, Dir::Left);
     }
     seek_home(&mut r, RejFinalHome, Reject);
+
+    // ══════════════════════════════════════════════════════════════
+    // LOAD PHASE: copy new head cell from TAPE to SYMCACHE
+    // ══════════════════════════════════════════════════════════════
+
+    // Entry points after move:
+    // MoveRight: MrPlaceHead → LdSeekHead → scan right past old cell to ^
+    {
+        scan_right(&mut r, LdSeekHead, bits);
+        r.add(LdSeekHead, Caret, LdRead, Caret, Dir::Right);
+    }
+    // MoveLeft: MlRestore → MlNavHead → scan left to ^
+    {
+        scan_left(&mut r, MlNavHead, bits);
+        r.add(MlNavHead, Caret, LdRead, Caret, Dir::Right);
+    }
+
+    // LdRead: at head cell in TAPE, find next unmarked bit
+    {
+        scan_right(&mut r, LdRead, marked_bits);
+        r.add(LdRead, Zero, LdC0, X, Dir::Left);
+        r.add(LdRead, One, LdC1, Y, Dir::Left);
+        r.add(LdRead, Comma, LdDone, Comma, Dir::Left);
+        r.add(LdRead, Blank, LdDone, Blank, Dir::Left);
+    }
+
+    // LdC0/LdC1: carry bit left from head cell through TAPE → BLANK → SYMCACHE
+    for c in [0u8, 1u8] {
+        let (carry, tp, bl, sc, wr, mark) = if c == 0 {
+            (LdC0, LdC0Tp, LdC0Bl, LdC0Sc, LdC0Wr, X)
+        } else {
+            (LdC1, LdC1Tp, LdC1Bl, LdC1Sc, LdC1Wr, Y)
+        };
+
+        // Scan left past marks in head cell to ^
+        scan_left(&mut r, carry, marked_bits);
+        r.add(carry, Caret, tp, Caret, Dir::Left);
+
+        // tp: scan left through TAPE cells to #[4]
+        {
+            let mut syms: Vec<Symbol> = bits.to_vec();
+            syms.push(Comma);
+            scan_left(&mut r, tp, &syms);
+            r.add(tp, Hash, bl, Hash, Dir::Left);
+        }
+
+        // bl: scan left through BLANK to #[3]
+        scan_left(&mut r, bl, bits);
+        r.add(bl, Hash, sc, Hash, Dir::Left);
+
+        // sc: scan left through SYMCACHE to #[2]
+        {
+            let mut syms: Vec<Symbol> = bits.to_vec();
+            syms.extend_from_slice(&[X, Y]);
+            scan_left(&mut r, sc, &syms);
+            r.add(sc, Hash, wr, Hash, Dir::Right);
+        }
+
+        // wr: in SYMCACHE, scan right past already-written X/Y, write at next position
+        scan_right(&mut r, wr, marked_bits);
+        r.add(wr, Zero, LdRetSc, mark, Dir::Right);
+        r.add(wr, One, LdRetSc, mark, Dir::Right);
+    }
+
+    // LdRetSc: return from SYMCACHE to TAPE
+    {
+        // Scan right through rest of SYMCACHE to #[3]
+        {
+            let mut syms: Vec<Symbol> = bits.to_vec();
+            syms.extend_from_slice(&[X, Y]);
+            scan_right(&mut r, LdRetSc, &syms);
+            r.add(LdRetSc, Hash, LdRetBl, Hash, Dir::Right);
+        }
+    }
+    {
+        // LdRetBl: scan right through BLANK to #[4]
+        scan_right(&mut r, LdRetBl, bits);
+        r.add(LdRetBl, Hash, LdRetFh, Hash, Dir::Right);
+    }
+    {
+        // LdRetFh: scan right through TAPE to ^
+        let mut syms: Vec<Symbol> = bits.to_vec();
+        syms.push(Comma);
+        scan_right(&mut r, LdRetFh, &syms);
+        r.add(LdRetFh, Caret, LdRead, Caret, Dir::Right);
+    }
+
+    // LdDone: all bits loaded, restore marks
+    {
+        // Go left: restore TAPE head cell marks (fix: must restore current bit too)
+        r.add(LdDone, X, LdRestTp, Zero, Dir::Left);
+        r.add(LdDone, Y, LdRestTp, One, Dir::Left);
+        r.add(LdDone, Caret, LdNavSc1, Caret, Dir::Left);
+    }
+    {
+        let rt = LdRestTp;
+        r.add(rt, X, rt, Zero, Dir::Left);
+        r.add(rt, Y, rt, One, Dir::Left);
+        scan_left(&mut r, rt, bits);
+        r.add(rt, Caret, LdNavSc1, Caret, Dir::Left);
+    }
+
+    // Navigate left from ^ to SYMCACHE
+    {
+        // LdNavSc1: scan left through TAPE to #[4]
+        let mut syms: Vec<Symbol> = bits.to_vec();
+        syms.push(Comma);
+        scan_left(&mut r, LdNavSc1, &syms);
+        r.add(LdNavSc1, Hash, LdNavSc2, Hash, Dir::Left);
+    }
+    {
+        // LdNavSc2: scan left through BLANK to #[3]
+        scan_left(&mut r, LdNavSc2, bits);
+        r.add(LdNavSc2, Hash, LdNavSc3, Hash, Dir::Left);
+    }
+    {
+        // LdNavSc3: scan left through SYMCACHE (has X/Y marks) to #[2]
+        let mut syms: Vec<Symbol> = bits.to_vec();
+        syms.extend_from_slice(&[X, Y]);
+        scan_left(&mut r, LdNavSc3, &syms);
+        r.add(LdNavSc3, Hash, LdRestSc, Hash, Dir::Right);
+    }
+    {
+        // LdRestSc: restore SYMCACHE marks, then seek home
+        let rs = LdRestSc;
+        r.add(rs, X, rs, Zero, Dir::Right);
+        r.add(rs, Y, rs, One, Dir::Right);
+        scan_right(&mut r, rs, bits);
+        r.add(rs, Hash, DoneSeekHome, Hash, Dir::Left);
+    }
 
     r
 }
@@ -1590,7 +1680,7 @@ impl UtmSpec for MyUtmSpec {
         let n_sym_bits = num_bits(guest_symbols.len());
 
         // Find the sections separated by #
-        // Layout: $ #[0] RULES #[1] ACC #[2] STATE #[3] BLANK #[4] TAPE $
+        // Layout: $ #[0] RULES > ACC #[1] STATE #[2] SYMCACHE #[3] BLANK #[4] TAPE
         let mut hashes: Vec<usize> = Vec::new();
         for (i, &s) in tape.iter().enumerate() {
             if s == Symbol::Hash {
@@ -1605,7 +1695,7 @@ impl UtmSpec for MyUtmSpec {
             ));
         }
 
-        let state_start = hashes[2] + 1;
+        let state_start = hashes[1] + 1;
         let state = guest_states[from_binary_at(tape, state_start, n_state_bits)];
 
         let tape_start = hashes[4] + 1;
@@ -1804,6 +1894,8 @@ impl MyUtmSpec {
         let mut tape: Vec<Symbol> = Vec::new();
         tape.push(Symbol::Dollar);
 
+        // Layout: $# RULES > ACCEPT # STATE # SYMCACHE # BLANK # TAPE
+
         // Identify noop rules: (state, sym) -> (state, sym, dir) where nst==st && nsym==sym
         // Group noop rules by (state_encoding, dir) for compact encoding
         let mut noop_groups: HashMap<(usize, Dir), Vec<usize>> = HashMap::new();
@@ -1820,7 +1912,7 @@ impl MyUtmSpec {
             }
         }
 
-        // RULES section: # .rule1 ; .rule2 ; .rule3 ... #
+        // RULES section: # .rule1 ; .rule2 ; .rule3 ...
         tape.push(Symbol::Hash);
         let mut first_rule = true;
         for (i, &&(st, sym, nst, nsym, dir)) in ordered_rules.iter().enumerate() {
@@ -1869,7 +1961,8 @@ impl MyUtmSpec {
             }
         }
 
-        tape.push(Symbol::Hash);
+        // > delimiter then ACCEPT entries
+        tape.push(Symbol::Gt);
         for (i, state) in guest
             .spec
             .iter_states()
@@ -1882,18 +1975,34 @@ impl MyUtmSpec {
             tape.extend_from_slice(&to_binary(hints.state_encodings[&state], n_state_bits));
         }
 
+        // STATE section
         tape.push(Symbol::Hash);
         tape.extend_from_slice(&to_binary(
             hints.state_encodings[&guest.state],
             n_state_bits,
         ));
 
+        // SYMCACHE section: copy of head cell symbol
+        tape.push(Symbol::Hash);
+        {
+            let default_tape = vec![guest.spec.blank()];
+            let nonempty_guest_tape = if guest.tape.is_empty() {
+                &default_tape
+            } else {
+                &guest.tape
+            };
+            let head_sym = nonempty_guest_tape[guest.pos];
+            tape.extend_from_slice(&to_binary(hints.symbol_encodings[&head_sym], n_sym_bits));
+        }
+
+        // BLANK section
         tape.push(Symbol::Hash);
         tape.extend_from_slice(&to_binary(
             hints.symbol_encodings[&guest.spec.blank()],
             n_sym_bits,
         ));
 
+        // TAPE section
         tape.push(Symbol::Hash);
 
         let caret_pos = tape.len();

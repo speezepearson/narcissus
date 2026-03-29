@@ -13,6 +13,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use crate::utm::to_binary;
+
 use crate::{
     compiled::{CSymbol, CompiledTuringMachineSpec},
     tm::{RunningTuringMachine, SimpleTuringMachineSpec},
@@ -38,7 +40,7 @@ impl InfiniteTape {
             .iter()
             .position(|&s| s == Symbol::Caret)
             .expect("encoded tape should contain ^");
-        let header = dummy[..caret_pos].to_vec();
+        let mut header = dummy[..caret_pos].to_vec();
 
         let sym_to_idx: HashMap<Symbol, usize> = optimization_hints
             .symbol_encodings
@@ -47,6 +49,26 @@ impl InfiniteTape {
             .collect();
         let n_sym_bits = num_bits(sym_to_idx.len());
         let cell_width = 1 + n_sym_bits;
+
+        // Fix SYMCACHE: the first cell encodes header[0] (Dollar), not blank.
+        // SYMCACHE is between #[2] and #[3] in the header.
+        // Find the hash positions in the header.
+        let hashes: Vec<usize> = header
+            .iter()
+            .enumerate()
+            .filter(|(_, &s)| s == Symbol::Hash)
+            .map(|(i, _)| i)
+            .collect();
+        if hashes.len() >= 3 {
+            let symcache_start = hashes[2] + 1;
+            // The first tape cell encodes header[0] (typically Dollar)
+            let first_cell_sym = header[0];
+            let first_cell_idx = sym_to_idx[&first_cell_sym];
+            let bits = to_binary(first_cell_idx, n_sym_bits);
+            for (j, &bit) in bits.iter().enumerate() {
+                header[symcache_start + j] = bit;
+            }
+        }
 
         Self {
             header,
