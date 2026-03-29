@@ -2,7 +2,6 @@
 /// `TuringMachineSpec<State, Symbol>` interface in `ui/src/types.ts`.
 use std::collections::BTreeMap;
 
-
 use serde::Serialize;
 
 use crate::tm::{Dir, TuringMachineSpec};
