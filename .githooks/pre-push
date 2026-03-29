@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Rust tests
+export PATH="$HOME/.cargo/bin:$PATH"
+cargo test
+
+# UI tests
+(cd ui && npx vitest run)

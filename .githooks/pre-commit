@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# UI checks
+(cd ui && npx prettier --check src scripts && npm run lint && npm run build)
+
+# Rust checks
+export PATH="$HOME/.cargo/bin:$PATH"
+cargo fmt --check && cargo build
+cargo run --bin export_specs --release > ui/src/rust-export.json
+if ! git diff --quiet ui/src/rust-export.json; then
+  echo "ERROR: ui/src/rust-export.json is out of date. The regenerated file has been left in your working tree; please stage it."
+  exit 1
+fi
