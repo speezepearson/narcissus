@@ -57,7 +57,11 @@ export function useTuringMachine(
   }, [publish]);
 
   const reset = useCallback(() => {
+    const oldState = snapRef.current.state;
     const snap = copySnapshot(init);
+    if (snap.state !== oldState) {
+      onStateChangeRef.current?.(oldState, snap);
+    }
     publish(snap);
   }, [init, publish]);
 
