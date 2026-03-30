@@ -223,59 +223,75 @@ export function WelcomeModal() {
 
             <ul>
               <li>
-                The UTM's tape layout is: <code>$ # ACCEPTSTATES # BLANK # RULES # STATE # TAPE</code>
+                The UTM's tape layout is:{" "}
+                <code>$ # ACCEPTSTATES # BLANK # RULES # STATE # TAPE</code>
                 <ul>
-              <li>
-                <code>ACCEPTSTATES</code> is a list of the simulated machine's "accepting" states.
-                When the UTM discovers that the simulated machine has halted, it checks whether
-                the simulated machine's current state is in the list of accepting states,
-                and accepts/rejects based on that.
-              </li>
-              <li>
-                <code>BLANK</code> is the simulated machine's "blank" symbol.
-                Classically, a TM's tape is infinite and covered in some blank symbol.
-                When the simulated machine's head moves farther off the end of the simulated tape,
-                the UTM needs to know what pattern to fill in the simulated cell with.
-              </li>
-              <li>
-                <code>RULES</code> is a list of the simulated machine's state transitions.
-                Each one is of the form <code>.STATE|SYMBOL|NEWSTATE|NEWSYMBOL|DIR;</code>.
-              </li>
-              <li>
-                <code>STATE</code> is the simulated machine's current state.
-              </li>
-              <li>
-                <code>TAPE</code> is the simulated machine's tape. Each cell begins with a <code>,</code>, or <code>^</code> to indicate the cell the simulated machine's head is pointing at.
-              </li>
-              </ul>
+                  <li>
+                    <code>ACCEPTSTATES</code> is a list of the simulated
+                    machine's "accepting" states. When the UTM discovers that
+                    the simulated machine has halted, it checks whether the
+                    simulated machine's current state is in the list of
+                    accepting states, and accepts/rejects based on that.
+                  </li>
+                  <li>
+                    <code>BLANK</code> is the simulated machine's "blank"
+                    symbol. Classically, a TM's tape is infinite and covered in
+                    some blank symbol. When the simulated machine's head moves
+                    farther off the end of the simulated tape, the UTM needs to
+                    know what pattern to fill in the simulated cell with.
+                  </li>
+                  <li>
+                    <code>RULES</code> is a list of the simulated machine's
+                    state transitions. Each one is of the form{" "}
+                    <code>.STATE|SYMBOL|NEWSTATE|NEWSYMBOL|DIR;</code>.
+                  </li>
+                  <li>
+                    <code>STATE</code> is the simulated machine's current state.
+                  </li>
+                  <li>
+                    <code>TAPE</code> is the simulated machine's tape. Each cell
+                    begins with a <code>,</code>, or <code>^</code> to indicate
+                    the cell the simulated machine's head is pointing at.
+                  </li>
+                </ul>
               </li>
               <li>
                 The UTM's core loop looks like:
                 <ul>
                   <li>
-                    For each rule, starting from the right-hand end of the RULES section:
+                    For each rule, starting from the right-hand end of the RULES
+                    section:
                   </li>
                   <li>
-                    Mark it with a <code>*</code> to make it easy to get back to.
+                    Mark it with a <code>*</code> to make it easy to get back
+                    to.
                   </li>
                   <li>
-                    Compare the rule's <code>STATE</code> to the simulated machine's <code>STATE</code>.
-                    (Comparisons happen one bit at a time: translate 0/1 to X/Y, one bit at a time. On any mismatch, clean up the X/Y transformation and abort.)
-                    On a mismatch, this rule doesn't apply; move on to the next one.
+                    Compare the rule's <code>STATE</code> to the simulated
+                    machine's <code>STATE</code>. (Comparisons happen one bit at
+                    a time: translate 0/1 to X/Y, one bit at a time. On any
+                    mismatch, clean up the X/Y transformation and abort.) On a
+                    mismatch, this rule doesn't apply; move on to the next one.
                   </li>
                   <li>
-                    Compare the rule's <code>SYMBOL</code> to the contents of the TAPE cell marked <code>^</code> (where the simulated head is).
-                    On a mismatch, this rule doesn't apply; move on to the next one.
+                    Compare the rule's <code>SYMBOL</code> to the contents of
+                    the TAPE cell marked <code>^</code> (where the simulated
+                    head is). On a mismatch, this rule doesn't apply; move on to
+                    the next one.
                   </li>
                   <li>
-                    Copy the rule's <code>NEWSTATE</code> to the simulated machine's <code>STATE</code>.
-                    (Copies happen one bit at a time, much like comparisons.)
+                    Copy the rule's <code>NEWSTATE</code> to the simulated
+                    machine's <code>STATE</code>. (Copies happen one bit at a
+                    time, much like comparisons.)
                   </li>
                   <li>
-                    Copy the rule's <code>NEWSYMBOL</code> to the contents of the TAPE cell marked <code>^</code> (where the simulated head is).
+                    Copy the rule's <code>NEWSYMBOL</code> to the contents of
+                    the TAPE cell marked <code>^</code> (where the simulated
+                    head is).
                   </li>
                   <li>
-                    Move the simulated head to the previous/next comma, as prescribed by the rule's DIR.
+                    Move the simulated head to the previous/next comma, as
+                    prescribed by the rule's DIR.
                   </li>
                 </ul>
               </li>
