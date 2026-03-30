@@ -166,7 +166,7 @@ export function WelcomeModal() {
           <a href="https://en.wikipedia.org/wiki/Turing_machine">
             Turing machine
           </a>{" "}
-          is, right?), which flips all the bits on its tape:
+          is, right?), which takes a tape of 0/1s and flips them all:
         </p>
 
         <div style={{ margin: "0 10%" }}>
@@ -180,11 +180,18 @@ export function WelcomeModal() {
         <hr style={{ margin: "3em 0" }} />
 
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
-          Here's a universal Turing machine simulating the same flip-bits
-          machine on the same input:
+          You may recall that a Turing machine is "universal" if it's capable of
+          simulating arbitrary other Turing machines. (Precisely: if there
+          exists some encoding scheme mapping (other TM, tape for other TM) to
+          (tape for the UTM) such that the UTM "accepts" if-and-only-if the
+          simulated TM would accept.)
+        </p>
+        <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
+          Here's a universal Turing machine simulating the same bit-flipping
+          machine we were looking at before:
         </p>
 
-        <div style={{ margin: "0 10%" }}>
+        <div style={{ margin: "0 10% 16px" }}>
           <TuringMachineViewer
             init={utm1Snapshot}
             onStateChange={onUtm1StateChange}
@@ -216,16 +223,21 @@ export function WelcomeModal() {
           You can kinda see how it works:
           <ul>
             <li>
+              It encodes all the simulated machine's states/symbols into binary
+              strings.
+            </li>
+            <li>
               It has a description of all the simulated machine's state
               transitions: <code>.0|10|0|01|R;</code> means "if you're in state
               0, and you see symbol 10, then stay in state 0, and write symbol
               01, and move right."
             </li>
             <li>
-              After the next <code>#</code>s, there's: the list of accepting
-              states (here, just state 1); the machine's current state (starting
-              in state 0); the machine's "blank" symbol that should be used to
-              fill in the right-hand side of the tape;
+              Also delimited by <code>#</code>s, there's: the list of accepting
+              states (here, just state <code>1</code>); the machine's "blank"
+              symbol that should be used to fill in the right-hand side of the
+              tape (here, symbol <code>00</code>); the machine's current state
+              (it starts in state <code>0</code>);
             </li>
             <li>
               ...and, finally, the simulated machine's encoded tape, stretching
@@ -237,7 +249,10 @@ export function WelcomeModal() {
           through the rule list trying to find which one matches the simulated
           machine's current [state+symbol], going back and forth between [the
           rule it's currently checking] and [the simulated state/head sections],
-          comparing one bit at a time.
+          comparing one bit at a time. When if finds a matching rule, it copies
+          the rule's new state into the state register (one bit at a time, as
+          always), and the new symbol into the cell the simulated head is
+          pointed at.
         </p>
 
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
@@ -247,10 +262,10 @@ export function WelcomeModal() {
         <hr style={{ margin: "3em 0" }} />
 
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
-          Anyway, here's a UTM simulating that one:
+          Anyway, here's <i>another</i> UTM simulating <i>that</i> one:
         </p>
 
-        <div style={{ margin: "0 10%" }}>
+        <div style={{ margin: "0 10% 16px" }}>
           <div style={{ fontSize: "0.3em" }}>
             <TuringMachineViewer
               init={utm2Snapshot}
@@ -292,6 +307,40 @@ export function WelcomeModal() {
               />
             </>
           )}
+
+          <details>
+            <summary>Nitty-gritty details for the curious</summary>
+
+            <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
+              If you look closely at this UTM's looooong rules section, you'll
+              notice not all the rules have the same format.{" "}
+              <code>.10100001|0010|10100001|0000|R;</code>
+              should look familiar, the same format as the bit-flipper rules;
+              but <code>.01011101,0,1000,1011,1101|R;</code> is new.
+            </p>
+
+            <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
+              This is because -- and I cannot believe I am writing this -- I did
+              some performance optimization on the UTM.
+              <ol>
+                <li>
+                  <code>.STATE,SYM,SYM,SYM|DIR;</code> means "if you're in state
+                  STATE, and you see any of these SYMbols, don't change state,
+                  don't overwrite the symbol, just move DIR."
+                </li>
+                <li>
+                  ...and also, those <code>SYM</code>s are actually{" "}
+                  <i>prefixes</i> -- a SYM of <code>0</code> means "any symbol
+                  whose binary representation starting with 0."
+                </li>
+              </ol>
+              Together, those tricks greatly reduce the number of
+              bit-comparisons the UTM needs to do in order to find the
+              applicable rule, when the simulated TM is in a state where it's
+              scanning through the tape looking for a particular symbol. (Which,
+              recall, is how the UTM spends most of its time.)
+            </p>
+          </details>
         </div>
 
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
@@ -303,13 +352,13 @@ export function WelcomeModal() {
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
           And, you know, there's no reason this ever needs to <i>stop</i>. We
           could construct an (infinitely long, lazily initialized) tape that
-          describes a UTM simulating a UTM simulating a UTM simulating itself
+          describes a UTM simulating a UTM simulating a UTM simulating a UTM
           simulating...
         </p>
 
         <p style={{ marginBottom: "16px", lineHeight: "1.6" }}>
           That simulation is screaming along right now on some cloud machine.
-          The fruits of its labor are being streamed to you now!
+          The fruits of its labor are being streamed to you live!
         </p>
 
         <div style={{ textAlign: "center" }}>
