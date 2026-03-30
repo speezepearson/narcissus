@@ -449,24 +449,50 @@ impl<'de> serde::Deserialize<'de> for Symbol {
     }
 }
 
-const ALL_SYMBOLS: [Symbol; 16] = [
+/// const_concat!(a, b, c) == [...a, ...b, ...c]
+macro_rules! const_concat {
+    ($a:expr $(, $b:expr)*) => {const{
+        let mut out = [$a[0]; $a.len() $(+ $b.len())*];
+        let mut offset = 0;
+        let mut i = 0;
+        while i < $a.len() { out[offset+i] = $a[i]; i += 1; }
+        offset += $a.len();
+        $({
+            i = 0;
+            while i < $b.len() { out[offset+i] = $b[i]; i += 1; }
+            offset += $b.len();
+        })*
+        let _ = offset;
+        out
+    }
+    };
+}
+/// A group of symbols that we scan over very frequently.
+/// Their binary encodings are exactly those ones that start with 0,
+/// which makes them quick to scan over since the UTM abbreviates
+/// groups of scan-rules with prefixes.
+const ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R: [Symbol; 8] = [
     Symbol::Zero,
     Symbol::One,
-    Symbol::X,
-    Symbol::Y,
-    Symbol::L,
-    Symbol::R,
+    Symbol::Dot,
     Symbol::Pipe,
     Symbol::Semi,
     Symbol::Comma,
-    Symbol::Hash,
-    Symbol::Caret,
-    Symbol::Dot,
-    Symbol::Star,
-    Symbol::Gt,
-    Symbol::Dollar,
-    Symbol::Blank,
+    Symbol::L,
+    Symbol::R,
 ];
+
+/// A group of symbols that we scan over very frequently.
+/// Their binary encodings are exactly those ones that start with 10,
+/// which makes them quick to scan over since the UTM abbreviates
+/// groups of scan-rules with prefixes.
+const X_Y_STAR_GT: [Symbol; 4] = [Symbol::X, Symbol::Y, Symbol::Star, Symbol::Gt];
+
+const ALL_SYMBOLS: [Symbol; 16] = const_concat!(
+    ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R,
+    X_Y_STAR_GT,
+    [Symbol::Hash, Symbol::Caret, Symbol::Dollar, Symbol::Blank,]
+);
 
 // ── Helpers ──
 pub fn num_bits(count: usize) -> usize {
@@ -599,7 +625,7 @@ fn build_utm_rules() -> RuleSet {
 
     // Symbol groups
     let rule_internals: &[Symbol] = &[Zero, One, X, Y, Pipe, L, R, Comma];
-    let rule_all: &[Symbol] = &[Zero, One, X, Y, Pipe, L, R, Semi, Dot, Star, Comma, Gt];
+    let rule_all: &[Symbol] = &const_concat!(ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R, X_Y_STAR_GT);
     let bits: &[Symbol] = &[Zero, One];
     let marked_bits: &[Symbol] = &[X, Y];
     let bits_and_marked: &[Symbol] = &[Zero, One, X, Y];
@@ -611,11 +637,11 @@ fn build_utm_rules() -> RuleSet {
     // Init starts at $ (or $+1 after seek_home), skip ACC and BLANK to reach RULES
     r.add(Init, Dollar, Init, Dollar, Dir::Right);
     // Scan right through ACCEPT content (bits, semicolons)
-    scan_right(&mut r, Init, &[Zero, One, Semi]);
+    scan_right(&mut r, Init, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
     // Hit #[0] → skip BLANK
     r.add(Init, Hash, InitSkip, Hash, Dir::Right);
     // InitSkip: scan right through BLANK (bits)
-    scan_right(&mut r, InitSkip, bits);
+    scan_right(&mut r, InitSkip, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
     // Hit #[1] → enter RULES section
     r.add(InitSkip, Hash, InitSeekEnd, Hash, Dir::Right);
     {
@@ -781,9 +807,7 @@ fn build_utm_rules() -> RuleSet {
 
         // Find ^ in TAPE
         {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Comma);
-            scan_right(&mut r, fh, &syms);
+            scan_right(&mut r, fh, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
             r.add(fh, Caret, fb, Caret, Dir::Right);
         }
 
@@ -905,9 +929,7 @@ fn build_utm_rules() -> RuleSet {
     {
         // SmcFh: find ^ in TAPE
         let fh = SmcFh;
-        let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-        syms.push(Comma);
-        scan_right(&mut r, fh, &syms);
+        scan_right(&mut r, fh, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
         r.add(fh, Caret, SmcRestHead, Caret, Dir::Right);
     }
     {
@@ -1057,9 +1079,7 @@ fn build_utm_rules() -> RuleSet {
 
         // fh: find ^ in TAPE
         {
-            let mut syms: Vec<Symbol> = bits_and_marked.to_vec();
-            syms.push(Comma);
-            scan_right(&mut r, fh, &syms);
+            scan_right(&mut r, fh, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
             r.add(fh, Caret, fb, Caret, Dir::Right);
         }
 
@@ -1110,7 +1130,7 @@ fn build_utm_rules() -> RuleSet {
     {
         // CpNsymRnS1: skip STATE → directly into TAPE
         let s1 = CpNsymRnS1;
-        scan_right(&mut r, s1, bits);
+        scan_right(&mut r, s1, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
         r.add(s1, Hash, CpNsymRnFh, Hash, Dir::Right);
     }
     {
@@ -1186,9 +1206,7 @@ fn build_utm_rules() -> RuleSet {
     }
     {
         let fh = MrFindHead;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Comma);
-        scan_right(&mut r, fh, &syms);
+        scan_right(&mut r, fh, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
         r.add(fh, Caret, MrSkipCell, Gt, Dir::Right);
     }
     {
@@ -1301,9 +1319,7 @@ fn build_utm_rules() -> RuleSet {
     }
     {
         let fh = MlFindHead;
-        let mut syms: Vec<Symbol> = bits.to_vec();
-        syms.push(Comma);
-        scan_right(&mut r, fh, &syms);
+        scan_right(&mut r, fh, &ZERO_ONE_DOT_PIPE_SEMI_COMMA_L_R);
         r.add(fh, Caret, MlMark, Gt, Dir::Left);
     }
     {
