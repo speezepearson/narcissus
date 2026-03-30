@@ -149,10 +149,30 @@ function useSseTower(): {
   };
 }
 
+function toExponential(
+  x: number,
+  nDecimal: number,
+): { mantissa: string; exponent: number } {
+  const exponent = 3 * Math.floor(Math.log10(x) / 3);
+  const mantissa = x / 10 ** exponent;
+  return { mantissa: mantissa.toFixed(nDecimal), exponent };
+}
+
 function TowerLevelView({ level, name }: { level: TowerLevel; name: string }) {
   const fontSize = useMemo(() => {
     return `${Math.min(1, Math.max(0.2, Math.pow(7000 / level.tape.length, 2)))}em`;
   }, [level.tape.length]);
+
+  const prettyNSteps = useMemo(() => {
+    if (level.steps < 1000) return level.steps;
+    const { mantissa, exponent } = toExponential(level.steps, 2);
+    return (
+      <>
+        {mantissa} x 10<sup>{exponent}</sup>
+      </>
+    );
+  }, [level.steps]);
+
   return (
     <div
       style={{
@@ -171,7 +191,8 @@ function TowerLevelView({ level, name }: { level: TowerLevel; name: string }) {
         }}
       >
         {name} &middot;{" "}
-        <span style={{ fontFamily: "monospace" }}>{level.steps}</span> steps
+        <span style={{ fontFamily: "monospace" }}>{prettyNSteps}</span> step
+        {level.steps === 1 ? "" : "s"}
         &middot; <span style={{ fontFamily: "monospace" }}>{level.state}</span>
       </div>
       <div
