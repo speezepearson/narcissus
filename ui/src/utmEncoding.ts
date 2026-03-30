@@ -32,16 +32,90 @@ function fromBinary(
   return val;
 }
 
+function toBinary(index: number, width: number): boolean[] {
+  const bits: boolean[] = [];
+  for (let i = width - 1; i >= 0; i--) {
+    bits.push(((index >> i) & 1) === 1);
+  }
+  return bits;
+}
+
+function bitsToKey(bits: boolean[]): string {
+  return bits.map((b) => (b ? "1" : "0")).join("");
+}
+
+/**
+ * Build a reverse mapping from bit-reversed binary encoding to state,
+ * matching the Rust greedy assignment in from_transition_stats with empty stats.
+ *
+ * With empty stats every rule has count 0, so group_rules preserves input order.
+ * We walk the guest rules, group noops, then iterate from last (most frequent)
+ * to first, assigning bit-reversed indices.
+ */
+function buildStateEncodingMap(
+  guestSpec: TuringMachineSpec,
+): Map<string, (typeof guestSpec.allStates)[number]> {
+  type S = (typeof guestSpec.allStates)[number];
+  const nStateBits = numBits(guestSpec.allStates.length);
+
+  // Replicate group_rules with empty stats: collect rules in iteration order,
+  // group noops (same state+dir where new_state==state && new_sym==sym),
+  // emit each group once in the position of its first member.
+  // With zero stats the sort is stable, so order is preserved.
+  const ruleStatesInOrder: S[] = [];
+  const noopEmitted = new Set<string>();
+
+  for (const [state, symMap] of guestSpec.rules) {
+    for (const [sym, [newState, newSym, dir]] of symMap) {
+      const isNoop = newState === state && newSym === sym;
+      if (isNoop) {
+        const key = `${state}|${dir}`;
+        if (noopEmitted.has(key)) continue;
+        noopEmitted.add(key);
+      }
+      ruleStatesInOrder.push(state);
+    }
+  }
+
+  // Walk from last to first, assign bit-reversed encodings
+  const encodingToState = new Map<string, S>();
+  const assignedStates = new Set<S>();
+  let nextIndex = 0;
+
+  for (let i = ruleStatesInOrder.length - 1; i >= 0; i--) {
+    const st = ruleStatesInOrder[i];
+    if (assignedStates.has(st)) continue;
+    assignedStates.add(st);
+    const bits = toBinary(nextIndex, nStateBits);
+    bits.reverse();
+    encodingToState.set(bitsToKey(bits), st);
+    nextIndex++;
+  }
+
+  // Assign remaining states not in any rule
+  for (const st of guestSpec.allStates) {
+    if (assignedStates.has(st)) continue;
+    assignedStates.add(st);
+    const bits = toBinary(nextIndex, nStateBits);
+    bits.reverse();
+    encodingToState.set(bitsToKey(bits), st);
+    nextIndex++;
+  }
+
+  return encodingToState;
+}
+
 // ── Decode ──
 
 export function decodeFromUtm(
   guestSpec: TuringMachineSpec,
   utmTape: readonly Symbol[],
 ): TuringMachineSnapshot {
-  const guestStates = guestSpec.allStates;
   const guestSymbols = guestSpec.allSymbols;
-  const nStateBits = numBits(guestStates.length);
+  const nStateBits = numBits(guestSpec.allStates.length);
   const nSymBits = numBits(guestSymbols.length);
+
+  const stateEncodings = buildStateEncodingMap(guestSpec);
 
   // Find # delimiters
   const hashes: number[] = [];
@@ -54,7 +128,12 @@ export function decodeFromUtm(
 
   // STATE section: between hashes[2] and hashes[3]
   const stateStart = hashes[2] + 1;
-  const state = guestStates[fromBinary(utmTape, stateStart, nStateBits)];
+  const stateBitsVal = fromBinary(utmTape, stateStart, nStateBits);
+  const stateBits = toBinary(stateBitsVal, nStateBits);
+  const state = stateEncodings.get(bitsToKey(stateBits));
+  if (state === undefined) {
+    throw new Error(`Unknown state encoding: ${bitsToKey(stateBits)}`);
+  }
 
   // TAPE section: after hashes[3]
   const tapeStart = hashes[3] + 1;
