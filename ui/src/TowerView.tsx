@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface UtmMeta {
   utmStates: string[];
@@ -150,6 +150,9 @@ function useSseTower(): {
 }
 
 function TowerLevelView({ level, name }: { level: TowerLevel; name: string }) {
+  const fontSize = useMemo(() => {
+    return `${Math.min(1, Math.max(0.2, Math.pow(7000 / level.tape.length, 2)))}em`;
+  }, [level.tape.length]);
   return (
     <div
       style={{
@@ -174,9 +177,9 @@ function TowerLevelView({ level, name }: { level: TowerLevel; name: string }) {
       <div
         style={{
           fontFamily: "var(--mono)",
-          fontSize: "12px",
           lineHeight: "1.3",
           overflowWrap: "break-word",
+          fontSize,
         }}
         dangerouslySetInnerHTML={{
           __html:
