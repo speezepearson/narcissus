@@ -1559,11 +1559,18 @@ impl UtmSpec for MyUtmSpec {
         guest: &'a Guest,
         tape: &[Self::Symbol],
     ) -> Result<RunningTuringMachine<'a, Guest>, String> {
-        let guest_states: Vec<Guest::State> = guest.iter_states().collect();
+        let hints = MyUtmSpecOptimizationHints::guess(guest);
         let guest_symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
 
-        let n_state_bits = num_bits(guest_states.len());
+        let n_state_bits = num_bits(guest.iter_states().count());
         let n_sym_bits = num_bits(guest_symbols.len());
+
+        // Build reverse mapping: bitstring -> state
+        let state_from_bits: HashMap<Bitstring, Guest::State> = hints
+            .state_encodings
+            .iter()
+            .map(|(&s, bits)| (bits.clone(), s))
+            .collect();
 
         // Find the sections separated by #
         // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] TAPE
@@ -1582,7 +1589,10 @@ impl UtmSpec for MyUtmSpec {
         }
 
         let state_start = hashes[2] + 1;
-        let state = guest_states[from_binary_at(tape, state_start, n_state_bits)];
+        let state_bits = to_binary(from_binary_at(tape, state_start, n_state_bits), n_state_bits);
+        let state = *state_from_bits.get(&state_bits).ok_or_else(|| {
+            format!("unknown state encoding: {:?}", state_bits)
+        })?;
 
         let tape_start = hashes[3] + 1;
         let tape_end = tape.len();
@@ -1690,11 +1700,34 @@ impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
 
         let n_state_bits = num_bits(guest.iter_states().count());
         let n_sym_bits = num_bits(guest.iter_symbols().count());
-        let state_encodings = guest
-            .iter_states()
-            .enumerate()
-            .map(|(i, s)| (s, to_binary(i, n_state_bits)))
-            .collect();
+
+        // Assign state encodings greedily: walk rules from last (most frequent)
+        // to first, assigning bit-reversed binary indices so that the most
+        // frequently used states get encodings with the most leading zeros.
+        let mut state_encodings = HashMap::new();
+        let mut next_index = 0usize;
+        for rule in rules.iter().rev() {
+            let state = match rule {
+                GuestRule::Single { state, .. } => *state,
+                GuestRule::NoopGroup { state, .. } => *state,
+            };
+            if !state_encodings.contains_key(&state) {
+                let mut bits = to_binary(next_index, n_state_bits);
+                bits.reverse();
+                state_encodings.insert(state, bits);
+                next_index += 1;
+            }
+        }
+        // Assign any remaining states not found in rules
+        for s in guest.iter_states() {
+            if !state_encodings.contains_key(&s) {
+                let mut bits = to_binary(next_index, n_state_bits);
+                bits.reverse();
+                state_encodings.insert(s, bits);
+                next_index += 1;
+            }
+        }
+
         let symbol_encodings = guest
             .iter_symbols()
             .enumerate()
