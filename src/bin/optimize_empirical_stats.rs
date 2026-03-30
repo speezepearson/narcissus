@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use utmmmmm::compiled::{CState, CSymbol, CompiledTuringMachineSpec};
 use utmmmmm::infinity::InfiniteTape;
 use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::utm::{
-    make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol,
-};
+use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
 
 fn run_and_tally(
     utm_spec: &MyUtmSpec,
@@ -54,21 +52,17 @@ fn run_and_tally(
 
     (
         inner_steps,
-        HashMap::from_iter(
-            tallies
-                .iter()
-                .enumerate()
-                .filter(|(_, &c)| c > 0)
-                .map(|(i, &count)| {
+        HashMap::from_iter(tallies.iter().enumerate().filter(|(_, &c)| c > 0).map(
+            |(i, &count)| {
+                (
                     (
-                        (
-                            compiled.decompile_state(CState((i / 256) as u8)),
-                            compiled.decompile_symbol(CSymbol((i % 256) as u8)),
-                        ),
-                        count,
-                    )
-                }),
-        ),
+                        compiled.decompile_state(CState((i / 256) as u8)),
+                        compiled.decompile_symbol(CSymbol((i % 256) as u8)),
+                    ),
+                    count,
+                )
+            },
+        )),
     )
 }
 
@@ -82,7 +76,7 @@ fn codegen(stats: &HashMap<(State, Symbol), usize>) -> String {
     code.push_str("// This file contains empirically-derived transition statistics\n");
     code.push_str("// for optimizing UTM rule ordering.\n\n");
     code.push_str("use std::collections::HashMap;\n\n");
-    code.push_str("use crate::utm::{MyUtmSpec, State, Symbol, TmTransitionStats};\n\n");
+    code.push_str("use crate::utm::{ State, Symbol, TmTransitionStats};\n\n");
     code.push_str("pub fn make_empirical_transition_stats() -> TmTransitionStats<MyUtmSpec> {\n");
     code.push_str("    TmTransitionStats(HashMap::from([\n");
 

@@ -16,13 +16,12 @@ use std::collections::HashMap;
 use crate::{
     compiled::{CSymbol, CompiledTuringMachineSpec},
     tm::{RunningTuringMachine, SimpleTuringMachineSpec},
-    utm::{num_bits, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol},
+    utm::{ MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol},
 };
 
 pub struct InfiniteTape {
     header: Vec<Symbol>,
-    sym_to_idx: HashMap<Symbol, usize>,
-    n_sym_bits: usize,
+    symbol_encodings: HashMap<Symbol, Vec<Symbol>>,
     cell_width: usize, // 1 (marker) + n_sym_bits
     realized: RefCell<Vec<Symbol>>,
 }
@@ -40,18 +39,18 @@ impl InfiniteTape {
             .expect("encoded tape should contain ^");
         let header = dummy[..caret_pos].to_vec();
 
-        let sym_to_idx: HashMap<Symbol, usize> = optimization_hints
-            .symbol_encodings
-            .iter()
-            .map(|(&s, &i)| (s, i))
-            .collect();
-        let n_sym_bits = num_bits(sym_to_idx.len());
+        let symbol_encodings: HashMap<Symbol, Vec<Symbol>> =
+            optimization_hints.symbol_encodings.clone();
+        let n_sym_bits = symbol_encodings
+            .values()
+            .map(|s| s.len())
+            .max()
+            .expect("symbol encodings should not be empty");
         let cell_width = 1 + n_sym_bits;
 
         Self {
             header,
-            sym_to_idx,
-            n_sym_bits,
+            symbol_encodings,
             cell_width,
             realized: RefCell::new(Vec::new()),
         }
@@ -101,8 +100,7 @@ impl InfiniteTape {
 
         let header = &self.header;
         let header_len = header.len();
-        let sym_to_idx = &self.sym_to_idx;
-        let n_sym_bits = self.n_sym_bits;
+        let symbol_encodings = &self.symbol_encodings;
         let cell_width = self.cell_width;
 
         while cache.len() <= index {
@@ -125,8 +123,11 @@ impl InfiniteTape {
                     let bit_offset = offset % cell_width - 1;
 
                     let sym = cache[cell_index]; // always available: cell_index < pos
-                    let sym_idx = sym_to_idx[&sym];
-                    let bit = (sym_idx >> (n_sym_bits - 1 - bit_offset)) & 1;
+                    let bit = match symbol_encodings[&sym][bit_offset] {
+                        Symbol::One => 1,
+                        Symbol::Zero => 0,
+                        _ => panic!("symbol encoding should only contain One and Zero"),
+                    };
                     cache.push(if bit == 1 { Symbol::One } else { Symbol::Zero });
                 }
             }

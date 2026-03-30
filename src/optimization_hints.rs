@@ -4,5 +4,8 @@ use crate::{
 };
 
 pub fn make_my_utm_self_optimization_hints() -> MyUtmSpecOptimizationHints<MyUtmSpec> {
-    MyUtmSpecOptimizationHints::from_transition_stats(&make_utm_spec(), &make_empirical_transition_stats())
+    MyUtmSpecOptimizationHints::from_transition_stats(
+        &make_utm_spec(),
+        &make_empirical_transition_stats(),
+    )
 }

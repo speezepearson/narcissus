@@ -1669,27 +1669,34 @@ pub fn run_until_inner_step<Spec: UtmSpec>(
 }
 
 pub struct MyUtmSpecOptimizationHints<Guest: TuringMachineSpec> {
-    pub rules: Vec<GuestRule>,
-    pub state_encodings: HashMap<Guest::State, usize>,
-    pub symbol_encodings: HashMap<Guest::Symbol, usize>,
+    pub rules: Vec<GuestRule<Guest::State, Guest::Symbol>>,
+    pub state_encodings: HashMap<Guest::State, Vec<Symbol>>,
+    pub symbol_encodings: HashMap<Guest::Symbol, Vec<Symbol>>,
     pub transition_stats: HashMap<(Guest::State, Guest::Symbol), usize>,
 }
 impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
     pub fn guess(guest: &Guest) -> Self {
         Self::from_transition_stats(guest, &HashMap::new())
     }
-    pub fn from_transition_stats(guest: &Guest, transition_stats: &HashMap<(Guest::State, Guest::Symbol), usize>) -> Self {
+    pub fn from_transition_stats(
+        guest: &Guest,
+        transition_stats: &HashMap<(Guest::State, Guest::Symbol), usize>,
+    ) -> Self {
+        let rules = group_rules(&guest.iter_rules().collect::<Vec<_>>(), transition_stats);
+
+        let n_state_bits = num_bits(guest.iter_states().count());
+        let n_sym_bits = num_bits(guest.iter_symbols().count());
         let state_encodings = guest
             .iter_states()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, s)| (s, to_binary(i, n_state_bits)))
             .collect();
         let symbol_encodings = guest
             .iter_symbols()
             .enumerate()
-            .map(|(i, s)| (s, i))
+            .map(|(i, s)| (s, to_binary(i, n_sym_bits)))
             .collect();
-        let rules = group_rules(&guest.iter_rules().collect::<Vec<_>>(), &state_encodings, &symbol_encodings, transition_stats);
+
         Self {
             rules,
             state_encodings,
@@ -1701,20 +1708,20 @@ impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
 
 /// A rule in the encoded guest program, using encoded indices.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GuestRule {
+pub enum GuestRule<GState, GSymbol> {
     /// Normal rule: state | sym | new_state | new_sym | dir
     Single {
-        state: usize,
-        sym: usize,
-        new_state: usize,
-        new_sym: usize,
+        state: GState,
+        sym: GSymbol,
+        new_state: GState,
+        new_sym: GSymbol,
         dir: Dir,
     },
     /// Compact noop rule: state , sym1 , sym2 , ... | dir
     /// All listed symbols leave state and symbol unchanged, just move.
     NoopGroup {
-        state: usize,
-        syms: Vec<usize>,
+        state: GState,
+        syms: Vec<GSymbol>,
         dir: Dir,
     },
 }
@@ -1726,54 +1733,23 @@ pub enum GuestRule {
 /// with `n_bits=4`, indices `{0,1,2,3,4,5,6,7,8,9,10}` compress to prefixes
 /// `["0", "100", "1010"]` because all 8 values starting with `0` are present,
 /// both values starting with `100` are present, and `1010` stands alone.
-pub fn compress_prefixes(syms: &[usize], n_bits: usize) -> Vec<Vec<Symbol>> {
-    let sym_set: HashSet<usize> = syms.iter().copied().collect();
-    let mut result = Vec::new();
-    compress_prefixes_rec(&sym_set, n_bits, 0, 0, &mut result);
-    result.sort_by_key(|p| p.len());
-    result
+pub fn compress_prefixes<GSymbol>(
+    syms: &[GSymbol],
+    symbol_encodings: &HashMap<GSymbol, Vec<Symbol>>,
+) -> Vec<Vec<Symbol>>
+where
+    GSymbol: Eq + Hash + Copy,
+{
+    todo!();
 }
 
-fn compress_prefixes_rec(
-    sym_set: &HashSet<usize>,
-    n_bits: usize,
-    prefix: usize,
-    depth: usize,
-    result: &mut Vec<Vec<Symbol>>,
-) {
-    if depth == n_bits {
-        // Full-width: this is a single symbol
-        if sym_set.contains(&prefix) {
-            result.push(to_binary(prefix, n_bits));
-        }
-        return;
-    }
-
-    // Count how many values under this prefix are in the set
-    let remaining = n_bits - depth;
-    let subtree_size = 1usize << remaining;
-    let base = prefix << remaining;
-    let count = (base..base + subtree_size)
-        .filter(|v| sym_set.contains(v))
-        .count();
-
-    if count == 0 {
-        return;
-    }
-    if count == subtree_size {
-        // All values under this prefix are present — emit just the prefix
-        result.push(to_binary(prefix, depth));
-        return;
-    }
-
-    // Recurse into 0-child and 1-child
-    compress_prefixes_rec(sym_set, n_bits, prefix * 2, depth + 1, result);
-    compress_prefixes_rec(sym_set, n_bits, prefix * 2 + 1, depth + 1, result);
-}
-
-impl GuestRule {
+impl<GState: Eq + Hash + Copy, GSymbol: Eq + Hash + Copy> GuestRule<GState, GSymbol> {
     /// Serialize this rule into UTM tape symbols.
-    pub fn serialize(&self, n_state_bits: usize, n_sym_bits: usize) -> Vec<Symbol> {
+    pub fn serialize(
+        &self,
+        state_encodings: &HashMap<GState, Vec<Symbol>>,
+        symbol_encodings: &HashMap<GSymbol, Vec<Symbol>>,
+    ) -> Vec<Symbol> {
         let mut out = Vec::new();
         match self {
             GuestRule::Single {
@@ -1784,13 +1760,13 @@ impl GuestRule {
                 dir,
             } => {
                 out.push(Symbol::Dot);
-                out.extend_from_slice(&to_binary(*state, n_state_bits));
+                out.extend_from_slice(&state_encodings[state]);
                 out.push(Symbol::Pipe);
-                out.extend_from_slice(&to_binary(*sym, n_sym_bits));
+                out.extend_from_slice(&symbol_encodings[sym]);
                 out.push(Symbol::Pipe);
-                out.extend_from_slice(&to_binary(*new_state, n_state_bits));
+                out.extend_from_slice(&state_encodings[new_state]);
                 out.push(Symbol::Pipe);
-                out.extend_from_slice(&to_binary(*new_sym, n_sym_bits));
+                out.extend_from_slice(&symbol_encodings[new_sym]);
                 out.push(Symbol::Pipe);
                 out.push(match dir {
                     Dir::Left => Symbol::L,
@@ -1799,8 +1775,8 @@ impl GuestRule {
             }
             GuestRule::NoopGroup { state, syms, dir } => {
                 out.push(Symbol::Dot);
-                out.extend_from_slice(&to_binary(*state, n_state_bits));
-                let prefixes = compress_prefixes(syms, n_sym_bits);
+                out.extend_from_slice(&state_encodings[state]);
+                let prefixes = compress_prefixes(syms, symbol_encodings);
                 for prefix in &prefixes {
                     out.push(Symbol::Comma);
                     out.extend_from_slice(prefix);
@@ -1817,13 +1793,17 @@ impl GuestRule {
 }
 
 /// Serialize a list of GuestRules into the RULES section content (without surrounding #).
-pub fn serialize_rules(rules: &[GuestRule], n_state_bits: usize, n_sym_bits: usize) -> Vec<Symbol> {
+pub fn serialize_rules<GState: Eq + Copy + Hash, GSymbol: Eq + Copy + Hash>(
+    rules: &[GuestRule<GState, GSymbol>],
+    state_encodings: &HashMap<GState, Vec<Symbol>>,
+    symbol_encodings: &HashMap<GSymbol, Vec<Symbol>>,
+) -> Vec<Symbol> {
     let mut tape = Vec::new();
     for (i, rule) in rules.iter().enumerate() {
         if i > 0 {
             tape.push(Symbol::Semi);
         }
-        tape.extend(rule.serialize(n_state_bits, n_sym_bits));
+        tape.extend(rule.serialize(state_encodings, symbol_encodings));
     }
     tape
 }
@@ -1834,50 +1814,39 @@ pub fn serialize_rules(rules: &[GuestRule], n_state_bits: usize, n_sym_bits: usi
 /// Noop rules for the same (state, direction) are grouped into a single NoopGroup.
 /// The resulting Vec is sorted by ascending sum of transition stat counts,
 /// so the UTM (which scans rules right-to-left) finds frequent rules first.
-pub fn group_rules<GState, GSymbol>
-(
-    rules: &[(
-        GState,
-        GSymbol,
-        GState,
-        GSymbol,
-        Dir,
-    )],
-    state_encodings: &HashMap<GState, usize>,
-    symbol_encodings: &HashMap<GSymbol, usize>,
+pub fn group_rules<GState, GSymbol>(
+    rules: &[(GState, GSymbol, GState, GSymbol, Dir)],
     transition_stats: &HashMap<(GState, GSymbol), usize>,
-) -> Vec<GuestRule> 
-where GState: Eq + Hash + Copy, GSymbol: Eq + Hash + Copy,
+) -> Vec<GuestRule<GState, GSymbol>>
+where
+    GState: Eq + Hash + Copy,
+    GSymbol: Eq + Hash + Copy,
 {
     // Identify noop rules and group by (state_encoding, dir)
-    let mut noop_groups: HashMap<(usize, Dir), Vec<usize>> = HashMap::new();
+    let mut noop_groups: HashMap<(GState, Dir), Vec<GSymbol>> = HashMap::new();
     let mut noop_set: HashSet<(GState, GSymbol)> = HashSet::new();
     // Track Guest-typed keys per noop group for stat lookups
-    let mut noop_group_keys: HashMap<(usize, Dir), Vec<(GState, GSymbol)>> =
-        HashMap::new();
+    let mut noop_group_keys: HashMap<(GState, Dir), Vec<(GState, GSymbol)>> = HashMap::new();
 
     for &(st, sym, nst, nsym, dir) in rules {
         if nst == st && nsym == sym {
-            let st_idx = state_encodings[&st];
-            let sym_idx = symbol_encodings[&sym];
-            noop_groups.entry((st_idx, dir)).or_default().push(sym_idx);
+            noop_groups.entry((st, dir)).or_default().push(sym);
             noop_set.insert((st, sym));
             noop_group_keys
-                .entry((st_idx, dir))
+                .entry((st, dir))
                 .or_default()
                 .push((st, sym));
         }
     }
 
     // Build result: one entry per noop group, one per non-noop rule
-    let mut emitted_noop_groups: HashSet<(usize, Dir)> = HashSet::new();
-    let mut result: Vec<(GuestRule, usize)> = Vec::new();
+    let mut emitted_noop_groups: HashSet<(GState, Dir)> = HashSet::new();
+    let mut result: Vec<(GuestRule<GState, GSymbol>, usize)> = Vec::new();
 
     for &(st, sym, nst, nsym, dir) in rules {
         let count = *transition_stats.get(&(st, sym)).unwrap_or(&0);
         if noop_set.contains(&(st, sym)) {
-            let st_idx = state_encodings[&st];
-            let key = (st_idx, dir);
+            let key = (st, dir);
             if emitted_noop_groups.contains(&key) {
                 continue;
             }
@@ -1889,7 +1858,7 @@ where GState: Eq + Hash + Copy, GSymbol: Eq + Hash + Copy,
                 .sum();
             result.push((
                 GuestRule::NoopGroup {
-                    state: st_idx,
+                    state: st,
                     syms,
                     dir,
                 },
@@ -1898,10 +1867,10 @@ where GState: Eq + Hash + Copy, GSymbol: Eq + Hash + Copy,
         } else {
             result.push((
                 GuestRule::Single {
-                    state: state_encodings[&st],
-                    sym: symbol_encodings[&sym],
-                    new_state: state_encodings[&nst],
-                    new_sym: symbol_encodings[&nsym],
+                    state: st,
+                    sym: sym,
+                    new_state: nst,
+                    new_sym: nsym,
                     dir,
                 },
                 count,
@@ -1930,8 +1899,6 @@ impl MyUtmSpec {
         if hints.symbol_encodings.len() != guest.spec.iter_symbols().count() {
             panic!("symbol encodings length mismatch");
         }
-        let n_state_bits = num_bits(hints.state_encodings.len());
-        let n_sym_bits = num_bits(hints.symbol_encodings.len());
 
         let all_rules: Vec<_> = guest.spec.iter_rules().collect();
 
@@ -1950,32 +1917,25 @@ impl MyUtmSpec {
             if i > 0 {
                 tape.push(Symbol::Semi);
             }
-            tape.extend_from_slice(&to_binary(hints.state_encodings[&state], n_state_bits));
+            tape.extend_from_slice(&hints.state_encodings[&state]);
         }
 
         // BLANK section
         tape.push(Symbol::Hash);
-        tape.extend_from_slice(&to_binary(
-            hints.symbol_encodings[&guest.spec.blank()],
-            n_sym_bits,
-        ));
+        tape.extend_from_slice(&hints.symbol_encodings[&guest.spec.blank()]);
 
         // RULES section: # .rule1 ; .rule2 ; .rule3 ...
         tape.push(Symbol::Hash);
-        let guest_rules = group_rules(
-            &all_rules,
+        let guest_rules = group_rules(&all_rules, &hints.transition_stats);
+        tape.extend(serialize_rules(
+            &guest_rules,
             &hints.state_encodings,
             &hints.symbol_encodings,
-            &hints.transition_stats,
-        );
-        tape.extend(serialize_rules(&guest_rules, n_state_bits, n_sym_bits));
+        ));
 
         // STATE section
         tape.push(Symbol::Hash);
-        tape.extend_from_slice(&to_binary(
-            hints.state_encodings[&guest.state],
-            n_state_bits,
-        ));
+        tape.extend_from_slice(&hints.state_encodings[&guest.state]);
 
         // TAPE section
         tape.push(Symbol::Hash);
@@ -1990,7 +1950,7 @@ impl MyUtmSpec {
         };
         for sym in nonempty_guest_tape {
             tape.push(Symbol::Comma);
-            tape.extend_from_slice(&to_binary(hints.symbol_encodings[&sym], n_sym_bits));
+            tape.extend_from_slice(&hints.symbol_encodings[&sym]);
         }
         tape[caret_pos] = Symbol::Caret;
 

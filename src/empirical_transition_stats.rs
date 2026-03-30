@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use crate::utm::{MyUtmSpec, State, Symbol};
+use crate::utm::{ State, Symbol};
 
 pub fn make_empirical_transition_stats() -> HashMap<(State, Symbol), usize> {
     HashMap::from([
