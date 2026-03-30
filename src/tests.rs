@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use crate::gen_utm::UtmSpec;
-use crate::optimization_hints::make_my_utm_self_optimization_hints;
+use crate::gen_utm::{Encoder, UtmSpec};
 use crate::tm::{
     run_tm, run_until_enters_state, step, HaltReason, RunUntilResult, RunningTMStatus,
     RunningTuringMachine, TuringMachineSpec,
@@ -40,6 +39,7 @@ fn run_via_utm<'a, Guest: TuringMachineSpec>(
     max_utm_steps: usize,
 ) -> (String, RunningTuringMachine<'a, Guest>) {
     let utm_spec = make_utm_spec();
+    let encoder = MyUtmSpecOptimizationHints::guess(guest);
 
     let mut guest_tm = RunningTuringMachine::new(guest);
     guest_tm.tape = if input.is_empty() {
@@ -48,7 +48,7 @@ fn run_via_utm<'a, Guest: TuringMachineSpec>(
         input.to_vec()
     };
 
-    let encoded = utm_spec.encode(&guest_tm);
+    let encoded = encoder.encode(&guest_tm);
     let mut utm_tm = RunningTuringMachine::new(&utm_spec);
     utm_tm.tape = encoded;
 
@@ -59,8 +59,8 @@ fn run_via_utm<'a, Guest: TuringMachineSpec>(
         Err(_) => "limit",
     };
 
-    let decoded = utm_spec
-        .decode(guest, &utm_tm.tape)
+    let decoded = encoder
+        .decode(&utm_tm.tape)
         .expect("should be able to decode UTM tape");
 
     (status.to_string(), decoded)
@@ -85,7 +85,8 @@ fn assert_faithful<Spec: TuringMachineSpec + std::fmt::Debug>(
     Spec::State: std::fmt::Debug,
     Spec::Symbol: std::fmt::Debug,
 {
-    let utm = make_utm_spec();
+    let utm_spec = make_utm_spec();
+    let encoder = MyUtmSpecOptimizationHints::guess(guest_tm.spec);
     // Run directly
     let mut direct_tm = RunningTuringMachine {
         spec: guest_tm.spec,
@@ -101,8 +102,7 @@ fn assert_faithful<Spec: TuringMachineSpec + std::fmt::Debug>(
     };
 
     // Run via UTM
-    let encoded = utm.encode(&guest_tm);
-    let utm_spec = make_utm_spec();
+    let encoded = encoder.encode(&guest_tm);
     let mut utm_tm = RunningTuringMachine::new(&utm_spec);
     utm_tm.tape = encoded;
 
@@ -119,8 +119,8 @@ fn assert_faithful<Spec: TuringMachineSpec + std::fmt::Debug>(
         direct_status, utm_status
     );
 
-    let mut decoded = utm
-        .decode(guest_tm.spec, &utm_tm.tape)
+    let mut decoded = encoder
+        .decode(&utm_tm.tape)
         .expect("should decode UTM tape after halting");
 
     strip_trailing_blanks(&mut direct_tm);
@@ -200,8 +200,9 @@ fn test_encode_decode_roundtrip_flip_bits() {
     guest_tm.tape = vec![Zero, One];
 
     let utm = make_utm_spec();
-    let encoded = utm.encode(&guest_tm);
-    let decoded = utm.decode(spec, &encoded).unwrap();
+    let encoder = utm.encoder(guest_tm.spec);
+    let encoded = encoder.encode(&guest_tm);
+    let decoded = encoder.decode(&encoded).unwrap();
     assert_eq!(decoded.state, guest_tm.state);
     assert_eq!(decoded.pos, 0);
     assert_eq!(decoded.tape, vec![Zero, One]);
@@ -214,8 +215,9 @@ fn test_encode_decode_roundtrip_empty() {
     guest_tm.tape = vec![spec.blank()];
 
     let utm = make_utm_spec();
-    let encoded = utm.encode(&guest_tm);
-    let decoded = utm.decode(spec, &encoded).unwrap();
+    let encoder = utm.encoder(guest_tm.spec);
+    let encoded = encoder.encode(&guest_tm);
+    let decoded = encoder.decode(&encoded).unwrap();
     assert_eq!(decoded.state, spec.initial());
     assert_eq!(decoded.pos, 0);
     assert_eq!(decoded.tape, vec![spec.blank()]);
@@ -230,8 +232,9 @@ fn test_encode_decode_roundtrip_palindrome() {
     guest_tm.tape = vec![Letter(A), Letter(B), Letter(A)];
 
     let utm = make_utm_spec();
-    let encoded = utm.encode(&guest_tm);
-    let decoded = utm.decode(spec, &encoded).unwrap();
+    let encoder = utm.encoder(guest_tm.spec);
+    let encoded = encoder.encode(&guest_tm);
+    let decoded = encoder.decode(&encoded).unwrap();
     assert_eq!(decoded.state, CheckPalindromeState::Start);
     assert_eq!(decoded.pos, 0);
     assert_eq!(decoded.tape, vec![Letter(A), Letter(B), Letter(A)]);
@@ -341,7 +344,7 @@ fn test_faithful_utm_running_accept_immediately() {
 
     // Encode the inner TM into a UTM tape
     let utm_spec = make_utm_spec();
-    let encoded_inner = utm_spec.encode(&inner_tm);
+    let encoded_inner = utm_spec.encoder(inner_tm.spec).encode(&inner_tm);
 
     let mut utm_tm = RunningTuringMachine::new(&utm_spec);
     utm_tm.tape = encoded_inner;
@@ -365,13 +368,11 @@ fn test_encode_with_last_rules_faithful_flip_bits() {
 
     // Put one specific rule last
     let utm_spec = make_utm_spec();
-    let encoded = utm_spec.encode_optimized(
-        &tm,
-        &MyUtmSpecOptimizationHints::from_transition_stats(
-            &spec,
-            &HashMap::from([((FlipBitsState::Flip, Zero), 1)]),
-        ),
+    let encoder = MyUtmSpecOptimizationHints::from_transition_stats(
+        spec,
+        &HashMap::from([((FlipBitsState::Flip, Zero), 1)]),
     );
+    let encoded = encoder.encode(&tm);
 
     // Run directly
     let mut direct_tm = RunningTuringMachine {
@@ -395,7 +396,8 @@ fn test_encode_with_last_rules_faithful_flip_bits() {
     );
 
     let decoded = utm_spec
-        .decode(spec, &utm_tm.tape)
+        .encoder(spec)
+        .decode(&utm_tm.tape)
         .expect("should decode UTM tape");
     strip_trailing_blanks(&mut direct_tm);
     let mut decoded_stripped = decoded;
@@ -411,8 +413,8 @@ fn test_encode_with_none_same_as_encode() {
     tm.tape = vec![Zero, One];
 
     let utm = make_utm_spec();
-    let plain = utm.encode(&tm);
-    let with_none = utm.encode_optimized(&tm, &MyUtmSpecOptimizationHints::guess(&spec));
+    let plain = utm.encoder(tm.spec).encode(&tm);
+    let with_none = utm.encoder(tm.spec).encode(&tm);
     assert_eq!(plain, with_none);
 }
 
@@ -436,11 +438,11 @@ fn bench_compiled_vs_interpreted() {
     // Build utm(encode(utm(encode(accept_immediately))))
     let acc_spec = &*ACCEPT_IMMEDIATELY_SPEC;
     let inner_tm = RunningTuringMachine::new(acc_spec);
-    let inner_encoded = utm_spec.encode(&inner_tm);
+    let inner_encoded = utm_spec.encoder(inner_tm.spec).encode(&inner_tm);
 
     let mut mid_tm = RunningTuringMachine::new(&utm_spec);
     mid_tm.tape = inner_encoded;
-    let outer_encoded = utm_spec.encode(&mid_tm);
+    let outer_encoded = utm_spec.encoder(mid_tm.spec).encode(&mid_tm);
 
     // Helper: convert Symbol tape to CSymbol tape
     let compiled = CompiledTuringMachineSpec::compile(&utm_spec).expect("UTM should compile");
@@ -601,8 +603,7 @@ fn bench_rule_order_optimization() {
     // Helper: build a compiled TM running the infinite UTM tape with given rule order
     let build_tm = |optimization_hints: &MyUtmSpecOptimizationHints<MyUtmSpec>| {
         // Compute the header with the given rule order
-        let header_tape =
-            utm_spec.encode_optimized(&RunningTuringMachine::new(&utm_spec), &optimization_hints);
+        let header_tape = optimization_hints.encode(&RunningTuringMachine::new(&utm_spec));
         let caret_pos = header_tape
             .iter()
             .position(|&s| s == Symbol::Caret)
@@ -678,7 +679,7 @@ fn bench_rule_order_optimization() {
     let unopt_guest_steps = count_guest_steps(&mut unopt_tm);
 
     // ── Optimized (hints rule order) ──
-    let mut opt_tm = build_tm(&make_my_utm_self_optimization_hints());
+    let mut opt_tm = build_tm(&MyUtmSpecOptimizationHints::guess(&utm_spec));
     let opt_guest_steps = count_guest_steps(&mut opt_tm);
 
     eprintln!(
@@ -716,6 +717,7 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
     Spec::Symbol: std::fmt::Debug + PartialEq,
 {
     let utm_spec = make_utm_spec();
+    let encoder = utm_spec.encoder(guest_spec);
 
     // Set up guest TM
     let mut guest_tm = RunningTuringMachine::new(guest_spec);
@@ -726,13 +728,13 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
     };
 
     // Encode and create UTM
-    let encoded = utm_spec.encode(&guest_tm);
+    let encoded = encoder.encode(&guest_tm);
     let mut utm_tm = RunningTuringMachine::new(&utm_spec);
     utm_tm.tape = encoded;
 
     // Decode of freshly encoded tape should match initial guest
-    let decoded = utm_spec
-        .decode(guest_spec, &utm_tm.tape)
+    let decoded = encoder
+        .decode(&utm_tm.tape)
         .expect("decode at initial state");
     assert_eq!(decoded.state, guest_tm.state, "initial state mismatch");
     assert_eq!(decoded.pos, guest_tm.pos, "initial pos mismatch");
@@ -760,8 +762,8 @@ fn assert_tick_faithful<Spec: TuringMachineSpec>(
         );
 
         // Decode and compare
-        let decoded = utm_spec
-            .decode(guest_spec, &utm_tm.tape)
+        let decoded = encoder
+            .decode(&utm_tm.tape)
             .expect(&format!("decode at tick {}", i + 1));
 
         assert_eq!(
@@ -855,7 +857,7 @@ fn test_noop_encoding_has_commas() {
     let utm = make_utm_spec();
     let mut tm = RunningTuringMachine::new(&spec);
     tm.tape = vec![1, 2, 0]; // S0, S1, Blank
-    let encoded = utm.encode(&tm);
+    let encoded = utm.encoder(tm.spec).encode(&tm);
 
     // Find rules section: between #[1] and #[2] in new layout
     // Layout: $ ACC #[0] BLANK #[1] RULES #[2] STATE #[3] TAPE
@@ -931,10 +933,7 @@ fn test_group_rules_no_noops() {
     let hints = MyUtmSpecOptimizationHints::guess(&spec);
     // Filter to just the non-noop rule: (Scan=0, Blank=0) -> (Done=1, Blank=0, L)
     let rules = vec![(0u8, 0u8, 1u8, 0u8, Dir::Left)];
-    let grouped = group_rules(
-        &rules,
-        &hints.transition_stats,
-    );
+    let grouped = group_rules(&rules, &hints.transition_stats);
     assert_eq!(grouped.len(), 1);
     assert!(matches!(grouped[0], GuestRule::Single { .. }));
 }
@@ -948,10 +947,7 @@ fn test_group_rules_all_noops_same_dir() {
         (0u8, 1u8, 0u8, 1u8, Dir::Right), // noop: Scan, S0
         (0u8, 2u8, 0u8, 2u8, Dir::Right), // noop: Scan, S1
     ];
-    let grouped = group_rules(
-        &rules,
-        &hints.transition_stats,
-    );
+    let grouped = group_rules(&rules, &hints.transition_stats);
     assert_eq!(grouped.len(), 1);
     match &grouped[0] {
         GuestRule::NoopGroup { state, syms, dir } => {
@@ -975,10 +971,7 @@ fn test_group_rules_mixed() {
         (0u8, 0u8, 1u8, 0u8, Dir::Left),  // non-noop
         (0u8, 2u8, 0u8, 2u8, Dir::Right), // noop (same group as first)
     ];
-    let grouped = group_rules(
-        &rules,
-        &hints.transition_stats,
-    );
+    let grouped = group_rules(&rules, &hints.transition_stats);
     assert_eq!(grouped.len(), 2);
     // With zero stats, sorted stably: NoopGroup (encountered first), then Single.
     let noop_count = grouped
@@ -1010,10 +1003,7 @@ fn test_group_rules_different_dirs() {
         (0u8, 1u8, 0u8, 1u8, Dir::Right), // noop R
         (0u8, 2u8, 0u8, 2u8, Dir::Left),  // noop L (different dir)
     ];
-    let grouped = group_rules(
-        &rules,
-        &hints.transition_stats,
-    );
+    let grouped = group_rules(&rules, &hints.transition_stats);
     assert_eq!(grouped.len(), 2);
     // Each is its own NoopGroup (single-symbol groups are still NoopGroups)
     assert!(matches!(
@@ -1032,10 +1022,8 @@ fn test_group_rules_different_dirs() {
 #[test]
 fn test_serialize_single_rule() {
     // 2 states (1 bit), 4 symbols (2 bits)
-    let state_encodings: HashMap<u8, Bitstring> = HashMap::from([
-        (0, vec![false]),
-        (1, vec![true]),
-    ]);
+    let state_encodings: HashMap<u8, Bitstring> =
+        HashMap::from([(0, vec![false]), (1, vec![true])]);
     let symbol_encodings: HashMap<u8, Bitstring> = HashMap::from([
         (0, vec![false, false]),
         (1, vec![false, true]),
@@ -1112,10 +1100,8 @@ fn test_serialize_noop_group() {
 
 #[test]
 fn test_serialize_rules_semicolons() {
-    let state_encodings: HashMap<u8, Bitstring> = HashMap::from([
-        (0, vec![false]),
-        (1, vec![true]),
-    ]);
+    let state_encodings: HashMap<u8, Bitstring> =
+        HashMap::from([(0, vec![false]), (1, vec![true])]);
     let symbol_encodings: HashMap<u8, Bitstring> = HashMap::from([
         (0, vec![false, false]),
         (1, vec![false, true]),

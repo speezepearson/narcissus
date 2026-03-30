@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    gen_utm::UtmSpec,
+    gen_utm::{Encoder, UtmSpec},
     tm::{Dir, RunningTuringMachine, SimpleTuringMachineSpec, TuringMachineSpec},
 };
 
@@ -1548,19 +1548,142 @@ fn build_utm_rules() -> RuleSet {
 
 pub type MyUtmSpec = SimpleTuringMachineSpec<State, Symbol>;
 impl UtmSpec for MyUtmSpec {
-    fn encode<Guest: TuringMachineSpec>(
+    type Encoder<'a, Guest: 'a + TuringMachineSpec> = MyUtmSpecOptimizationHints<'a, Guest>;
+    fn encoder<'a, Guest: 'a + TuringMachineSpec>(
         &self,
-        tm: &RunningTuringMachine<Guest>,
-    ) -> Vec<Self::Symbol> {
-        self.encode_optimized(tm, &MyUtmSpecOptimizationHints::guess(tm.spec))
+        tm: &'a Guest,
+    ) -> Self::Encoder<'a, Guest> {
+        MyUtmSpecOptimizationHints::guess(tm)
     }
-    fn decode<'a, Guest: TuringMachineSpec>(
-        &self,
-        guest: &'a Guest,
-        tape: &[Self::Symbol],
-    ) -> Result<RunningTuringMachine<'a, Guest>, String> {
-        let guest_states: Vec<Guest::State> = guest.iter_states().collect();
-        let guest_symbols: Vec<Guest::Symbol> = guest.iter_symbols().collect();
+
+    fn is_tick_boundary(&self, prev_state: State, state: State) -> bool {
+        prev_state != state && state == State::DoneSeekHome
+    }
+}
+
+/// Step a UTM until `is_tick_boundary` fires (or it halts).
+/// Takes at least one step before checking.
+/// Returns Ok(num_steps) on tick, Err on halt or step limit.
+#[allow(dead_code)]
+pub fn run_until_inner_step<Spec: UtmSpec>(
+    spec: &Spec,
+    tm: &mut RunningTuringMachine<Spec>,
+    max_steps: usize,
+) -> Result<usize, crate::tm::RunUntilResult> {
+    use crate::tm::{step, RunUntilResult, RunningTMStatus};
+
+    let mut prev_state = tm.state;
+
+    for step_count in 1..=max_steps {
+        if tm.pos >= tm.tape.len() {
+            tm.tape.resize(tm.pos + 1, spec.blank());
+        }
+        match step(tm) {
+            RunningTMStatus::Running => {
+                if tm.pos >= tm.tape.len() {
+                    tm.tape.resize(tm.pos + 1, spec.blank());
+                }
+                if spec.is_tick_boundary(prev_state, tm.state) {
+                    return Ok(step_count);
+                }
+                prev_state = tm.state;
+            }
+            RunningTMStatus::Accepted => {
+                return Err(RunUntilResult::Accepted {
+                    num_steps: step_count,
+                });
+            }
+            RunningTMStatus::Rejected => {
+                return Err(RunUntilResult::Rejected {
+                    num_steps: step_count,
+                });
+            }
+        }
+    }
+    Err(RunUntilResult::StepLimit)
+}
+
+#[derive(Clone)]
+pub struct MyUtmSpecOptimizationHints<'a, Guest: 'a + TuringMachineSpec> {
+    pub guest: &'a Guest,
+    pub rules: Vec<GuestRule<Guest::State, Guest::Symbol>>,
+    pub state_encodings: HashMap<Guest::State, Bitstring>,
+    pub symbol_encodings: HashMap<Guest::Symbol, Bitstring>,
+    pub transition_stats: HashMap<(Guest::State, Guest::Symbol), usize>,
+}
+
+impl<'a, Guest: 'a + TuringMachineSpec> Encoder<'a, Symbol, Guest>
+    for MyUtmSpecOptimizationHints<'a, Guest>
+{
+    fn encode(&self, guest: &RunningTuringMachine<Guest>) -> Vec<Symbol> {
+        if self.state_encodings.len() != guest.spec.iter_states().count() {
+            panic!("state encodings length mismatch");
+        }
+        if self.symbol_encodings.len() != guest.spec.iter_symbols().count() {
+            panic!("symbol encodings length mismatch");
+        }
+
+        let all_rules: Vec<_> = guest.spec.iter_rules().collect();
+
+        let mut tape: Vec<Symbol> = Vec::new();
+        tape.push(Symbol::Dollar);
+
+        // Layout: $ ACCEPT # BLANK # RULES # STATE # TAPE
+
+        // ACCEPT section (right after $)
+        for (i, state) in guest
+            .spec
+            .iter_states()
+            .filter(|s| guest.spec.is_accepting(*s))
+            .enumerate()
+        {
+            if i > 0 {
+                tape.push(Symbol::Semi);
+            }
+            tape.extend(bitstring_to_symbols(&self.state_encodings[&state]));
+        }
+
+        // BLANK section
+        tape.push(Symbol::Hash);
+        tape.extend(bitstring_to_symbols(
+            &self.symbol_encodings[&guest.spec.blank()],
+        ));
+
+        // RULES section: # .rule1 ; .rule2 ; .rule3 ...
+        tape.push(Symbol::Hash);
+        let guest_rules = group_rules(&all_rules, &self.transition_stats);
+        tape.extend(serialize_rules(
+            &guest_rules,
+            &self.state_encodings,
+            &self.symbol_encodings,
+        ));
+
+        // STATE section
+        tape.push(Symbol::Hash);
+        tape.extend(bitstring_to_symbols(&self.state_encodings[&guest.state]));
+
+        // TAPE section
+        tape.push(Symbol::Hash);
+
+        let caret_pos = tape.len();
+
+        let default_tape = vec![guest.spec.blank()];
+        let nonempty_guest_tape = if guest.tape.is_empty() {
+            &default_tape
+        } else {
+            &guest.tape
+        };
+        for sym in nonempty_guest_tape {
+            tape.push(Symbol::Comma);
+            tape.extend(bitstring_to_symbols(&self.symbol_encodings[&sym]));
+        }
+        tape[caret_pos] = Symbol::Caret;
+
+        tape
+    }
+    fn decode(&self, tape: &[Symbol]) -> Result<RunningTuringMachine<'a, Guest>, String> {
+        let guest_states: Vec<Guest::State> = self.guest.iter_states().collect();
+        let guest_symbols: Vec<Guest::Symbol> = self.guest.iter_symbols().collect();
 
         let n_state_bits = num_bits(guest_states.len());
         let n_sym_bits = num_bits(guest_symbols.len());
@@ -1618,72 +1741,20 @@ impl UtmSpec for MyUtmSpec {
         }
 
         Ok(RunningTuringMachine {
-            spec: guest,
+            spec: self.guest,
             state,
             pos: head_pos,
             tape: cells.iter().map(|&i| guest_symbols[i]).collect(),
         })
     }
-
-    fn is_tick_boundary(&self, prev_state: State, state: State) -> bool {
-        prev_state != state && state == State::DoneSeekHome
-    }
 }
 
-/// Step a UTM until `is_tick_boundary` fires (or it halts).
-/// Takes at least one step before checking.
-/// Returns Ok(num_steps) on tick, Err on halt or step limit.
-#[allow(dead_code)]
-pub fn run_until_inner_step<Spec: UtmSpec>(
-    spec: &Spec,
-    tm: &mut RunningTuringMachine<Spec>,
-    max_steps: usize,
-) -> Result<usize, crate::tm::RunUntilResult> {
-    use crate::tm::{step, RunUntilResult, RunningTMStatus};
-
-    let mut prev_state = tm.state;
-
-    for step_count in 1..=max_steps {
-        if tm.pos >= tm.tape.len() {
-            tm.tape.resize(tm.pos + 1, spec.blank());
-        }
-        match step(tm) {
-            RunningTMStatus::Running => {
-                if tm.pos >= tm.tape.len() {
-                    tm.tape.resize(tm.pos + 1, spec.blank());
-                }
-                if spec.is_tick_boundary(prev_state, tm.state) {
-                    return Ok(step_count);
-                }
-                prev_state = tm.state;
-            }
-            RunningTMStatus::Accepted => {
-                return Err(RunUntilResult::Accepted {
-                    num_steps: step_count,
-                });
-            }
-            RunningTMStatus::Rejected => {
-                return Err(RunUntilResult::Rejected {
-                    num_steps: step_count,
-                });
-            }
-        }
-    }
-    Err(RunUntilResult::StepLimit)
-}
-
-pub struct MyUtmSpecOptimizationHints<Guest: TuringMachineSpec> {
-    pub rules: Vec<GuestRule<Guest::State, Guest::Symbol>>,
-    pub state_encodings: HashMap<Guest::State, Bitstring>,
-    pub symbol_encodings: HashMap<Guest::Symbol, Bitstring>,
-    pub transition_stats: HashMap<(Guest::State, Guest::Symbol), usize>,
-}
-impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
-    pub fn guess(guest: &Guest) -> Self {
-        Self::from_transition_stats(guest, &HashMap::new())
+impl<'a, Guest: 'a + TuringMachineSpec> MyUtmSpecOptimizationHints<'a, Guest> {
+    pub fn guess(guest: &'a Guest) -> Self {
+        Self::from_transition_stats(&guest, &HashMap::new())
     }
     pub fn from_transition_stats(
-        guest: &Guest,
+        guest: &'a Guest,
         transition_stats: &HashMap<(Guest::State, Guest::Symbol), usize>,
     ) -> Self {
         let rules = group_rules(&guest.iter_rules().collect::<Vec<_>>(), transition_stats);
@@ -1702,6 +1773,7 @@ impl<Guest: TuringMachineSpec> MyUtmSpecOptimizationHints<Guest> {
             .collect();
 
         Self {
+            guest,
             rules,
             state_encodings,
             symbol_encodings,
@@ -1764,10 +1836,7 @@ fn compress_prefixes_rec(
     result: &mut Vec<Bitstring>,
 ) {
     // Count how many target encodings start with this prefix
-    let target_count = targets
-        .iter()
-        .filter(|enc| enc.starts_with(prefix))
-        .count();
+    let target_count = targets.iter().filter(|enc| enc.starts_with(prefix)).count();
     if target_count == 0 {
         return;
     }
@@ -1926,81 +1995,6 @@ where
     // Sort ascending by count so most-used rules end up rightmost (found first by UTM)
     result.sort_by_key(|&(_, count)| count);
     result.into_iter().map(|(rule, _)| rule).collect()
-}
-
-impl MyUtmSpec {
-    /// Encode a guest TM onto the UTM tape.
-    ///
-    /// Rules are grouped (noops consolidated) and sorted by transition frequency
-    /// so the UTM (which scans rules right-to-left) finds frequent rules first.
-    pub fn encode_optimized<Guest: TuringMachineSpec>(
-        &self,
-        guest: &RunningTuringMachine<Guest>,
-        hints: &MyUtmSpecOptimizationHints<Guest>,
-    ) -> Vec<Symbol> {
-        if hints.state_encodings.len() != guest.spec.iter_states().count() {
-            panic!("state encodings length mismatch");
-        }
-        if hints.symbol_encodings.len() != guest.spec.iter_symbols().count() {
-            panic!("symbol encodings length mismatch");
-        }
-
-        let all_rules: Vec<_> = guest.spec.iter_rules().collect();
-
-        let mut tape: Vec<Symbol> = Vec::new();
-        tape.push(Symbol::Dollar);
-
-        // Layout: $ ACCEPT # BLANK # RULES # STATE # TAPE
-
-        // ACCEPT section (right after $)
-        for (i, state) in guest
-            .spec
-            .iter_states()
-            .filter(|s| guest.spec.is_accepting(*s))
-            .enumerate()
-        {
-            if i > 0 {
-                tape.push(Symbol::Semi);
-            }
-            tape.extend(bitstring_to_symbols(&hints.state_encodings[&state]));
-        }
-
-        // BLANK section
-        tape.push(Symbol::Hash);
-        tape.extend(bitstring_to_symbols(&hints.symbol_encodings[&guest.spec.blank()]));
-
-        // RULES section: # .rule1 ; .rule2 ; .rule3 ...
-        tape.push(Symbol::Hash);
-        let guest_rules = group_rules(&all_rules, &hints.transition_stats);
-        tape.extend(serialize_rules(
-            &guest_rules,
-            &hints.state_encodings,
-            &hints.symbol_encodings,
-        ));
-
-        // STATE section
-        tape.push(Symbol::Hash);
-        tape.extend(bitstring_to_symbols(&hints.state_encodings[&guest.state]));
-
-        // TAPE section
-        tape.push(Symbol::Hash);
-
-        let caret_pos = tape.len();
-
-        let default_tape = vec![guest.spec.blank()];
-        let nonempty_guest_tape = if guest.tape.is_empty() {
-            &default_tape
-        } else {
-            &guest.tape
-        };
-        for sym in nonempty_guest_tape {
-            tape.push(Symbol::Comma);
-            tape.extend(bitstring_to_symbols(&hints.symbol_encodings[&sym]));
-        }
-        tape[caret_pos] = Symbol::Caret;
-
-        tape
-    }
 }
 
 pub fn make_utm_spec() -> MyUtmSpec {

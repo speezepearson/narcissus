@@ -1,5 +1,5 @@
 use serde::Serialize;
-use utmmmmm::gen_utm::UtmSpec as _;
+use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
 use utmmmmm::json_export::{export_spec, JsonTuringMachineSpec};
 use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::*;
@@ -393,6 +393,7 @@ fn main() {
         let mut guest = RunningTuringMachine::new(&*FLIP_BITS_SPEC);
         guest.tape = flip_bits_tape.clone();
         utm_spec
+            .encoder(guest.spec)
             .encode(&guest)
             .iter()
             .map(|s| utm_symbol_to_string(*s))
@@ -403,10 +404,11 @@ fn main() {
     let double_utm_input: Vec<String> = {
         let mut guest = RunningTuringMachine::new(&*FLIP_BITS_SPEC);
         guest.tape = flip_bits_tape;
-        let l1_tape = utm_spec.encode(&guest);
+        let l1_tape = utm_spec.encoder(guest.spec).encode(&guest);
         let mut l1_tm = RunningTuringMachine::new(&utm_spec);
         l1_tm.tape = l1_tape;
         utm_spec
+            .encoder(l1_tm.spec)
             .encode(&l1_tm)
             .iter()
             .map(|s| utm_symbol_to_string(*s))

@@ -58,9 +58,9 @@ mod tests {
 
     #[test]
     fn test_total_then_two_deltas() {
-        let optimization_hints = make_my_utm_self_optimization_hints();
-        let utm_spec = make_utm_spec();
-        let background = InfiniteTape::new(&utm_spec, &optimization_hints);
+        let spec = make_utm_spec();
+        let encoder = make_my_utm_self_optimization_hints(&spec);
+        let background = InfiniteTape::new(&encoder);
 
         // === Total event: tape has position 1 changed to X ===
         let mut tape = vec![];

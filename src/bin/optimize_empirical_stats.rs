@@ -2,18 +2,18 @@ use std::collections::HashMap;
 
 use utmmmmm::compiled::{CState, CSymbol, CompiledTuringMachineSpec};
 use utmmmmm::infinity::InfiniteTape;
+use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
 use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
 use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
 
 fn run_and_tally(
-    utm_spec: &MyUtmSpec,
-    hints: &MyUtmSpecOptimizationHints<MyUtmSpec>,
+    encoder: &MyUtmSpecOptimizationHints<MyUtmSpec>,
     max_steps: u64,
 ) -> (u64, HashMap<(State, Symbol), usize>) {
-    let compiled = CompiledTuringMachineSpec::compile(utm_spec).expect("UTM should compile");
+    let compiled = CompiledTuringMachineSpec::compile(encoder.guest).expect("UTM should compile");
 
     let mut tm = RunningTuringMachine::new(&compiled);
-    let background = InfiniteTape::new(utm_spec, hints);
+    let background = InfiniteTape::new(encoder);
 
     let mut tallies: [usize; 256 * 256] = [0; 256 * 256];
     let mut inner_steps: u64 = 0;
@@ -102,7 +102,7 @@ fn main() {
     let utm_spec = make_utm_spec();
 
     // Start with current best hints
-    let initial_hints = utmmmmm::optimization_hints::make_my_utm_self_optimization_hints();
+    let initial_hints = make_my_utm_self_optimization_hints(&utm_spec);
 
     let mut best_inner_steps: u64 = 0;
     let mut best_stats: Option<HashMap<(State, Symbol), usize>> = None;
@@ -114,7 +114,7 @@ fn main() {
         iteration += 1;
         eprintln!("=== Iteration {} ===", iteration);
 
-        let (inner_steps, stats) = run_and_tally(&utm_spec, &current_hints, max_steps);
+        let (inner_steps, stats) = run_and_tally(&current_hints, max_steps);
         eprintln!(
             "  {} inner steps in {} outer steps (ratio {:.1})",
             inner_steps,

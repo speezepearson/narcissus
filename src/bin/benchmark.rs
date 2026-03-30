@@ -12,12 +12,12 @@ fn main() {
 
     let report_interval: u64 = 100_000_000;
 
-    let optimization_hints = make_my_utm_self_optimization_hints();
     let utm_spec = make_utm_spec();
+    let encoder = make_my_utm_self_optimization_hints(&utm_spec);
     let compiled = CompiledTuringMachineSpec::compile(&utm_spec).expect("UTM should compile");
 
     let mut tm = RunningTuringMachine::new(&compiled);
-    let background = InfiniteTape::new(&utm_spec, &optimization_hints);
+    let background = InfiniteTape::new(&encoder);
 
     let mut total_steps: u64 = 0;
     let mut inner_steps: u64 = 0;

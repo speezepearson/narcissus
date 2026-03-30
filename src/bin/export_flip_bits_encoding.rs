@@ -1,4 +1,4 @@
-use utmmmmm::gen_utm::UtmSpec as _;
+use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
 use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::{FlipBitsSymbol, FLIP_BITS_SPEC};
 use utmmmmm::utm::{make_utm_spec, Symbol};
@@ -31,7 +31,7 @@ fn main() {
     // Empty tape = just a blank
     tm.tape = vec![FlipBitsSymbol::Blank];
 
-    let encoded = utm_spec.encode(&tm);
+    let encoded = utm_spec.encoder(spec).encode(&tm);
     let tape_str: String = encoded.iter().map(|s| symbol_to_char(*s)).collect();
 
     println!("{}", tape_str);

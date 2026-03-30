@@ -16,7 +16,7 @@ use utmmmmm::savepoint::{
 };
 use utmmmmm::tm::{RunningTMStatus, RunningTuringMachine, TuringMachineSpec};
 use utmmmmm::tower::Tower;
-use utmmmmm::utm::{make_utm_spec, MyUtmSpec, State, Symbol};
+use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
 
 // ── Snapshot: shared between tower thread and SSE client threads ──
 
@@ -91,19 +91,18 @@ fn publish(event: DeltaEventJson, sse_clients: &Mutex<Vec<SseClient>>) {
 // ── Main simulation thread ──
 
 fn sim_thread(
-    spec: &MyUtmSpec,
+    encoder: &MyUtmSpecOptimizationHints<MyUtmSpec>,
     latest: Arc<RwLock<Option<Snapshot>>>,
     sse_clients: SseClients,
     savepoint_path: Option<String>,
 ) {
-    let optimization_hints = make_my_utm_self_optimization_hints();
-    let background = InfiniteTape::new(spec, &optimization_hints);
-    let compiled = CompiledTuringMachineSpec::compile(spec).expect("UTM should compile");
+    let background = InfiniteTape::new(&encoder);
+    let compiled = CompiledTuringMachineSpec::compile(encoder.guest).expect("UTM should compile");
 
-    let mut tower = Tower::new(spec, RunningTuringMachine::new(&compiled));
+    let mut tower = Tower::new(encoder, RunningTuringMachine::new(&compiled));
 
     if let Some(ref sp_path) = savepoint_path {
-        if let Some(t) = load_savepoint(spec, sp_path, &compiled, &background) {
+        if let Some(t) = load_savepoint(encoder, sp_path, &compiled, &background) {
             tower = t;
         }
     }
@@ -263,15 +262,15 @@ fn main() {
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    let utm_spec = make_utm_spec();
-    let optimization_hints = make_my_utm_self_optimization_hints();
+    let utm_spec = Arc::new(make_utm_spec());
+    let encoder = Arc::new(make_my_utm_self_optimization_hints(&utm_spec));
 
     // Pre-compute the unblemished infinite tape (1M symbols)
     // TODO: we should technically dynamically send updates to the clients,
     // as though the tape will ever get to 1M symbols
     let unblemished_str: Arc<String> = {
         let mut syms: Vec<Symbol> = Vec::new();
-        InfiniteTape::new(&utm_spec, &optimization_hints).extend(&mut syms, 1_000_000);
+        InfiniteTape::new(&encoder).extend(&mut syms, 1_000_000);
         Arc::new(syms.iter().map(|s| format!("{}", s)).collect())
     };
 
@@ -283,11 +282,6 @@ fn main() {
 
     let latest: Arc<RwLock<Option<Snapshot>>> = Arc::new(RwLock::new(None));
     let sse_clients: SseClients = Arc::new(Mutex::new(Vec::new()));
-
-    // Start simulation background thread
-    let latest_clone = Arc::clone(&latest);
-    let sse_clone = Arc::clone(&sse_clients);
-    thread::spawn(move || sim_thread(&utm_spec, latest_clone, sse_clone, savepoint_path));
 
     let addr = format!("0.0.0.0:{}", port);
     let server = Server::http(&addr).expect("Failed to start HTTP server");
@@ -302,78 +296,87 @@ fn main() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/dist")
     };
 
-    for request in server.incoming_requests() {
-        let url = request.url().to_string();
+    // Start simulation background thread
+    let latest_clone = Arc::clone(&latest);
+    let sse_clone = Arc::clone(&sse_clients);
+    let encoder_clone = Arc::clone(&encoder);
 
-        if url == "/api/tower" {
-            // SSE: grab the raw socket and stream events
-            let latest_c = Arc::clone(&latest);
-            let clients_c = Arc::clone(&sse_clients);
-            let ub_str = Arc::clone(&unblemished_str);
-            let utm_st = Arc::clone(&utm_states);
-            let utm_sc = Arc::clone(&utm_symbol_chars);
-            let mut writer = request.into_writer();
+    thread::scope(|scope| {
+        scope.spawn(move || sim_thread(&encoder_clone, latest_clone, sse_clone, savepoint_path));
 
-            // Write HTTP response headers for SSE
-            let header_ok = write!(
-                writer,
-                "HTTP/1.1 200 OK\r\n\
+        for request in server.incoming_requests() {
+            let url = request.url().to_string();
+
+            if url == "/api/tower" {
+                // SSE: grab the raw socket and stream events
+                let latest_c = Arc::clone(&latest);
+                let clients_c = Arc::clone(&sse_clients);
+                let ub_str = Arc::clone(&unblemished_str);
+                let utm_st = Arc::clone(&utm_states);
+                let utm_sc = Arc::clone(&utm_symbol_chars);
+                let mut writer = request.into_writer();
+
+                // Write HTTP response headers for SSE
+                let header_ok = write!(
+                    writer,
+                    "HTTP/1.1 200 OK\r\n\
                  Content-Type: text/event-stream\r\n\
                  Cache-Control: no-cache\r\n\
                  Connection: keep-alive\r\n\
                  \r\n"
-            )
-            .is_ok()
-                && writer.flush().is_ok();
+                )
+                .is_ok()
+                    && writer.flush().is_ok();
 
-            if !header_ok {
+                if !header_ok {
+                    continue;
+                }
+
+                // Create channel and register BEFORE reading latest snapshot,
+                // so we don't miss any broadcasts between reading latest and subscribing.
+                let (tx, rx) = mpsc::channel();
+                clients_c.lock().unwrap().push(tx);
+
+                scope.spawn(move || {
+                    sse_client_thread(rx, latest_c, ub_str, utm_st, utm_sc, writer);
+                });
                 continue;
             }
 
-            // Create channel and register BEFORE reading latest snapshot,
-            // so we don't miss any broadcasts between reading latest and subscribing.
-            let (tx, rx) = mpsc::channel();
-            clients_c.lock().unwrap().push(tx);
+            // Serve static files from ui/dist/
+            let file_path = if url == "/" {
+                dist_dir.join("index.html")
+            } else {
+                dist_dir.join(url.trim_start_matches('/'))
+            };
 
-            thread::spawn(move || {
-                sse_client_thread(rx, latest_c, ub_str, utm_st, utm_sc, writer);
-            });
-            continue;
-        }
-
-        // Serve static files from ui/dist/
-        let file_path = if url == "/" {
-            dist_dir.join("index.html")
-        } else {
-            dist_dir.join(url.trim_start_matches('/'))
-        };
-
-        if file_path.is_file() {
-            match std::fs::read(&file_path) {
-                Ok(data) => {
-                    let ct = content_type_for(file_path.to_str().unwrap_or(""));
-                    let response = Response::from_data(data)
-                        .with_header(Header::from_bytes("Content-Type", ct).unwrap());
-                    let _ = request.respond(response);
+            if file_path.is_file() {
+                match std::fs::read(&file_path) {
+                    Ok(data) => {
+                        let ct = content_type_for(file_path.to_str().unwrap_or(""));
+                        let response = Response::from_data(data)
+                            .with_header(Header::from_bytes("Content-Type", ct).unwrap());
+                        let _ = request.respond(response);
+                    }
+                    Err(_) => {
+                        let _ = request.respond(Response::from_string("500").with_status_code(500));
+                    }
                 }
-                Err(_) => {
-                    let _ = request.respond(Response::from_string("500").with_status_code(500));
-                }
-            }
-        } else {
-            // SPA fallback: serve index.html for unmatched routes
-            let index = dist_dir.join("index.html");
-            match std::fs::read(&index) {
-                Ok(data) => {
-                    let response = Response::from_data(data).with_header(
-                        Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap(),
-                    );
-                    let _ = request.respond(response);
-                }
-                Err(_) => {
-                    let _ = request.respond(Response::from_string("404").with_status_code(404));
+            } else {
+                // SPA fallback: serve index.html for unmatched routes
+                let index = dist_dir.join("index.html");
+                match std::fs::read(&index) {
+                    Ok(data) => {
+                        let response = Response::from_data(data).with_header(
+                            Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap(),
+                        );
+                        let _ = request.respond(response);
+                    }
+                    Err(_) => {
+                        let _ = request.respond(Response::from_string("404").with_status_code(404));
+                    }
                 }
             }
         }
-    }
+    });
 }

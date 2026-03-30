@@ -207,10 +207,10 @@ mod tests {
         use crate::infinity::InfiniteTape;
         use crate::tm::step;
 
-        let optimization_hints = make_my_utm_self_optimization_hints();
         let utm_spec = make_utm_spec();
+        let encoder = make_my_utm_self_optimization_hints(&utm_spec);
         let compiled = CompiledTuringMachineSpec::compile(&utm_spec).unwrap();
-        let background = InfiniteTape::new(&utm_spec, &optimization_hints);
+        let background = InfiniteTape::new(&encoder);
 
         // Interpreted: run 1000 steps with InfiniteTape
         let mut interp_tm = RunningTuringMachine::new(&utm_spec);

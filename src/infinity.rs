@@ -15,6 +15,7 @@ use std::collections::HashMap;
 
 use crate::{
     compiled::{CSymbol, CompiledTuringMachineSpec},
+    gen_utm::Encoder,
     tm::{RunningTuringMachine, SimpleTuringMachineSpec},
     utm::{Bitstring, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol},
 };
@@ -27,20 +28,16 @@ pub struct InfiniteTape {
 }
 
 impl InfiniteTape {
-    pub fn new(
-        spec: &MyUtmSpec,
-        optimization_hints: &MyUtmSpecOptimizationHints<MyUtmSpec>,
-    ) -> Self {
+    pub fn new(encoder: &MyUtmSpecOptimizationHints<MyUtmSpec>) -> Self {
         // Compute the header: everything before the ^ in the encoded tape
-        let dummy = spec.encode_optimized(&RunningTuringMachine::new(spec), optimization_hints);
+        let dummy = encoder.encode(&RunningTuringMachine::new(encoder.guest));
         let caret_pos = dummy
             .iter()
             .position(|&s| s == Symbol::Caret)
             .expect("encoded tape should contain ^");
         let header = dummy[..caret_pos].to_vec();
 
-        let symbol_encodings: HashMap<Symbol, Bitstring> =
-            optimization_hints.symbol_encodings.clone();
+        let symbol_encodings: HashMap<Symbol, Bitstring> = encoder.symbol_encodings.clone();
         let n_sym_bits = symbol_encodings
             .values()
             .map(|s| s.len())
@@ -134,25 +131,25 @@ impl InfiniteTape {
 #[cfg(test)]
 mod tests {
 
-    use crate::{gen_utm::UtmSpec, utm::make_utm_spec};
+    use crate::{utm::make_utm_spec};
 
     use super::*;
 
     #[test]
     fn test_is_self_similar() {
         let spec = make_utm_spec();
-        let optimization_hints = MyUtmSpecOptimizationHints::guess(&spec);
-        let inf = InfiniteTape::new(&spec, &optimization_hints);
+        let encoder = MyUtmSpecOptimizationHints::guess(&spec);
+        let inf = InfiniteTape::new(&encoder);
 
-        let header_len = spec.encode(&RunningTuringMachine::new(&spec)).len() + 10;
+        let header_len = encoder.encode(&RunningTuringMachine::new(&spec)).len() + 10;
 
         let mut l0_tape = vec![];
         inf.extend(&mut l0_tape, 200 * header_len);
-        let l1 = spec.decode(&spec, &l0_tape).unwrap();
+        let l1 = encoder.decode(&l0_tape).unwrap();
         assert_eq!(l1.tape[..header_len], l0_tape[..header_len]);
-        let l2 = spec.decode(&spec, &l1.tape).unwrap();
+        let l2 = encoder.decode(&l1.tape).unwrap();
         assert_eq!(l2.tape[..header_len], l1.tape[..header_len]);
-        let l3 = spec.decode(&spec, &l2.tape).unwrap();
+        let l3 = encoder.decode(&l2.tape).unwrap();
         assert_eq!(l3.tape[..header_len], l2.tape[..header_len]);
     }
 }
