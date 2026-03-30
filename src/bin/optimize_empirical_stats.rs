@@ -134,7 +134,7 @@ fn main() {
         }
 
         // Check convergence: this iteration's count >= 0.99 * previous iteration's count
-        if iteration > 1 && inner_steps as f64 <= 1.01 * prev_inner_steps as f64 {
+        if iteration > 3 && inner_steps as f64 <= 1.01 * prev_inner_steps as f64 {
             eprintln!(
                 "  Converged ({} <= 1.01 * {} = {:.0}). Done.",
                 inner_steps,
