@@ -1,6 +1,6 @@
 use serde::Serialize;
 use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
-use utmmmmm::json_export::{export_spec, JsonTuringMachineSpec};
+use utmmmmm::json_export::{export_spec, export_spec_with_clusters, JsonTuringMachineSpec};
 use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
 use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::*;
@@ -9,6 +9,50 @@ use utmmmmm::utm::make_utm_spec;
 
 fn utm_symbol_to_string(s: utm::Symbol) -> String {
     format!("{}", s)
+}
+
+fn utm_cluster_for(state_name: &str) -> Option<(String, String)> {
+    let (id, label) = if state_name.starts_with("Init") {
+        ("init", "Phase 0: Init")
+    } else if state_name == "MarkRule" || state_name == "MarkRuleNoMatch" {
+        ("mark_rule", "Phase 1: Mark Rule")
+    } else if state_name.starts_with("CmpSt")
+        || state_name.starts_with("Stm")
+        || state_name.starts_with("Stf")
+        || state_name == "StMatchCleanup"
+        || state_name == "SymSkipState"
+    {
+        ("cmp_state", "Phase 2: Compare State")
+    } else if state_name.starts_with("CmpSym")
+        || state_name.starts_with("Symf")
+        || state_name == "SymMatchCleanup"
+        || state_name.starts_with("Smc")
+    {
+        ("cmp_sym", "Phase 3: Compare Symbol")
+    } else if state_name.starts_with("CpNst") || state_name == "ApplyReadNst" {
+        ("cp_nst", "Phase 4: Copy New State")
+    } else if state_name.starts_with("CpNsym") {
+        ("cp_nsym", "Phase 5: Copy New Symbol")
+    } else if state_name.starts_with("Rd") || state_name == "ReadDir" {
+        ("read_dir", "Phase 6: Read Direction")
+    } else if state_name.starts_with("Mr") || state_name == "MoveRight" {
+        ("move_right", "Move Right")
+    } else if state_name.starts_with("Ml") || state_name == "MoveLeft" {
+        ("move_left", "Move Left")
+    } else if state_name == "DoneSeekHome" || state_name == "DoneSeekHomeThroughState" {
+        ("seek_home", "Phase 7: Seek Home")
+    } else if state_name.starts_with("ChkAcc") || state_name.starts_with("Nm") {
+        ("chk_acc", "Phase 8: Check Accept")
+    } else if state_name.starts_with("Acc") || state_name == "Accept" {
+        ("accept", "Accept")
+    } else if state_name.starts_with("Rej") || state_name == "Reject" {
+        ("reject", "Reject")
+    } else if state_name.starts_with("Np") {
+        ("noop", "Noop Compact")
+    } else {
+        ("other", "Other")
+    };
+    Some((id.to_string(), label.to_string()))
 }
 
 #[derive(Serialize)]
@@ -134,11 +178,11 @@ fn main() {
                 DoubleXSymbol::Z => 'Z',
             },
         ),
-        export_spec(
+        export_spec_with_clusters(
             &utm_spec,
             "Universal Turing Machine",
             "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
-            |s| format!("{:?}", s),
+            &|s| format!("{:?}", s),
             |s| match s {
                 utm::State::Accept => "accepted!",
                 utm::State::Reject => "rejected — no matching rule and state is not accepting",
@@ -350,8 +394,8 @@ fn main() {
                 utm::State::NpReadDir => "noop rule; reading direction L/R",
                 utm::State::NpSymfRestore => "noop rule mismatch; restoring current alternative, trying next",
             }.to_string(),
-            |s| format!("{:?}", s),
-            |s| match s {
+            &|s| format!("{:?}", s),
+            &|s| match s {
                 utm::Symbol::Blank => '_',
                 utm::Symbol::Zero => '0',
                 utm::Symbol::One => '1',
@@ -369,6 +413,7 @@ fn main() {
                 utm::Symbol::Gt => '>',
                 utm::Symbol::Dollar => '$',
             },
+            |s| utm_cluster_for(&format!("{:?}", s)),
         ),
     ];
 
@@ -439,17 +484,17 @@ fn main() {
     );
 
     // For the UTM spec in welcome modal, reuse the same export logic
-    let utm_spec_export = export_spec(
+    let utm_spec_export = export_spec_with_clusters(
         &utm_spec,
         "Universal Turing Machine",
         "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
-        |s| format!("{:?}", s),
+        &|s| format!("{:?}", s),
         |s| match s {
             utm::State::Accept => "accepted!".to_string(),
             _ => format!("{:?}", s),
         },
-        |s| format!("{:?}", s),
-        |s| match s {
+        &|s| format!("{:?}", s),
+        &|s| match s {
             utm::Symbol::Blank => '_',
             utm::Symbol::Zero => '0',
             utm::Symbol::One => '1',
@@ -467,6 +512,7 @@ fn main() {
             utm::Symbol::Gt => '>',
             utm::Symbol::Dollar => '$',
         },
+        |s| utm_cluster_for(&format!("{:?}", s)),
     );
 
     let _ = (bit_flipper_idx, utm_idx); // suppress unused warnings

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LogSlider } from "./LogSlider";
 import { TapeView } from "./TapeView";
 import { TMStateGraph } from "./TMStateGraph";
+import type { GraphSpec } from "./parseSpec";
 import { type State, type TuringMachineSnapshot } from "./types";
 import { useTuringMachine } from "./useTuringMachine";
 
@@ -10,6 +11,7 @@ type TuringMachineViewerProps = {
   onStateChange?: (oldState: State, cur: TuringMachineSnapshot) => void;
   initialFps?: number;
   stateDescriptions?: Record<string, string>;
+  graph?: GraphSpec;
 };
 
 export function TuringMachineViewer({
@@ -17,6 +19,7 @@ export function TuringMachineViewer({
   onStateChange,
   initialFps,
   stateDescriptions,
+  graph,
 }: TuringMachineViewerProps) {
   const { snapshot, status, playPause, doStep, reset } = useTuringMachine(
     init,
@@ -25,6 +28,10 @@ export function TuringMachineViewer({
 
   const halted = status !== "running";
   const [showGraph, setShowGraph] = useState(false);
+
+  // Current symbol under head (for edge highlighting)
+  const currentSymbol =
+    snapshot.tape[snapshot.pos] ?? snapshot.spec.blank;
 
   return (
     <div className="tm-viewer">
@@ -36,9 +43,11 @@ export function TuringMachineViewer({
           {playPause.playing ? "Pause" : "Play"}
         </button>
         <button onClick={reset}>Reset</button>
-        <button onClick={() => setShowGraph((v) => !v)}>
-          {showGraph ? "Hide Graph" : "Show Graph"}
-        </button>
+        {graph && (
+          <button onClick={() => setShowGraph((v) => !v)}>
+            {showGraph ? "Hide Graph" : "Show Graph"}
+          </button>
+        )}
         <LogSlider
           label="FPS"
           value={playPause.fps}
@@ -50,8 +59,12 @@ export function TuringMachineViewer({
 
       <TapeView tm={snapshot} stateDescriptions={stateDescriptions} />
 
-      {showGraph && (
-        <TMStateGraph spec={snapshot.spec} state={snapshot.state} />
+      {showGraph && graph && (
+        <TMStateGraph
+          graph={graph}
+          currentState={snapshot.state}
+          currentSymbol={currentSymbol}
+        />
       )}
     </div>
   );

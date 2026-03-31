@@ -45,6 +45,7 @@ export function MachineExplorer() {
           key={`${selectedIdx}-${tapeInput}`}
           init={snapshot}
           stateDescriptions={selected.stateDescriptions}
+          graph={selected.graph}
         />
       )}
     </div>

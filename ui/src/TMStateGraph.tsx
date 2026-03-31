@@ -1,211 +1,222 @@
-import {
-  type Dir,
-  type State,
-  type Symbol,
-  type TuringMachineSpec,
-} from "./types";
+import { useEffect, useRef } from "react";
+import cytoscape from "cytoscape";
+import dagre from "cytoscape-dagre";
+import type { GraphSpec } from "./parseSpec";
+import type { State, Symbol } from "./types";
+
+cytoscape.use(dagre);
 
 type Props = {
-  spec: TuringMachineSpec;
-  state: State;
+  graph: GraphSpec;
+  currentState: State;
+  /** The symbol currently under the head (for highlighting the active edge). */
+  currentSymbol?: Symbol;
 };
 
-type TargetNode = {
-  id: string;
-  label: string;
-  symbols: Symbol[];
+const CLUSTER_COLORS: Record<string, string> = {
+  init: "#6366f1",
+  mark_rule: "#8b5cf6",
+  cmp_state: "#3b82f6",
+  cmp_sym: "#0ea5e9",
+  cp_nst: "#14b8a6",
+  cp_nsym: "#10b981",
+  read_dir: "#f59e0b",
+  move_right: "#f97316",
+  move_left: "#ef4444",
+  seek_home: "#ec4899",
+  chk_acc: "#a855f7",
+  accept: "#16a34a",
+  reject: "#dc2626",
+  noop: "#64748b",
+  other: "#94a3b8",
 };
 
-export function TMStateGraph({ spec, state }: Props) {
-  const rulesForState = spec.rules.get(state);
-  if (!rulesForState)
-    return (
-      <div className="tm-state-graph-empty">No transitions from this state</div>
-    );
+function clusterColor(clusterId: string | undefined): string {
+  if (!clusterId) return "#94a3b8";
+  return CLUSTER_COLORS[clusterId] ?? "#94a3b8";
+}
 
-  // Categorize transitions: identity (same state, same symbol) vs normal
-  const identity: Record<Dir, Symbol[]> = { L: [], R: [] };
-  const normal: {
-    symbol: Symbol;
-    newState: State;
-    newSymbol: Symbol;
-    dir: Dir;
-  }[] = [];
+export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cyRef = useRef<cytoscape.Core | null>(null);
 
-  for (const [symbol, [newState, newSymbol, dir]] of rulesForState) {
-    if (newState === state && newSymbol === symbol) {
-      identity[dir].push(symbol);
-    } else {
-      normal.push({ symbol, newState, newSymbol, dir });
+  // Build cytoscape elements once per graph identity
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const elements: cytoscape.ElementDefinition[] = [];
+
+    // Compound (parent) nodes for clusters
+    for (const cluster of graph.clusters) {
+      elements.push({
+        data: { id: `cluster-${cluster.id}`, label: cluster.label },
+        classes: "cluster",
+      });
     }
-  }
 
-  // Build target nodes
-  const targets: TargetNode[] = [];
-
-  for (const dir of ["L", "R"] as Dir[]) {
-    if (identity[dir].length > 0) {
-      targets.push({ id: `identity-${dir}`, label: dir, symbols: identity[dir] });
+    // State nodes
+    for (const node of graph.nodes) {
+      elements.push({
+        data: {
+          id: node.id,
+          label: node.label,
+          parent: node.cluster ? `cluster-${node.cluster}` : undefined,
+          clusterId: node.cluster,
+        },
+      });
     }
-  }
 
-  for (const t of normal) {
-    targets.push({
-      id: `normal-${String(t.symbol)}`,
-      label: `write ${String(t.newSymbol)}\nmove ${t.dir}\n→ ${String(t.newState)}`,
-      symbols: [t.symbol],
+    // Edges
+    for (const edge of graph.edges) {
+      elements.push({
+        data: {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          label: edge.label,
+          symbol: edge.symbol,
+        },
+      });
+    }
+
+    const cy = cytoscape({
+      container: containerRef.current,
+      elements,
+      style: [
+        {
+          selector: "node",
+          style: {
+            label: "data(label)",
+            "text-valign": "center",
+            "text-halign": "center",
+            "font-size": "8px",
+            "font-family": "ui-monospace, Consolas, monospace",
+            width: 20,
+            height: 20,
+            "background-color": "#e2e8f0",
+            "border-width": 1,
+            "border-color": "#94a3b8",
+            color: "#1e293b",
+            "text-wrap": "ellipsis",
+            "text-max-width": "60px",
+          },
+        },
+        {
+          selector: "node.cluster",
+          style: {
+            "text-valign": "top",
+            "text-halign": "center",
+            "font-size": "10px",
+            "font-weight": "bold",
+            "background-opacity": 0.08,
+            "border-width": 1,
+            "border-color": "#cbd5e1",
+            "border-opacity": 0.5,
+            padding: "12px",
+            shape: "roundrectangle",
+            color: "#475569",
+          },
+        },
+        {
+          selector: "node.active-state",
+          style: {
+            "background-color": "#6366f1",
+            "border-color": "#4338ca",
+            "border-width": 3,
+            color: "#ffffff",
+            "font-weight": "bold",
+            "z-index": 999,
+          },
+        },
+        {
+          selector: "edge",
+          style: {
+            width: 1,
+            "line-color": "#cbd5e1",
+            "target-arrow-color": "#cbd5e1",
+            "target-arrow-shape": "triangle",
+            "curve-style": "bezier",
+            label: "data(label)",
+            "font-size": "6px",
+            "font-family": "ui-monospace, Consolas, monospace",
+            "text-rotation": "autorotate",
+            color: "#64748b",
+            "text-background-color": "#ffffff",
+            "text-background-opacity": 0.8,
+            "text-background-padding": "1px",
+            "arrow-scale": 0.6,
+          },
+        },
+        {
+          selector: "edge.active-edge",
+          style: {
+            width: 3,
+            "line-color": "#ef4444",
+            "target-arrow-color": "#ef4444",
+            "font-weight": "bold",
+            color: "#ef4444",
+            "z-index": 999,
+          },
+        },
+      ],
+      layout: {
+        name: "dagre",
+        rankDir: "LR",
+        nodeSep: 15,
+        rankSep: 40,
+        edgeSep: 5,
+        padding: 20,
+      } as cytoscape.LayoutOptions,
+      minZoom: 0.1,
+      maxZoom: 5,
+      wheelSensitivity: 0.3,
     });
-  }
 
-  if (targets.length === 0) return null;
+    cyRef.current = cy;
 
-  // Layout constants
-  const srcNodeW = 100;
-  const srcNodeH = 40;
-  const tgtNodeW = 130;
-  const tgtLineH = 18;
-  const tgtPadY = 14;
-  const rowGap = 12;
-  const gapX = 120;
-  const padX = 20;
-  const padY = 16;
+    return () => {
+      cy.destroy();
+      cyRef.current = null;
+    };
+  }, [graph]);
 
-  // Measure target node heights
-  const tgtHeights = targets.map(
-    (t) => t.label.split("\n").length * tgtLineH + tgtPadY,
-  );
-  const totalTgtH =
-    tgtHeights.reduce((a, b) => a + b, 0) + rowGap * (targets.length - 1);
+  // Update highlighting when currentState/currentSymbol change
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
 
-  const svgW = padX + srcNodeW + gapX + tgtNodeW + padX;
-  const svgH = Math.max(srcNodeH + 2 * padY, totalTgtH + 2 * padY);
+    // Clear previous highlights
+    cy.elements(".active-state").removeClass("active-state");
+    cy.elements(".active-edge").removeClass("active-edge");
 
-  const srcCX = padX + srcNodeW / 2;
-  const srcCY = svgH / 2;
-  const tgtLeft = padX + srcNodeW + gapX;
-  const tgtCX = tgtLeft + tgtNodeW / 2;
+    // Highlight current state
+    const stateNode = cy.getElementById(String(currentState));
+    if (stateNode.length) {
+      stateNode.addClass("active-state");
+    }
 
-  // Compute target node Y centers
-  let curY = (svgH - totalTgtH) / 2;
-  const tgtCYs: number[] = [];
-  for (let i = 0; i < targets.length; i++) {
-    tgtCYs.push(curY + tgtHeights[i] / 2);
-    curY += tgtHeights[i] + rowGap;
-  }
-
-  const fmtSymbols = (syms: Symbol[]) => syms.map(String).join(", ");
+    // Highlight the edge about to be taken
+    if (currentSymbol !== undefined) {
+      const edgeId = `${String(currentState)}--${String(currentSymbol)}`;
+      const edge = cy.getElementById(edgeId);
+      if (edge.length) {
+        edge.addClass("active-edge");
+      }
+    }
+  }, [currentState, currentSymbol]);
 
   return (
-    <svg
+    <div
+      ref={containerRef}
       className="tm-state-graph"
-      width={svgW}
-      height={svgH}
-      style={{ display: "block", margin: "8px 0" }}
-    >
-      <defs>
-        <marker
-          id="sg-arrow"
-          markerWidth="8"
-          markerHeight="6"
-          refX="8"
-          refY="3"
-          orient="auto"
-        >
-          <polygon points="0 0, 8 3, 0 6" fill="var(--text, #888)" />
-        </marker>
-      </defs>
-
-      {/* Source node */}
-      <rect
-        x={srcCX - srcNodeW / 2}
-        y={srcCY - srcNodeH / 2}
-        width={srcNodeW}
-        height={srcNodeH}
-        rx="6"
-        fill="var(--code-bg, #f5f5f5)"
-        stroke="#6366f1"
-        strokeWidth="2"
-      />
-      <text
-        x={srcCX}
-        y={srcCY}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="var(--text-h, #222)"
-        fontFamily="var(--mono, monospace)"
-        fontSize="14"
-        fontWeight="700"
-      >
-        {String(state)}
-      </text>
-
-      {/* Edges and target nodes */}
-      {targets.map((target, i) => {
-        const ty = tgtCYs[i];
-        const h = tgtHeights[i];
-        const lines = target.label.split("\n");
-
-        // Bezier from source right edge to target left edge
-        const x1 = srcCX + srcNodeW / 2;
-        const y1 = srcCY;
-        const x2 = tgtLeft;
-        const y2 = ty;
-        const cpx = (x1 + x2) / 2;
-
-        // Label position along the curve
-        const lx = cpx;
-        const ly = (y1 + y2) / 2 - 8;
-
-        return (
-          <g key={target.id}>
-            {/* Arrow */}
-            <path
-              d={`M${x1},${y1} C${cpx},${y1} ${cpx},${y2} ${x2},${y2}`}
-              fill="none"
-              stroke="var(--text, #888)"
-              strokeWidth="1.5"
-              markerEnd="url(#sg-arrow)"
-            />
-            {/* Edge label (symbols) */}
-            <text
-              x={lx}
-              y={ly}
-              textAnchor="middle"
-              fill="var(--text, #888)"
-              fontFamily="var(--mono, monospace)"
-              fontSize="11"
-            >
-              {fmtSymbols(target.symbols)}
-            </text>
-
-            {/* Target node */}
-            <rect
-              x={tgtLeft}
-              y={ty - h / 2}
-              width={tgtNodeW}
-              height={h}
-              rx="6"
-              fill="var(--code-bg, #f5f5f5)"
-              stroke="var(--border, #ccc)"
-              strokeWidth="1.5"
-            />
-            {lines.map((line, li) => (
-              <text
-                key={li}
-                x={tgtCX}
-                y={ty - ((lines.length - 1) * tgtLineH) / 2 + li * tgtLineH}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="var(--text-h, #222)"
-                fontFamily="var(--mono, monospace)"
-                fontSize="12"
-              >
-                {line}
-              </text>
-            ))}
-          </g>
-        );
-      })}
-    </svg>
+      style={{
+        width: "100%",
+        height: "500px",
+        border: "1px solid var(--border, #ccc)",
+        borderRadius: "8px",
+        margin: "8px 0",
+        background: "var(--code-bg, #f8fafc)",
+      }}
+    />
   );
 }

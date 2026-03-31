@@ -174,6 +174,7 @@ export function WelcomeModal() {
             init={snapshot}
             initialFps={5}
             stateDescriptions={flipBitsSpec.stateDescriptions}
+            graph={flipBitsSpec.graph}
           />
           <p className="aside">
             (The red cell is where the machine's head is.)
@@ -200,6 +201,7 @@ export function WelcomeModal() {
             onStateChange={onUtm1StateChange}
             initialFps={30}
             stateDescriptions={utmSpec.stateDescriptions}
+            graph={utmSpec.graph}
           />
           <p className="aside">
             (The green squares have no mechanical significance; they just call
@@ -339,6 +341,7 @@ export function WelcomeModal() {
               onStateChange={onUtm2StateChange}
               initialFps={10000000}
               stateDescriptions={utmSpec.stateDescriptions}
+              graph={utmSpec.graph}
             />
           </div>
 
