@@ -7,37 +7,6 @@ const RuleTriple = z.tuple([z.string(), z.string(), DirSchema]);
 const SymbolName = z.string().brand<"SymbolName">();
 type SymbolName = z.infer<typeof SymbolName>;
 
-const GraphNodeSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  cluster: z.string().optional(),
-});
-
-const GraphEdgeSchema = z.object({
-  id: z.string(),
-  source: z.string(),
-  target: z.string(),
-  label: z.string(),
-  symbols: z.array(z.string()),
-});
-
-const GraphClusterSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  parent: z.string().optional(),
-});
-
-const GraphSpecSchema = z.object({
-  nodes: z.array(GraphNodeSchema),
-  edges: z.array(GraphEdgeSchema),
-  clusters: z.array(GraphClusterSchema),
-});
-
-export type GraphSpec = z.infer<typeof GraphSpecSchema>;
-export type GraphNode = z.infer<typeof GraphNodeSchema>;
-export type GraphEdge = z.infer<typeof GraphEdgeSchema>;
-export type GraphCluster = z.infer<typeof GraphClusterSchema>;
-
 const JsonSpecSchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -49,7 +18,6 @@ const JsonSpecSchema = z.object({
   rules: z.record(State, z.record(SymbolName, RuleTriple)),
   symbolChars: z.record(z.string(), Symbol),
   stateDescriptions: z.record(State, z.string()),
-  graph: GraphSpecSchema,
 });
 type JsonSpec = z.infer<typeof JsonSpecSchema>;
 
@@ -60,7 +28,6 @@ export type ParsedSpec = {
   symbolChars: Record<SymbolName, Symbol>;
   stateDescriptions: Record<State, string>;
   blank: SymbolName;
-  graph: GraphSpec;
 };
 
 function parseSpec(json: JsonSpec): ParsedSpec {
@@ -89,7 +56,6 @@ function parseSpec(json: JsonSpec): ParsedSpec {
     symbolChars: json.symbolChars,
     stateDescriptions: json.stateDescriptions,
     blank: json.blank,
-    graph: json.graph,
   };
 }
 

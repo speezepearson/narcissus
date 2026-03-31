@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import cytoscape from "cytoscape";
 // @ts-expect-error no type declarations for cytoscape-dagre
 import dagre from "cytoscape-dagre";
-import type { GraphSpec } from "./parseSpec";
+import type { GraphSpec } from "./buildGraph";
 import type { State, Symbol } from "./types";
 
 cytoscape.use(dagre);

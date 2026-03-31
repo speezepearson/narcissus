@@ -1,8 +1,6 @@
 use serde::Serialize;
 use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
-use utmmmmm::json_export::{
-    export_spec, export_spec_with_clusters, GraphCluster, JsonTuringMachineSpec,
-};
+use utmmmmm::json_export::{export_spec, JsonTuringMachineSpec};
 use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
 use utmmmmm::tm::RunningTuringMachine;
 use utmmmmm::toy_machines::*;
@@ -11,96 +9,6 @@ use utmmmmm::utm::make_utm_spec;
 
 fn utm_symbol_to_string(s: utm::Symbol) -> String {
     format!("{}", s)
-}
-
-fn utm_cluster_for(state_name: &str) -> Option<(String, String)> {
-    let (id, label) = if state_name.starts_with("Init") {
-        ("init", "Phase 0: Init")
-    } else if state_name == "MarkRule" || state_name == "MarkRuleNoMatch" {
-        ("mark_rule", "Phase 1: Mark Rule")
-    } else if state_name.starts_with("CmpSt")
-        || state_name.starts_with("Stm")
-        || state_name.starts_with("Stf")
-        || state_name == "StMatchCleanup"
-        || state_name == "SymSkipState"
-    {
-        ("cmp_state", "Phase 2: Compare State")
-    } else if state_name.starts_with("CmpSym")
-        || state_name.starts_with("Symf")
-        || state_name == "SymMatchCleanup"
-        || state_name.starts_with("Smc")
-    {
-        ("cmp_sym", "Phase 3: Compare Symbol")
-    } else if state_name.starts_with("CpNst") || state_name == "ApplyReadNst" {
-        ("cp_nst", "Phase 4: Copy New State")
-    } else if state_name.starts_with("CpNsym") {
-        ("cp_nsym", "Phase 5: Copy New Symbol")
-    } else if state_name.starts_with("Rd") || state_name == "ReadDir" {
-        ("read_dir", "Phase 6: Read Direction")
-    } else if state_name.starts_with("Mr") || state_name == "MoveRight" {
-        ("move_right", "Move Right")
-    } else if state_name.starts_with("Ml") || state_name == "MoveLeft" {
-        ("move_left", "Move Left")
-    } else if state_name == "DoneSeekHome" || state_name == "DoneSeekHomeThroughState" {
-        ("seek_home", "Phase 7: Seek Home")
-    } else if state_name.starts_with("ChkAcc") || state_name.starts_with("Nm") {
-        ("chk_acc", "Phase 8: Check Accept")
-    } else if state_name.starts_with("Acc") || state_name == "Accept" {
-        ("accept", "Accept")
-    } else if state_name.starts_with("Rej") || state_name == "Reject" {
-        ("reject", "Reject")
-    } else if state_name.starts_with("Np") {
-        ("noop", "Noop Compact")
-    } else {
-        ("other", "Other")
-    };
-    Some((id.to_string(), label.to_string()))
-}
-
-/// Add meta-clusters and parent relationships to the UTM graph.
-/// Tree structure:
-///   init
-///   find_rule  { mark_rule, cmp_state, cmp_sym { noop } }
-///   apply_rule { cp_nst, cp_nsym, read_dir, seek_home, move_head { move_left, move_right } }
-///   halt       { chk_acc, accept, reject }
-fn add_utm_cluster_hierarchy(spec: &mut JsonTuringMachineSpec) {
-    // Define meta-clusters (id, label, children)
-    let meta: &[(&str, &str, &[&str])] = &[
-        ("find_rule", "Find Rule", &["mark_rule", "cmp_state", "cmp_sym"]),
-        ("apply_rule", "Apply Rule", &["cp_nst", "cp_nsym", "read_dir", "seek_home", "move_head"]),
-        ("move_head", "Move Head", &["move_left", "move_right"]),
-        ("halt", "Halt", &["chk_acc", "accept", "reject"]),
-    ];
-
-    // Also nest noop under cmp_sym
-    let nesting: &[(&str, &str)] = &[("noop", "cmp_sym")];
-
-    // Add meta-cluster nodes
-    for &(id, label, _) in meta {
-        spec.graph.clusters.push(GraphCluster {
-            id: id.to_string(),
-            label: label.to_string(),
-            parent: None,
-        });
-    }
-
-    // Set parent for children of meta-clusters
-    for &(meta_id, _, children) in meta {
-        for &child_id in children {
-            if let Some(c) = spec.graph.clusters.iter_mut().find(|c| c.id == child_id) {
-                c.parent = Some(meta_id.to_string());
-            }
-        }
-    }
-
-    // Set additional nesting
-    for &(child_id, parent_id) in nesting {
-        if let Some(c) = spec.graph.clusters.iter_mut().find(|c| c.id == child_id) {
-            c.parent = Some(parent_id.to_string());
-        }
-    }
-
-    // move_head is itself a child of apply_rule (already set above since it's in apply_rule's children)
 }
 
 #[derive(Serialize)]
@@ -128,7 +36,7 @@ struct WelcomeModalExample {
 fn main() {
     let utm_spec = make_utm_spec();
 
-    let mut specs = vec![
+    let specs = vec![
         export_spec(
             &*ACCEPT_IMMEDIATELY_SPEC,
             "Accept Immediately",
@@ -226,11 +134,11 @@ fn main() {
                 DoubleXSymbol::Z => 'Z',
             },
         ),
-        export_spec_with_clusters(
+        export_spec(
             &utm_spec,
             "Universal Turing Machine",
             "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
-            &|s| format!("{:?}", s),
+            |s| format!("{:?}", s),
             |s| match s {
                 utm::State::Accept => "accepted!",
                 utm::State::Reject => "rejected — no matching rule and state is not accepting",
@@ -442,8 +350,8 @@ fn main() {
                 utm::State::NpReadDir => "noop rule; reading direction L/R",
                 utm::State::NpSymfRestore => "noop rule mismatch; restoring current alternative, trying next",
             }.to_string(),
-            &|s| format!("{:?}", s),
-            &|s| match s {
+            |s| format!("{:?}", s),
+            |s| match s {
                 utm::Symbol::Blank => '_',
                 utm::Symbol::Zero => '0',
                 utm::Symbol::One => '1',
@@ -461,14 +369,8 @@ fn main() {
                 utm::Symbol::Gt => '>',
                 utm::Symbol::Dollar => '$',
             },
-            |s| utm_cluster_for(&format!("{:?}", s)),
         ),
     ];
-
-    // Add nested cluster hierarchy to the UTM spec
-    if let Some(utm) = specs.iter_mut().find(|s| s.name == "Universal Turing Machine") {
-        add_utm_cluster_hierarchy(utm);
-    }
 
     // Build welcome modal example tapes
     // bitFlipperInput: the flip-bits machine's own initial tape (display symbols)
@@ -537,17 +439,17 @@ fn main() {
     );
 
     // For the UTM spec in welcome modal, reuse the same export logic
-    let mut utm_spec_export = export_spec_with_clusters(
+    let utm_spec_export = export_spec(
         &utm_spec,
         "Universal Turing Machine",
         "A universal Turing machine that can simulate any other TM given an encoded description on its tape.",
-        &|s| format!("{:?}", s),
+        |s| format!("{:?}", s),
         |s| match s {
             utm::State::Accept => "accepted!".to_string(),
             _ => format!("{:?}", s),
         },
-        &|s| format!("{:?}", s),
-        &|s| match s {
+        |s| format!("{:?}", s),
+        |s| match s {
             utm::Symbol::Blank => '_',
             utm::Symbol::Zero => '0',
             utm::Symbol::One => '1',
@@ -565,9 +467,7 @@ fn main() {
             utm::Symbol::Gt => '>',
             utm::Symbol::Dollar => '$',
         },
-        |s| utm_cluster_for(&format!("{:?}", s)),
     );
-    add_utm_cluster_hierarchy(&mut utm_spec_export);
 
     let _ = (bit_flipper_idx, utm_idx); // suppress unused warnings
 

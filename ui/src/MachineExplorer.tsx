@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TuringMachineViewer } from "./TuringMachineViewer";
+import { UTM_CLUSTER_CONFIG } from "./buildGraph";
 import { machineSpecs } from "./parseSpec";
 import { TapeInput } from "./TapeInput";
 import { useTapeInput } from "./useTapeInput";
@@ -45,7 +46,11 @@ export function MachineExplorer() {
           key={`${selectedIdx}-${tapeInput}`}
           init={snapshot}
           stateDescriptions={selected.stateDescriptions}
-          graph={selected.graph}
+          clusterConfig={
+            selected.name === "Universal Turing Machine"
+              ? UTM_CLUSTER_CONFIG
+              : undefined
+          }
         />
       )}
     </div>

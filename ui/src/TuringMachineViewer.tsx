@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LogSlider } from "./LogSlider";
 import { TapeView } from "./TapeView";
 import { TMStateGraph } from "./TMStateGraph";
-import type { GraphSpec } from "./parseSpec";
+import { buildGraph, type ClusterConfig } from "./buildGraph";
 import { type State, type TuringMachineSnapshot } from "./types";
 import { useTuringMachine } from "./useTuringMachine";
 
@@ -11,7 +11,7 @@ type TuringMachineViewerProps = {
   onStateChange?: (oldState: State, cur: TuringMachineSnapshot) => void;
   initialFps?: number;
   stateDescriptions?: Record<string, string>;
-  graph?: GraphSpec;
+  clusterConfig?: ClusterConfig;
 };
 
 export function TuringMachineViewer({
@@ -19,7 +19,7 @@ export function TuringMachineViewer({
   onStateChange,
   initialFps,
   stateDescriptions,
-  graph,
+  clusterConfig,
 }: TuringMachineViewerProps) {
   const { snapshot, status, playPause, doStep, reset } = useTuringMachine(
     init,
@@ -32,6 +32,12 @@ export function TuringMachineViewer({
   // Current symbol under head (for edge highlighting)
   const currentSymbol = snapshot.tape[snapshot.pos] ?? snapshot.spec.blank;
 
+  // Build graph from spec (memoized on spec identity)
+  const graph = useMemo(
+    () => buildGraph(snapshot.spec, clusterConfig),
+    [snapshot.spec, clusterConfig],
+  );
+
   return (
     <div className="tm-viewer">
       <div className="tm-controls">
@@ -42,11 +48,9 @@ export function TuringMachineViewer({
           {playPause.playing ? "Pause" : "Play"}
         </button>
         <button onClick={reset}>Reset</button>
-        {graph && (
-          <button onClick={() => setShowGraph((v) => !v)}>
-            {showGraph ? "Hide Graph" : "Show Graph"}
-          </button>
-        )}
+        <button onClick={() => setShowGraph((v) => !v)}>
+          {showGraph ? "Hide Graph" : "Show Graph"}
+        </button>
         <LogSlider
           label="FPS"
           value={playPause.fps}
@@ -58,7 +62,7 @@ export function TuringMachineViewer({
 
       <TapeView tm={snapshot} stateDescriptions={stateDescriptions} />
 
-      {showGraph && graph && (
+      {showGraph && (
         <TMStateGraph
           graph={graph}
           currentState={snapshot.state}

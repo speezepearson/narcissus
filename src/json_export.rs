@@ -6,40 +6,6 @@ use serde::Serialize;
 
 use crate::tm::{Dir, TuringMachineSpec};
 
-#[derive(Serialize, Clone)]
-pub struct GraphNode {
-    pub id: String,
-    pub label: String,
-    /// If present, this node belongs to a cluster.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cluster: Option<String>,
-}
-
-#[derive(Serialize, Clone)]
-pub struct GraphEdge {
-    pub id: String,
-    pub source: String,
-    pub target: String,
-    pub label: String,
-    /// The triggering symbols (display chars), for highlighting the active edge.
-    pub symbols: Vec<String>,
-}
-
-#[derive(Serialize, Clone)]
-pub struct GraphCluster {
-    pub id: String,
-    pub label: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent: Option<String>,
-}
-
-#[derive(Serialize, Clone)]
-pub struct GraphSpec {
-    pub nodes: Vec<GraphNode>,
-    pub edges: Vec<GraphEdge>,
-    pub clusters: Vec<GraphCluster>,
-}
-
 #[derive(Serialize)]
 pub struct JsonTuringMachineSpec {
     pub name: String,
@@ -60,8 +26,6 @@ pub struct JsonTuringMachineSpec {
     /// Maps each state's string name to a human-friendly description.
     #[serde(rename = "stateDescriptions")]
     pub state_descriptions: BTreeMap<String, String>,
-    /// Graph spec for visualization (nodes, edges, clusters).
-    pub graph: GraphSpec,
 }
 
 pub fn export_spec<Spec: TuringMachineSpec>(
@@ -73,37 +37,15 @@ pub fn export_spec<Spec: TuringMachineSpec>(
     symbol_name: impl Fn(Spec::Symbol) -> String,
     symbol_char: impl Fn(Spec::Symbol) -> char,
 ) -> JsonTuringMachineSpec {
-    export_spec_with_clusters(
-        spec,
-        name,
-        description,
-        &state_name,
-        state_description,
-        &symbol_name,
-        &symbol_char,
-        |_| None,
-    )
-}
-
-pub fn export_spec_with_clusters<Spec: TuringMachineSpec>(
-    spec: &Spec,
-    name: &str,
-    description: &str,
-    state_name: &impl Fn(Spec::State) -> String,
-    state_description: impl Fn(Spec::State) -> String,
-    symbol_name: &impl Fn(Spec::Symbol) -> String,
-    symbol_char: &impl Fn(Spec::Symbol) -> char,
-    state_cluster: impl Fn(Spec::State) -> Option<(String, String)>,
-) -> JsonTuringMachineSpec {
-    let all_states: Vec<String> = spec.iter_states().map(state_name).collect();
-    let all_symbols: Vec<String> = spec.iter_symbols().map(symbol_name).collect();
+    let all_states: Vec<String> = spec.iter_states().map(&state_name).collect();
+    let all_symbols: Vec<String> = spec.iter_symbols().map(&symbol_name).collect();
     let initial = state_name(spec.initial());
     let blank = symbol_name(spec.blank());
 
     let accepting_states: Vec<String> = spec
         .iter_states()
         .filter(|s| spec.is_accepting(*s))
-        .map(state_name)
+        .map(&state_name)
         .collect();
 
     let mut rules: BTreeMap<String, BTreeMap<String, (String, String, String)>> = BTreeMap::new();
@@ -128,79 +70,6 @@ pub fn export_spec_with_clusters<Spec: TuringMachineSpec>(
         .map(|s| (state_name(s), state_description(s)))
         .collect();
 
-    // Build graph spec
-    let mut seen_clusters: BTreeMap<String, String> = BTreeMap::new();
-    let nodes: Vec<GraphNode> = spec
-        .iter_states()
-        .map(|s| {
-            let cluster = state_cluster(s);
-            if let Some((ref cid, ref clabel)) = cluster {
-                seen_clusters
-                    .entry(cid.clone())
-                    .or_insert_with(|| clabel.clone());
-            }
-            GraphNode {
-                id: state_name(s),
-                label: state_name(s),
-                cluster: cluster.map(|(cid, _)| cid),
-            }
-        })
-        .collect();
-
-    let clusters: Vec<GraphCluster> = seen_clusters
-        .into_iter()
-        .map(|(id, label)| GraphCluster {
-            id,
-            label,
-            parent: None,
-        })
-        .collect();
-
-    // Group edges: for each rule, compute the "right side" of the arrow label.
-    // If sym == nsym: abbreviated to just dir (e.g. "R")
-    // If sym != nsym: "nsym,dir" (e.g. "X,R")
-    // Then group by (source, target, right_side) and merge symbols on the left.
-    // key: (source, target, right_side) -> (Vec<display_char_symbol>, Vec<display_char_symbol_for_highlighting>)
-    let mut edge_groups: BTreeMap<(String, String, String), Vec<char>> = BTreeMap::new();
-    for (st, sym, nst, nsym, dir) in spec.iter_rules() {
-        let dir_str = match dir {
-            Dir::Left => "L",
-            Dir::Right => "R",
-        };
-        let sc = symbol_char(sym);
-        let nsc = symbol_char(nsym);
-        let right = if sym == nsym {
-            dir_str.to_string()
-        } else {
-            format!("{},{}", nsc, dir_str)
-        };
-        let key = (state_name(st), state_name(nst), right);
-        edge_groups.entry(key).or_default().push(sc);
-    }
-
-    let edges: Vec<GraphEdge> = edge_groups
-        .into_iter()
-        .map(|((source, target, right), syms)| {
-            let left: String = syms.iter().collect();
-            let label = format!("{} → {}", left, right);
-            let id = format!("{}--{}", source, left);
-            let symbols = syms.iter().map(|c| c.to_string()).collect();
-            GraphEdge {
-                id,
-                source,
-                target,
-                label,
-                symbols,
-            }
-        })
-        .collect();
-
-    let graph = GraphSpec {
-        nodes,
-        edges,
-        clusters,
-    };
-
     JsonTuringMachineSpec {
         name: name.to_string(),
         description: description.to_string(),
@@ -212,6 +81,5 @@ pub fn export_spec_with_clusters<Spec: TuringMachineSpec>(
         rules,
         symbol_chars,
         state_descriptions,
-        graph,
     }
 }
