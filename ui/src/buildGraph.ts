@@ -106,7 +106,25 @@ export function buildGraph(
     });
   }
 
-  return { nodes, edges, clusters };
+  // -- Filter out nodes with no incoming edges (except initial state) --
+  const initId = String(spec.initial);
+  const hasIncoming = new Set<string>();
+  for (const edge of edges) {
+    if (edge.target !== edge.source) {
+      hasIncoming.add(edge.target);
+    }
+  }
+  const keepNodes = new Set(
+    nodes
+      .filter((n) => n.id === initId || hasIncoming.has(n.id))
+      .map((n) => n.id),
+  );
+  const filteredNodes = nodes.filter((n) => keepNodes.has(n.id));
+  const filteredEdges = edges.filter(
+    (e) => keepNodes.has(e.source) && keepNodes.has(e.target),
+  );
+
+  return { nodes: filteredNodes, edges: filteredEdges, clusters };
 }
 
 // ════════════════════════════════════════════════════════════════════
