@@ -39,7 +39,8 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
           id: node.id,
           label: node.label,
           parent: node.cluster ? `cluster-${node.cluster}` : undefined,
-          clusterId: node.cluster,
+          // Width hint: character count for sizing
+          labelWidth: node.label.length * 7 + 16,
         },
       });
     }
@@ -54,6 +55,7 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
           label: edge.label,
           symbol: edge.symbol,
         },
+        classes: edge.source === edge.target ? "selfloop" : undefined,
       });
     }
 
@@ -67,16 +69,17 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
             label: "data(label)",
             "text-valign": "center",
             "text-halign": "center",
-            "font-size": "8px",
+            "font-size": "10px",
             "font-family": "ui-monospace, Consolas, monospace",
-            width: 20,
-            height: 20,
+            width: "data(labelWidth)",
+            height: 28,
+            shape: "roundrectangle",
             "background-color": "#e2e8f0",
             "border-width": 1,
             "border-color": "#94a3b8",
             color: "#1e293b",
-            "text-wrap": "ellipsis",
-            "text-max-width": "60px",
+            "text-wrap": "none",
+            padding: "4px",
           },
         },
         {
@@ -84,15 +87,19 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
           style: {
             "text-valign": "top",
             "text-halign": "center",
-            "font-size": "10px",
+            "font-size": "11px",
             "font-weight": "bold",
             "background-opacity": 0.08,
             "border-width": 1,
             "border-color": "#cbd5e1",
             "border-opacity": 0.5,
-            padding: "12px",
+            padding: "16px",
             shape: "roundrectangle",
             color: "#475569",
+            "text-wrap": "none",
+            // Override the data-driven width/height for compound nodes
+            width: undefined as unknown as number,
+            height: undefined as unknown as number,
           },
         },
         {
@@ -115,14 +122,23 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
             label: "data(label)",
-            "font-size": "6px",
+            "font-size": "7px",
             "font-family": "ui-monospace, Consolas, monospace",
             "text-rotation": "autorotate",
             color: "#64748b",
             "text-background-color": "#ffffff",
             "text-background-opacity": 0.8,
-            "text-background-padding": "1px",
+            "text-background-padding": "2px",
             "arrow-scale": 0.6,
+          },
+        },
+        {
+          selector: "edge.selfloop",
+          style: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            "curve-style": "loop" as any,
+            "loop-direction": "0deg",
+            "loop-sweep": "-90deg",
           },
         },
         {
@@ -140,9 +156,9 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
       layout: {
         name: "dagre",
         rankDir: "LR",
-        nodeSep: 15,
-        rankSep: 40,
-        edgeSep: 5,
+        nodeSep: 20,
+        rankSep: 50,
+        edgeSep: 8,
         padding: 20,
       } as cytoscape.LayoutOptions,
       minZoom: 0.1,
@@ -173,13 +189,15 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
       stateNode.addClass("active-state");
     }
 
-    // Highlight the edge about to be taken
+    // Highlight the edge about to be taken (match by source + symbol data)
     if (currentSymbol !== undefined) {
-      const edgeId = `${String(currentState)}--${String(currentSymbol)}`;
-      const edge = cy.getElementById(edgeId);
-      if (edge.length) {
-        edge.addClass("active-edge");
-      }
+      const sym = String(currentSymbol);
+      const st = String(currentState);
+      cy.edges().forEach((edge) => {
+        if (edge.data("source") === st && edge.data("symbol") === sym) {
+          edge.addClass("active-edge");
+        }
+      });
     }
   }, [currentState, currentSymbol]);
 

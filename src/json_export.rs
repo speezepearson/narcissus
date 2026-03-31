@@ -153,19 +153,15 @@ pub fn export_spec_with_clusters<Spec: TuringMachineSpec>(
 
     let mut edges: Vec<GraphEdge> = Vec::new();
     for (st, sym, nst, nsym, dir) in spec.iter_rules() {
-        // Skip self-loops that don't change the symbol (like gen_mermaid)
-        if st == nst && sym == nsym {
-            continue;
-        }
         let dir_str = match dir {
             Dir::Left => "L",
             Dir::Right => "R",
         };
         let sc = symbol_char(sym);
         let nsc = symbol_char(nsym);
-        let label = format!("{}/{},{}", sc, nsc, dir_str);
+        let label = format!("{}→{},{}", sc, nsc, dir_str);
         edges.push(GraphEdge {
-            id: format!("{}--{}", state_name(st), symbol_name(sym)),
+            id: format!("{}--{}", state_name(st), sc),
             source: state_name(st),
             target: state_name(nst),
             label,
