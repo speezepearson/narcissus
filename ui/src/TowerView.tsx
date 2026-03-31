@@ -217,7 +217,7 @@ function TowerLevelView({
         dangerouslySetInnerHTML={{
           __html:
             colorizeTape(level.tape, level.headPos) +
-            " &nbsp;&nbsp;&nbsp; ...and so on",
+            " &nbsp;&nbsp;&nbsp; ...",
         }}
       />
     </div>
@@ -273,7 +273,7 @@ export function TowerView({
               overflowWrap: "break-word",
             }}
           >
-            ...and so on
+            ...
           </div>
         </div>
       </div>
