@@ -30,8 +30,7 @@ export function TuringMachineViewer({
   const [showGraph, setShowGraph] = useState(false);
 
   // Current symbol under head (for edge highlighting)
-  const currentSymbol =
-    snapshot.tape[snapshot.pos] ?? snapshot.spec.blank;
+  const currentSymbol = snapshot.tape[snapshot.pos] ?? snapshot.spec.blank;
 
   return (
     <div className="tm-viewer">

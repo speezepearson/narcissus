@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import cytoscape from "cytoscape";
+// @ts-expect-error no type declarations for cytoscape-dagre
 import dagre from "cytoscape-dagre";
 import type { GraphSpec } from "./parseSpec";
 import type { State, Symbol } from "./types";
@@ -12,29 +13,6 @@ type Props = {
   /** The symbol currently under the head (for highlighting the active edge). */
   currentSymbol?: Symbol;
 };
-
-const CLUSTER_COLORS: Record<string, string> = {
-  init: "#6366f1",
-  mark_rule: "#8b5cf6",
-  cmp_state: "#3b82f6",
-  cmp_sym: "#0ea5e9",
-  cp_nst: "#14b8a6",
-  cp_nsym: "#10b981",
-  read_dir: "#f59e0b",
-  move_right: "#f97316",
-  move_left: "#ef4444",
-  seek_home: "#ec4899",
-  chk_acc: "#a855f7",
-  accept: "#16a34a",
-  reject: "#dc2626",
-  noop: "#64748b",
-  other: "#94a3b8",
-};
-
-function clusterColor(clusterId: string | undefined): string {
-  if (!clusterId) return "#94a3b8";
-  return CLUSTER_COLORS[clusterId] ?? "#94a3b8";
-}
 
 export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
