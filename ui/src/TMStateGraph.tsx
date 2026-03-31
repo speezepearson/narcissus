@@ -217,7 +217,7 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
             "border-color": "#94a3b8",
             color: "#1e293b",
             "text-wrap": "wrap",
-            "text-max-width": "7em",
+            "text-max-width": "10em",
             padding: "6px",
           },
         },
@@ -226,7 +226,7 @@ export function TMStateGraph({ graph, currentState, currentSymbol }: Props) {
           style: {
             "text-valign": "top",
             "text-halign": "center",
-            "font-size": "11px",
+            "font-size": "81px",
             "font-weight": "bold",
             "background-opacity": 0.08,
             "border-width": 1,
