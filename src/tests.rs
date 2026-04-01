@@ -937,7 +937,10 @@ fn test_state_groups_no_noops() {
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].state, 0u8);
     assert_eq!(groups[0].alternatives.len(), 1);
-    assert!(matches!(groups[0].alternatives[0], Alternative::Full { .. }));
+    assert!(matches!(
+        groups[0].alternatives[0],
+        Alternative::Full { .. }
+    ));
 }
 
 #[test]
@@ -1006,7 +1009,7 @@ fn test_state_groups_different_dirs() {
     ];
     let groups = make_state_groups(&rules, &hints.transition_stats, &hints.symbol_encodings);
     assert_eq!(groups.len(), 1); // same state, one group
-    // Should have two alternatives with different directions
+                                 // Should have two alternatives with different directions
     let dirs: Vec<Dir> = groups[0]
         .alternatives
         .iter()

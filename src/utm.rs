@@ -1924,9 +1924,7 @@ impl<GState: Eq + Ord + Copy, GSymbol: Eq + Ord + Copy> StateGroup<GState, GSymb
                     out.push(Symbol::Pipe);
                     out.extend(bitstring_to_symbols(&state_encodings[new_state]));
                     out.push(Symbol::Pipe);
-                    out.extend(bitstring_to_symbols(
-                        &_symbol_encodings[new_sym],
-                    ));
+                    out.extend(bitstring_to_symbols(&_symbol_encodings[new_sym]));
                     out.push(match dir {
                         Dir::Left => Symbol::L,
                         Dir::Right => Symbol::R,
