@@ -1,8 +1,8 @@
-use utmmmmm::compiled::CompiledTuringMachineSpec;
-use utmmmmm::infinity::InfiniteTape;
-use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
-use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::utm::make_utm_spec;
+use narcissus::compiled::CompiledTuringMachineSpec;
+use narcissus::infinity::InfiniteTape;
+use narcissus::optimization_hints::make_my_utm_self_optimization_hints;
+use narcissus::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
+use narcissus::utm::make_utm_spec;
 
 fn main() {
     let utm_spec = make_utm_spec();

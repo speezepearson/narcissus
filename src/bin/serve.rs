@@ -7,16 +7,16 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tiny_http::{Header, Response, Server};
-use utmmmmm::compiled::CompiledTuringMachineSpec;
-use utmmmmm::delta::compute_new_overwrites;
-use utmmmmm::infinity::InfiniteTape;
-use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
-use utmmmmm::savepoint::{
+use narcissus::compiled::CompiledTuringMachineSpec;
+use narcissus::delta::compute_new_overwrites;
+use narcissus::infinity::InfiniteTape;
+use narcissus::optimization_hints::make_my_utm_self_optimization_hints;
+use narcissus::savepoint::{
     build_snapshot, load_savepoint, save_savepoint, Snapshot, TowerLevelJson,
 };
-use utmmmmm::tm::{RunningTMStatus, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::tower::Tower;
-use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
+use narcissus::tm::{RunningTMStatus, RunningTuringMachine, TuringMachineSpec};
+use narcissus::tower::Tower;
+use narcissus::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
 
 // ── Snapshot: shared between tower thread and SSE client threads ──
 

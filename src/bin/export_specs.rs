@@ -1,11 +1,11 @@
 use serde::Serialize;
-use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
-use utmmmmm::json_export::{export_spec, JsonTuringMachineSpec};
-use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
-use utmmmmm::tm::RunningTuringMachine;
-use utmmmmm::toy_machines::*;
-use utmmmmm::utm;
-use utmmmmm::utm::make_utm_spec;
+use narcissus::gen_utm::{Encoder, UtmSpec as _};
+use narcissus::json_export::{export_spec, JsonTuringMachineSpec};
+use narcissus::optimization_hints::make_my_utm_self_optimization_hints;
+use narcissus::tm::RunningTuringMachine;
+use narcissus::toy_machines::*;
+use narcissus::utm;
+use narcissus::utm::make_utm_spec;
 
 fn utm_symbol_to_string(s: utm::Symbol) -> String {
     format!("{}", s)

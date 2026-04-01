@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use utmmmmm::compiled::{CState, CSymbol, CompiledTuringMachineSpec};
-use utmmmmm::infinity::InfiniteTape;
-use utmmmmm::optimization_hints::make_my_utm_self_optimization_hints;
-use utmmmmm::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
-use utmmmmm::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
+use narcissus::compiled::{CState, CSymbol, CompiledTuringMachineSpec};
+use narcissus::infinity::InfiniteTape;
+use narcissus::optimization_hints::make_my_utm_self_optimization_hints;
+use narcissus::tm::{Dir, RunningTuringMachine, TuringMachineSpec};
+use narcissus::utm::{make_utm_spec, MyUtmSpec, MyUtmSpecOptimizationHints, State, Symbol};
 
 fn run_and_tally(
     encoder: &MyUtmSpecOptimizationHints<MyUtmSpec>,

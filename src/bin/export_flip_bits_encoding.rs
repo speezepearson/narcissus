@@ -1,7 +1,7 @@
-use utmmmmm::gen_utm::{Encoder, UtmSpec as _};
-use utmmmmm::tm::RunningTuringMachine;
-use utmmmmm::toy_machines::{FlipBitsSymbol, FLIP_BITS_SPEC};
-use utmmmmm::utm::{make_utm_spec, Symbol};
+use narcissus::gen_utm::{Encoder, UtmSpec as _};
+use narcissus::tm::RunningTuringMachine;
+use narcissus::toy_machines::{FlipBitsSymbol, FLIP_BITS_SPEC};
+use narcissus::utm::{make_utm_spec, Symbol};
 
 fn symbol_to_char(s: Symbol) -> char {
     match s {
